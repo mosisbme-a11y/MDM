@@ -10,7 +10,9 @@
     "start": "node server.js",
     "lint": "tsc --noEmit",
     "dev:api": "PORT=3001 node server.js",
-    "create-admin": "node scripts/create-admin.mjs"
+    "create-admin": "node scripts/create-admin.mjs",
+    "vercel-build": "npm run build",
+    "deploy": "npx vercel --prod"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -28,8 +30,6 @@
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
     "fast-levenshtein": "^3.0.0",
-    "firebase": "^12.19.0",
-    "firebase-admin": "^14.5.0",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
@@ -51,5 +51,8 @@
   "devDependencies": {
     "@types/fast-levenshtein": "^0.0.4",
     "@types/jszip": "^3.4.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
