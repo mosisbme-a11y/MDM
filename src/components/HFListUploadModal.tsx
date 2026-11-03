@@ -40,13 +40,16 @@ export function parseHealthFacilityRows(rawRows: any[], sourceName: string = 'Up
   const timestamp = Date.now();
 
   rawRows.forEach((row, index) => {
-    console.log('[HFList] Processing row:', index, row);
     // Build clean key map for flexible column detection
     const rowMap: Record<string, any> = {};
     Object.keys(row).forEach((k) => {
       rowMap[cleanKey(k)] = row[k];
     });
-    console.log('[HFList] RowMap:', rowMap);
+
+    // Skip completely empty rows (spreadsheets often carry thousands of blank formatted rows)
+    const hasAnyCode = String(rowMap['customer'] ?? rowMap['customercode'] ?? rowMap['customerno'] ?? rowMap['hfcode'] ?? rowMap['facilitycode'] ?? rowMap['code'] ?? '').trim() !== '';
+    const hasAnyName = String(rowMap['customerdescription'] ?? rowMap['customerdesc'] ?? rowMap['healthfacilityname'] ?? rowMap['facilityname'] ?? rowMap['hospitalname'] ?? rowMap['hospital'] ?? rowMap['healthfacility'] ?? rowMap['facility'] ?? rowMap['name'] ?? '').trim() !== '';
+    if (!hasAnyCode && !hasAnyName) return;
 
     // 1. Customer
     const customer = String(
@@ -100,8 +103,14 @@ export function parseHealthFacilityRows(rawRows: any[], sourceName: string = 'Up
       ''
     ).trim();
 
-    // Use enhanced fuzzy matching with location awareness
-    const masterRecord = matchHealthFacility(
+    // The upload is the source of truth when it already carries the full SAP columns
+    // (Delivering Plant + Region): then no fuzzy matching against the built-in list is needed
+    // (that matching is very slow on big files and would overwrite the file's own values).
+    const fileHasFullColumns = Boolean(String(rowMap['deliveringplant'] ?? rowMap['deliveryplant'] ?? rowMap['supplyingplant'] ?? '').trim()) &&
+      Boolean(incomingRegion);
+
+    // Use enhanced fuzzy matching with location awareness (only for sparse files)
+    const masterRecord = fileHasFullColumns ? null : matchHealthFacility(
       { 
         customerDescription, 
         region: incomingRegion, 
