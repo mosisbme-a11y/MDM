@@ -327,7 +327,7 @@ export async function pushCentralMasterData(
         body: JSON.stringify(updates)
       });
       if (!res.ok) {
-        let msg = `Server returned ${res.status}`;
+        let msg = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
         try { msg = (await res.json())?.error || msg; } catch {}
         throw new Error(msg);
       }
@@ -367,7 +367,7 @@ export async function pushCentralMasterData(
       const { body, headers } = await jsonBody({ field: u.field, index: u.index, payload: u.payload });
       const res = await fetch('/api/system-master-data/chunk', { method: 'PUT', headers, body });
       if (!res.ok) {
-        let msg = `Server returned ${res.status}`;
+        let msg = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
         try { msg = (await res.json())?.error || msg; } catch {}
         throw new Error(msg);
       }
@@ -423,9 +423,9 @@ export async function pushCentralMasterData(
       console.error('[CentralSyncService] Commit failed, res:', res.status, res.statusText);
       try {
         const body = await res.json();
-        errorMessage = body?.error || `Server returned ${res.status}`;
+        errorMessage = body?.error || `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
       } catch {
-        errorMessage = `Server returned ${res.status}`;
+        errorMessage = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
       }
     }
   } catch (err: any) {
