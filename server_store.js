@@ -27,7 +27,8 @@ const ARRAY_FIELDS = [
   'hfListItems',
   'programMdRecords',
   'noBkdItems',
-  'confirmedBatches'
+  'confirmedBatches',
+  'dspWorkflowRecords'
 ];
 // Object dataset
 const OBJECT_FIELDS = ['categoryThresholds'];
@@ -41,7 +42,8 @@ const COUNT_KEY = {
   hfListItems: 'hfList',
   programMdRecords: 'programMd',
   noBkdItems: 'noBkd',
-  confirmedBatches: 'confirmedBatches'
+  confirmedBatches: 'confirmedBatches',
+  dspWorkflowRecords: 'dspWorkflows'
 };
 
 const EMPTY_COUNTS = Object.fromEntries(Object.values(COUNT_KEY).map((k) => [k, 0]));
@@ -107,6 +109,7 @@ export async function getMasterData() {
       .flatMap((c) => c.payload);
   }
   result.counts = { ...EMPTY_COUNTS, ...(result.counts || {}) };
+  delete result.chunks;
   return result;
 }
 
@@ -223,12 +226,15 @@ async function doSave(updates) {
     await writeChunked(client, field, incoming, now);
   }
 
+  const chunks = { ...(meta.chunks || {}) };
+  for (const { field } of arrayWrites) delete chunks[field]; // hashes unknown after a full save -> clients re-download that dataset
   const newMeta = {
     version: (meta.version || 0) + 1,
     lastUpdated: now,
     lastUpdatedBy: updates.updatedBy || meta.lastUpdatedBy || 'Inventory Administrator',
     updateKind: updates.updateKind || 'Master Data Update',
-    counts
+    counts,
+    chunks
   };
   // Meta row is written LAST: browsers react to it via Realtime, so by the time
   // they hear about the new version the datasets are already in place.
@@ -270,4 +276,227 @@ export async function importLegacyDiskStoreIfNeeded() {
   } catch (err) {
     console.warn('[Supabase Store] Legacy import skipped:', err.message);
   }
+}
+
+
+// ==============================================================================
+// DELTA SYNC (stateless - safe on serverless hosts such as Vercel)
+//
+// Instead of moving the whole dataset on every change, the browser:
+//   1. GETs the manifest (version + hash of every stored chunk),
+//   2. uploads / downloads ONLY the chunks whose hash differs,
+//   3. POSTs a small "commit" that bumps the version.
+// Every request body/response stays well below Vercel's 4.5 MB limit.
+// ==============================================================================
+export const CHUNK_SIZE_PUBLIC = CHUNK_SIZE;
+export const ARRAY_FIELD_NAMES = ARRAY_FIELDS;
+
+const MAX_CHUNK_RECORDS = 2000;
+
+/** Version + per-chunk hashes for every array dataset. */
+export async function getManifest() {
+  const client = requireClient();
+  const meta = await readMeta();
+  const fields = {};
+  const missing = [];
+  for (const f of ARRAY_FIELDS) {
+    const m = meta.chunks && meta.chunks[f];
+    if (m && Array.isArray(m.hashes)) {
+      fields[f] = { keys: m.hashes.map((_, i) => chunkKey(f, i)), hashes: m.hashes };
+    } else {
+      missing.push(f);
+    }
+  }
+  if (missing.length) {
+    // Datasets written before delta sync existed (or by the full-save endpoint): list their rows, hashes unknown.
+    const { data, error } = await client.from(TABLE).select('dataset');
+    if (error) throw new Error(`Supabase manifest read failed: ${error.message}`);
+    const keys = (data || []).map((r) => String(r.dataset));
+    for (const f of missing) {
+      const indexed = keys.filter((k) => k.startsWith(`${f}:`)).sort();
+      const list = indexed.length ? indexed : keys.includes(f) ? [f] : [];
+      fields[f] = { keys: list, hashes: list.map(() => null) };
+    }
+  }
+  return {
+    version: meta.version || 0,
+    lastUpdated: meta.lastUpdated,
+    lastUpdatedBy: meta.lastUpdatedBy || 'Inventory Administrator',
+    updateKind: meta.updateKind || 'Master Inventory',
+    serverTime: new Date().toISOString(),
+    counts: meta.counts,
+    chunkSize: CHUNK_SIZE,
+    fields
+  };
+}
+
+function assertDatasetKey(key) {
+  const k = String(key || '');
+  if (OBJECT_FIELDS.includes(k)) return k;
+  const [field, idx, ...rest] = k.split(':');
+  if (!ARRAY_FIELDS.includes(field) || rest.length) throw badRequest('Unknown dataset key');
+  if (idx !== undefined && !/^\d{1,6}$/.test(idx)) throw badRequest('Bad chunk index');
+  return k;
+}
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+/** Reads one chunk (or categoryThresholds) by its dataset key. */
+export async function getDatasetRow(key) {
+  const client = requireClient();
+  const k = assertDatasetKey(key);
+  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', k).maybeSingle();
+  if (error) throw new Error(`Supabase read (${k}) failed: ${error.message}`);
+  return data ? data.payload : OBJECT_FIELDS.includes(k) ? {} : [];
+}
+
+/** Writes one chunk. The version is NOT bumped until commitMasterData() is called. */
+export async function putChunk(field, index, payload) {
+  const client = requireClient();
+  if (!ARRAY_FIELDS.includes(field)) throw badRequest('Unknown dataset');
+  if (!Number.isInteger(index) || index < 0 || index > 100000) throw badRequest('Bad chunk index');
+  if (!Array.isArray(payload) || payload.length > MAX_CHUNK_RECORDS) throw badRequest('Chunk must be an array');
+  const { error } = await client
+    .from(TABLE)
+    .upsert({ dataset: chunkKey(field, index), payload, updated_at: new Date().toISOString() }, { onConflict: 'dataset' });
+  if (error) throw new Error(`Supabase write failed (${field}:${index}): ${error.message}`);
+}
+
+/**
+ * Finalises a delta upload: records the new chunk hashes, removes stale chunks,
+ * bumps the version once. Retries on a version race so concurrent users never lose each other's changes.
+ */
+export async function commitMasterData({ fields = {}, categoryThresholds, updatedBy, updateKind }) {
+  const client = requireClient();
+  const isExplicitClear = Boolean(updateKind && /clear/i.test(updateKind));
+  const now = new Date().toISOString();
+
+  const accepted = {};
+  for (const [field, info] of Object.entries(fields)) {
+    if (!ARRAY_FIELDS.includes(field)) throw badRequest(`Unknown dataset: ${field}`);
+    const hashes = info && info.hashes;
+    const total = info && Number(info.total);
+    if (!Array.isArray(hashes) || hashes.length > 100000 || !hashes.every((h) => typeof h === 'string')) {
+      throw badRequest(`Bad hashes for ${field}`);
+    }
+    if (!Number.isFinite(total) || total < 0) throw badRequest(`Bad total for ${field}`);
+    if (total === 0 && !isExplicitClear) continue; // protect existing data from accidental empty saves
+    accepted[field] = { hashes, total };
+  }
+
+  if (categoryThresholds && typeof categoryThresholds === 'object' && !Array.isArray(categoryThresholds)) {
+    const { error } = await client
+      .from(TABLE)
+      .upsert({ dataset: 'categoryThresholds', payload: categoryThresholds, updated_at: now }, { onConflict: 'dataset' });
+    if (error) throw new Error(`Supabase write failed: ${error.message}`);
+  }
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const meta = await readMeta();
+    const counts = { ...meta.counts };
+    const chunks = { ...(meta.chunks || {}) };
+
+    // Remove chunks beyond the new length (only when the dataset could have shrunk / was never tracked)
+    for (const [field, info] of Object.entries(accepted)) {
+      const prev = chunks[field];
+      if (!prev || prev.hashes.length > info.hashes.length) {
+        const { data: list, error: listError } = await client.from(TABLE).select('dataset').like('dataset', `${field}:%`);
+        if (listError) throw new Error(`Supabase cleanup failed (${field}): ${listError.message}`);
+        const keep = new Set(info.hashes.map((_, i) => chunkKey(field, i)));
+        const stale = (list || []).map((r) => r.dataset).filter((k) => !keep.has(k));
+        stale.push(field); // old single-row format
+        const { error: delError } = await client.from(TABLE).delete().in('dataset', stale);
+        if (delError) throw new Error(`Supabase cleanup failed (${field}): ${delError.message}`);
+      }
+      chunks[field] = { hashes: info.hashes };
+      counts[COUNT_KEY[field]] = info.total;
+    }
+
+    const newMeta = {
+      version: (meta.version || 0) + 1,
+      lastUpdated: now,
+      lastUpdatedBy: updatedBy || meta.lastUpdatedBy || 'Inventory Administrator',
+      updateKind: updateKind || 'Master Data Update',
+      counts,
+      chunks
+    };
+
+    // Compare-and-set on the version so two simultaneous commits can not both claim the same number.
+    const { data: updated, error: updError } = await client
+      .from(TABLE)
+      .update({ payload: newMeta, updated_at: now })
+      .eq('dataset', META_KEY)
+      .eq('payload->>version', String(meta.version || 0))
+      .select('dataset');
+    if (updError) throw new Error(`Supabase write (_meta) failed: ${updError.message}`);
+    let won = Boolean(updated && updated.length);
+    if (!won) {
+      // Either the row does not exist yet (first ever save) or another commit won the race.
+      const { error: insError } = await client.from(TABLE).insert({ dataset: META_KEY, payload: newMeta, updated_at: now });
+      won = !insError;
+    }
+    if (won) {
+      console.log(`[Supabase Store] delta commit v${newMeta.version} (${newMeta.updateKind}) by ${newMeta.lastUpdatedBy}`);
+      return {
+        success: true,
+        version: newMeta.version,
+        lastUpdated: newMeta.lastUpdated,
+        lastUpdatedBy: newMeta.lastUpdatedBy,
+        updateKind: newMeta.updateKind,
+        counts
+      };
+    }
+  }
+  throw new Error('Could not save: too many people saving at once. Please try again.');
+}
+
+// ------------------------------------------------------------------------------
+// Uploaded-file registry (the files themselves live in Supabase Storage)
+// ------------------------------------------------------------------------------
+const REGISTRY_KEY = 'uploaded_files_registry';
+
+export async function getUploadRegistry() {
+  const client = requireClient();
+  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', REGISTRY_KEY).maybeSingle();
+  if (error) throw new Error(`Supabase read (registry) failed: ${error.message}`);
+  return data && Array.isArray(data.payload) ? data.payload : [];
+}
+
+export async function addUploadRecord(record) {
+  const client = requireClient();
+  const registry = await getUploadRegistry();
+  registry.unshift(record);
+  const { error } = await client
+    .from(TABLE)
+    .upsert({ dataset: REGISTRY_KEY, payload: registry, updated_at: new Date().toISOString() }, { onConflict: 'dataset' });
+  if (error) throw new Error(`Supabase write (registry) failed: ${error.message}`);
+  return record;
+}
+
+// ------------------------------------------------------------------------------
+// Master-data upload/audit log (shared, newest first, capped)
+// ------------------------------------------------------------------------------
+const LOGS_KEY = 'master_data_logs';
+const MAX_LOGS = 200;
+
+export async function getMasterDataLogs() {
+  const client = requireClient();
+  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', LOGS_KEY).maybeSingle();
+  if (error) throw new Error(`Supabase read (logs) failed: ${error.message}`);
+  return data && Array.isArray(data.payload) ? data.payload : [];
+}
+
+export async function addMasterDataLog(log) {
+  const client = requireClient();
+  const logs = await getMasterDataLogs();
+  logs.unshift(log);
+  const { error } = await client
+    .from(TABLE)
+    .upsert({ dataset: LOGS_KEY, payload: logs.slice(0, MAX_LOGS), updated_at: new Date().toISOString() }, { onConflict: 'dataset' });
+  if (error) throw new Error(`Supabase write (logs) failed: ${error.message}`);
+  return log;
 }
