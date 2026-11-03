@@ -58,7 +58,7 @@ import {
   applyFontScaleToDOM
 } from '../utils/systemSettings';
 import {
-  getAuthorizedUsers,
+  fetchAuthorizedUsers,
   addAuthorizedUser,
   deleteAuthorizedUser,
   resetUserPassword,
@@ -106,7 +106,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // User Access & Credential Management State
-  const [usersList, setUsersList] = useState<AuthorizedUser[]>(getAuthorizedUsers);
+  const [usersList, setUsersList] = useState<AuthorizedUser[]>([]);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const reloadUsers = async () => {
+    try {
+      setUsersList(await fetchAuthorizedUsers());
+      setUsersError(null);
+    } catch (err: any) {
+      setUsersError(err?.message || 'Could not load users');
+    }
+  };
+  useEffect(() => {
+    reloadUsers();
+  }, []);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -293,50 +305,66 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     triggerSuccess(language === 'am' ? 'ቅንብሮች ወደ ነባሪ ተመልሰዋል' : 'Settings restored to factory defaults');
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
-      alert('Please fill in name, email, and assigned password.');
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword) {
+      alert('Please fill in name, email, and password.');
       return;
     }
-    addAuthorizedUser({
-      username: newUserEmail.split('@')[0],
-      email: newUserEmail.trim(),
-      password: newUserPassword.trim(),
-      name: newUserName.trim(),
-      role: newUserRole.trim(),
-      hub: newUserHub.trim(),
-      isAdmin: isNewUserAdmin
-    });
-    setUsersList(getAuthorizedUsers());
-    setIsAddUserModalOpen(false);
-    setNewUserName('');
-    setNewUserEmail('');
-    setNewUserPassword('');
-    triggerSuccess('Authorized user created with admin-assigned password');
+    if (newUserPassword.length < 8) {
+      alert('Password must be at least 8 characters.');
+      return;
+    }
+    try {
+      await addAuthorizedUser({
+        email: newUserEmail.trim(),
+        password: newUserPassword,
+        name: newUserName.trim(),
+        role: newUserRole.trim(),
+        hub: newUserHub.trim(),
+        isAdmin: isNewUserAdmin
+      });
+      await reloadUsers();
+      setIsAddUserModalOpen(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      triggerSuccess('User account created');
+    } catch (err: any) {
+      alert(err?.message || 'Could not create user.');
+    }
   };
 
-  const handleDeleteUser = (id: string, username: string) => {
-    if (username === 'admin') {
-      alert('Cannot delete primary system administrator.');
+  const handleDeleteUser = async (id: string, _username: string) => {
+    if (id === userId) {
+      alert('You cannot delete your own account.');
       return;
     }
     if (confirm('Are you sure you want to revoke access for this user?')) {
-      deleteAuthorizedUser(id);
-      setUsersList(getAuthorizedUsers());
-      triggerSuccess('User access revoked');
+      try {
+        await deleteAuthorizedUser(id);
+        await reloadUsers();
+        triggerSuccess('User access revoked');
+      } catch (err: any) {
+        alert(err?.message || 'Could not delete user.');
+      }
     }
   };
 
-  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetModalUserId || !assignedPasswordInput.trim()) return;
-    const success = resetUserPassword(resetModalUserId, assignedPasswordInput.trim());
-    if (success) {
-      setUsersList(getAuthorizedUsers());
+    if (!resetModalUserId || !assignedPasswordInput) return;
+    if (assignedPasswordInput.length < 8) {
+      alert('Password must be at least 8 characters.');
+      return;
+    }
+    try {
+      await resetUserPassword(resetModalUserId, assignedPasswordInput);
       setResetModalUserId(null);
       setAssignedPasswordInput('');
-      triggerSuccess('User password successfully updated by admin');
+      triggerSuccess('User password successfully updated');
+    } catch (err: any) {
+      alert(err?.message || 'Could not update password.');
     }
   };
 
@@ -1916,6 +1944,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </button>
           </div>
 
+          {usersError && (
+            <div className="mb-3 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+              {usersError}
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-3">
             {usersList.map((u) => (
               <div key={u.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1940,8 +1973,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <span>Email: <strong className="text-slate-200">{u.email}</strong></span>
                       <span>•</span>
                       <span>Hub: <strong className="text-slate-200">{u.hub}</strong></span>
-                      <span>•</span>
-                      <span className="font-mono text-cyan-400">Assigned Password: {u.password}</span>
+                      {!u.isActive && (
+                        <>
+                          <span>•</span>
+                          <span className="font-semibold text-rose-400">Deactivated</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1950,7 +1987,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <button
                     onClick={() => {
                       setResetModalUserId(u.id);
-                      setAssignedPasswordInput(u.password);
+                      setAssignedPasswordInput('');
                     }}
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
                     title="Change or reset user password"
@@ -1959,7 +1996,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <span>{language === 'am' ? 'የይለፍ ቃል ቀይር' : 'Assign Password'}</span>
                   </button>
 
-                  {u.username !== 'admin' && (
+                  {u.id !== userId && (
                     <button
                       onClick={() => handleDeleteUser(u.id, u.username)}
                       className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition cursor-pointer border border-rose-500/20"
@@ -2018,13 +2055,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Admin-Assigned Password</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Initial Password (min. 8 characters)</label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
                   required
                   value={newUserPassword}
                   onChange={(e) => setNewUserPassword(e.target.value)}
-                  placeholder="e.g. securePass2026"
+                  placeholder="At least 8 characters"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-cyan-400"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
@@ -2108,9 +2147,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">New Admin-Assigned Password</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">New Password (min. 8 characters)</label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
                   required
                   value={assignedPasswordInput}
                   onChange={(e) => setAssignedPasswordInput(e.target.value)}
