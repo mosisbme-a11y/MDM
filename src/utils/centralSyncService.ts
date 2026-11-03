@@ -133,6 +133,23 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
   return null;
 }
 
+export type SupabaseSyncState = 'syncing' | 'synced' | 'error';
+export interface SupabaseSyncEventDetail {
+  state: SupabaseSyncState;
+  pending: number;
+  kind?: string;
+  version?: number;
+  message?: string;
+}
+export const SUPABASE_SYNC_EVENT = 'epss_supabase_sync';
+
+let pendingPushes = 0;
+function emitSyncEvent(detail: SupabaseSyncEventDetail): void {
+  try {
+    window.dispatchEvent(new CustomEvent(SUPABASE_SYNC_EVENT, { detail }));
+  } catch {}
+}
+
 /**
  * Pushes updates to the central server so all other browsers and devices
  * immediately reflect the same dataset.
@@ -145,6 +162,10 @@ export async function pushCentralMasterData(
 ): Promise<CentralSyncStatus | null> {
   console.log('[CentralSyncService] Pushing updates:', updates);
   let resultStatus: CentralSyncStatus | null = null;
+  let errorMessage = '';
+
+  pendingPushes += 1;
+  emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind });
 
   try {
     const res = await fetch('/api/system-master-data', {
@@ -170,9 +191,28 @@ export async function pushCentralMasterData(
       }
     } else {
       console.error('[CentralSyncService] Push failed, res:', res.status, res.statusText);
+      try {
+        const body = await res.json();
+        errorMessage = body?.error || `Server returned ${res.status}`;
+      } catch {
+        errorMessage = `Server returned ${res.status}`;
+      }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('[CentralSyncService] Failed to POST to central server API:', err);
+    errorMessage = err?.message || 'Network error';
+  }
+
+  pendingPushes = Math.max(0, pendingPushes - 1);
+  if (resultStatus) {
+    // Only announce "synced" once every outstanding upload has finished
+    emitSyncEvent(
+      pendingPushes > 0
+        ? { state: 'syncing', pending: pendingPushes }
+        : { state: 'synced', pending: 0, kind: resultStatus.updateKind, version: resultStatus.version }
+    );
+  } else {
+    emitSyncEvent({ state: 'error', pending: pendingPushes, message: errorMessage || 'Sync failed' });
   }
 
   return resultStatus;
