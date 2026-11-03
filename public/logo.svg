@@ -1,0 +1,13 @@
+<svg viewBox="0 0 240 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Red 'E' upper curve -->
+  <path d="M 170 45 C 130 45 100 45 70 45 C 40 45 25 60 25 88 C 25 115 40 130 70 130 L 168 130" stroke="#C92338" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Red 'E' middle crossbar -->
+  <path d="M 70 88 L 172 88" stroke="#C92338" stroke-width="20" stroke-linecap="round"/>
+  <!-- Blue 'P' lower loop and descending stem -->
+  <path d="M 50 115 L 50 195" stroke="#1C75BC" stroke-width="20" stroke-linecap="round"/>
+  <path d="M 50 118 L 138 118 C 172 118 190 134 190 154 C 190 174 172 186 138 186 L 50 186" stroke="#1C75BC" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Text -->
+  <text x="120" y="218" text-anchor="middle" fill="#111827" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="28px" letter-spacing="-0.5px">Ethiopian</text>
+  <text x="120" y="240" text-anchor="middle" fill="#1f2937" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="20px" letter-spacing="-0.3px">Pharmaceutical</text>
+  <text x="120" y="256" text-anchor="middle" fill="#4b5563" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="14px">Supply Service</text>
+</svg>

@@ -1,0 +1,1042 @@
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  Download,
+  FileSpreadsheet,
+  Search,
+  Filter,
+  Plus,
+  Trash2,
+  Check,
+  Edit3,
+  Copy,
+  Building2,
+  Calendar,
+  Layers,
+  Sparkles,
+  Maximize2,
+  Minimize2,
+  CheckCircle2,
+  FileText,
+  Upload,
+  X,
+  RefreshCw,
+  Printer
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { formatNumber } from '../utils/formatters';
+import { HealthFacilityRecord } from '../types';
+
+export interface Stage4Column {
+  id: string;
+  name: string; // e.g. "Anesthesia machine"
+  code: string; // e.g. "403-XRRD-0101"
+}
+
+export interface Stage4Row {
+  id: string;
+  region: string;
+  zone: string;
+  woreda: string;
+  healthFacility: string;
+  packages: string; // e.g. "MCH"
+  quantities: Record<string, number>;
+}
+
+export interface Stage4MatrixData {
+  date: string;
+  region: string;
+  columns: Stage4Column[];
+  rows: Stage4Row[];
+}
+
+export const DEFAULT_STAGE_4_COLUMNS: Stage4Column[] = [
+  { id: 'col-anesthesia', name: 'Anesthesia machine', code: '403-XRRD-0101' },
+  { id: 'col-bed', name: 'Bed - Patient, Fowler,', code: '403-XRRD-0101' },
+  { id: 'col-bowel', name: 'Bowel - With Stand, Stainles', code: '403-XRRB-0101N' },
+  { id: 'col-coldbox', name: 'Cold box', code: '403-XRRD-0101-001' },
+  { id: 'col-delivery', name: 'Couch - Delivery', code: '401-WICU-0101N' },
+  { id: 'col-exam', name: 'Couch - Examination', code: '401-WICU-0101N' },
+];
+
+export const DEFAULT_STAGE_4_ROWS: Stage4Row[] = [
+  {
+    id: 's4-row-1',
+    region: 'Oromia',
+    zone: 'Addis ketema',
+    woreda: '01',
+    healthFacility: 'Abeshige Health Center',
+    packages: 'MCH',
+    quantities: {
+      'col-anesthesia': 2,
+      'col-bed': 2,
+      'col-bowel': 2,
+      'col-coldbox': 2,
+      'col-delivery': 2,
+      'col-exam': 2,
+    }
+  },
+  {
+    id: 's4-row-2',
+    region: 'Oromia',
+    zone: 'Addis ketema',
+    woreda: '01',
+    healthFacility: 'Addis Hiwot Health Center',
+    packages: 'MCH',
+    quantities: {
+      'col-anesthesia': 2,
+      'col-bed': 2,
+      'col-bowel': 2,
+      'col-coldbox': 2,
+      'col-delivery': 2,
+      'col-exam': 2,
+    }
+  },
+  {
+    id: 's4-row-3',
+    region: 'Oromia',
+    zone: 'Addis ketema',
+    woreda: '02',
+    healthFacility: 'Adama Health Center',
+    packages: 'MCH',
+    quantities: {
+      'col-anesthesia': 2,
+      'col-bed': 2,
+      'col-bowel': 2,
+      'col-coldbox': 2,
+      'col-delivery': 2,
+      'col-exam': 2,
+    }
+  },
+  {
+    id: 's4-row-4',
+    region: 'Oromia',
+    zone: 'kirkose',
+    woreda: '03',
+    healthFacility: 'Bole 17 Health Center',
+    packages: 'MCH',
+    quantities: {
+      'col-anesthesia': 2,
+      'col-bed': 2,
+      'col-bowel': 2,
+      'col-coldbox': 2,
+      'col-delivery': 2,
+      'col-exam': 2,
+    }
+  },
+  {
+    id: 's4-row-5',
+    region: 'Oromia',
+    zone: 'kirkose',
+    woreda: '03',
+    healthFacility: 'Abala Primary Hospital',
+    packages: 'MCH',
+    quantities: {
+      'col-anesthesia': 2,
+      'col-bed': 2,
+      'col-bowel': 2,
+      'col-coldbox': 2,
+      'col-delivery': 2,
+      'col-exam': 2,
+    }
+  }
+];
+
+interface Stage4MohSubmittedMatrixTableProps {
+  data?: Stage4MatrixData;
+  onUpdateData?: (updated: Stage4MatrixData) => void;
+  isEditable?: boolean;
+  hfListItems?: HealthFacilityRecord[];
+  dossiers?: any[];
+  selectedDossierId?: string;
+  onSelectDossier?: (dossierId: string) => void;
+  title?: string;
+  subtitle?: string;
+}
+
+export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTableProps> = ({
+  data,
+  onUpdateData,
+  isEditable = true,
+  hfListItems = [],
+  dossiers = [],
+  selectedDossierId = '',
+  onSelectDossier,
+  title = '4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix',
+  subtitle = 'Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers'
+}) => {
+  const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
+  const [columns, setColumns] = useState<Stage4Column[]>(data?.columns || DEFAULT_STAGE_4_COLUMNS);
+  const [rows, setRows] = useState<Stage4Row[]>(data?.rows || DEFAULT_STAGE_4_ROWS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
+  const [selectedZone, setSelectedZone] = useState('all');
+  const [selectedPackage, setSelectedPackage] = useState('all');
+  const [isEditingMode, setIsEditingMode] = useState(isEditable);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Column configurator modal
+  const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnCode, setNewColumnCode] = useState('');
+
+  // File upload input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const notifyChange = (updatedCols: Stage4Column[], updatedRows: Stage4Row[]) => {
+    if (onUpdateData) {
+      onUpdateData({
+        date: internalDate,
+        region: selectedRegionFilter === 'all' ? 'All' : selectedRegionFilter,
+        columns: updatedCols,
+        rows: updatedRows
+      });
+    }
+  };
+
+  // Sync when data prop changes
+  useEffect(() => {
+    if (data) {
+      if (data.date) setInternalDate(data.date);
+      if (data.columns && data.columns.length > 0) setColumns(data.columns);
+      if (data.rows && data.rows.length > 0) setRows(data.rows);
+    }
+  }, [data]);
+
+  const uniqueRegions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => { if (r.region) set.add(r.region); });
+    return Array.from(set).sort();
+  }, [rows]);
+
+  const uniqueZones = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => {
+      if (selectedRegionFilter === 'all' || r.region === selectedRegionFilter) {
+        if (r.zone) set.add(r.zone);
+      }
+    });
+    return Array.from(set).sort();
+  }, [rows, selectedRegionFilter]);
+
+  const uniquePackages = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => { if (r.packages) set.add(r.packages); });
+    return Array.from(set).sort();
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter(r => {
+      const matchRegion = selectedRegionFilter === 'all' || r.region === selectedRegionFilter;
+      const matchZone = selectedZone === 'all' || r.zone === selectedZone;
+      const matchPackage = selectedPackage === 'all' || r.packages === selectedPackage;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        r.region.toLowerCase().includes(q) ||
+        r.zone.toLowerCase().includes(q) ||
+        r.woreda.toLowerCase().includes(q) ||
+        r.healthFacility.toLowerCase().includes(q) ||
+        r.packages.toLowerCase().includes(q);
+
+      return matchRegion && matchZone && matchPackage && matchSearch;
+    });
+  }, [rows, selectedRegionFilter, selectedZone, selectedPackage, searchQuery]);
+
+  // Column totals
+  const columnTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    columns.forEach(col => {
+      totals[col.id] = filteredRows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+    });
+    return totals;
+  }, [columns, filteredRows]);
+
+  const grandTotalUnits = useMemo(() => {
+    return Object.values(columnTotals).reduce((sum, val) => sum + val, 0);
+  }, [columnTotals]);
+
+  // Cell quantity change
+  const handleQuantityChange = (rowId: string, colId: string, value: string) => {
+    const num = Math.max(0, parseInt(value, 10) || 0);
+    const updated = rows.map(r => {
+      if (r.id === rowId) {
+        return {
+          ...r,
+          quantities: {
+            ...r.quantities,
+            [colId]: num
+          }
+        };
+      }
+      return r;
+    });
+    setRows(updated);
+    notifyChange(columns, updated);
+  };
+
+  // Row field change
+  const handleRowFieldChange = (rowId: string, field: keyof Omit<Stage4Row, 'quantities'>, value: string) => {
+    const updated = rows.map(r => {
+      if (r.id === rowId) {
+        return { ...r, [field]: value };
+      }
+      return r;
+    });
+    setRows(updated);
+    notifyChange(columns, updated);
+  };
+
+  // Add Row
+  const handleAddRow = () => {
+    const newRow: Stage4Row = {
+      id: `s4-row-${Date.now()}`,
+      region: selectedRegionFilter !== 'all' ? selectedRegionFilter : (rows[0]?.region || 'Oromia'),
+      zone: uniqueZones[0] || 'Zone 1',
+      woreda: '01',
+      healthFacility: `Health Center ${rows.length + 1}`,
+      packages: 'MCH',
+      quantities: {}
+    };
+    columns.forEach(col => {
+      newRow.quantities[col.id] = 2; // Default 2 matching user screenshot
+    });
+    const updated = [...rows, newRow];
+    setRows(updated);
+    notifyChange(columns, updated);
+    showToast(`✓ Added row for ${newRow.healthFacility}`);
+  };
+
+  // Delete Row
+  const handleDeleteRow = (rowId: string) => {
+    if (rows.length <= 1) {
+      alert('Cannot delete the last row.');
+      return;
+    }
+    const updated = rows.filter(r => r.id !== rowId);
+    setRows(updated);
+    notifyChange(columns, updated);
+  };
+
+  // Add Column
+  const handleAddColumn = () => {
+    if (!newColumnName.trim()) return;
+    const colCode = newColumnCode.trim() || `403-MAT-010${columns.length + 1}`;
+    const newCol: Stage4Column = {
+      id: `col-${Date.now()}`,
+      name: newColumnName.trim(),
+      code: colCode
+    };
+    const updatedCols = [...columns, newCol];
+    setColumns(updatedCols);
+
+    const updatedRows = rows.map(r => ({
+      ...r,
+      quantities: {
+        ...r.quantities,
+        [newCol.id]: 2
+      }
+    }));
+    setRows(updatedRows);
+    notifyChange(updatedCols, updatedRows);
+
+    setNewColumnName('');
+    setNewColumnCode('');
+    setIsColumnPickerOpen(false);
+    showToast(`✓ Added column: ${newCol.name} (${newCol.code})`);
+  };
+
+  // Remove Column
+  const handleRemoveColumn = (colId: string) => {
+    if (columns.length <= 1) {
+      alert('Cannot remove the last equipment column.');
+      return;
+    }
+    const updatedCols = columns.filter(c => c.id !== colId);
+    setColumns(updatedCols);
+    const updatedRows = rows.map(r => {
+      const copy = { ...r.quantities };
+      delete copy[colId];
+      return { ...r, quantities: copy };
+    });
+    setRows(updatedRows);
+    notifyChange(updatedCols, updatedRows);
+    showToast('✓ Removed equipment column');
+  };
+
+  // Update Column Header
+  const handleUpdateColumnHeader = (colId: string, name: string, code: string) => {
+    const updatedCols = columns.map(c => c.id === colId ? { ...c, name, code } : c);
+    setColumns(updatedCols);
+    notifyChange(updatedCols, rows);
+  };
+
+  // Export to Excel with two-tier header
+  const handleExportExcel = () => {
+    const headerRow1: string[] = [
+      'Region',
+      'Zone',
+      'Woreda',
+      'Name of health facility',
+      'List of Packeges',
+      ...columns.map(c => c.name)
+    ];
+
+    const headerRow2: string[] = [
+      '',
+      '',
+      '',
+      '',
+      'List of Packeges',
+      ...columns.map(c => c.code)
+    ];
+
+    const dataRows = filteredRows.map(r => [
+      r.region,
+      r.zone,
+      r.woreda,
+      r.healthFacility,
+      r.packages,
+      ...columns.map(c => r.quantities[c.id] !== undefined ? r.quantities[c.id] : 0)
+    ]);
+
+    const totalRow = [
+      'TOTAL',
+      '',
+      '',
+      `${filteredRows.length} Facilities`,
+      '',
+      ...columns.map(c => columnTotals[c.id] || 0)
+    ];
+
+    const aoa = [headerRow1, headerRow2, ...dataRows, totalRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 18 },
+      ...columns.map(() => ({ wch: 22 }))
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'MOH_EPSS_Breakdown_Matrix');
+    XLSX.writeFile(wb, `Stage4_MOH_to_EPSS_Matrix_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('✓ Excel export downloaded successfully!');
+  };
+
+  // Download Blank Template
+  const handleDownloadTemplate = () => {
+    const headerRow1 = [
+      'Region',
+      'Zone',
+      'Woreda',
+      'Name of health facility',
+      'List of Packeges',
+      ...columns.map(c => c.name)
+    ];
+
+    const headerRow2 = [
+      '',
+      '',
+      '',
+      '',
+      'List of Packeges',
+      ...columns.map(c => c.code)
+    ];
+
+    const sampleRow = [
+      'Oromia',
+      'Addis ketema',
+      '01',
+      'Sample Health Facility',
+      'MCH',
+      ...columns.map(() => 2)
+    ];
+
+    const aoa = [headerRow1, headerRow2, sampleRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 18 },
+      ...columns.map(() => ({ wch: 22 }))
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, `Stage4_MOH_EPSS_Breakdown_Template.xlsx`);
+    showToast('✓ Template downloaded successfully!');
+  };
+
+  // Upload Excel / CSV file
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        if (!data || data.length < 2) {
+          alert('Uploaded sheet does not contain enough header rows.');
+          return;
+        }
+
+        const row1 = data[0] || [];
+        const row2 = data[1] || [];
+
+        // Identify equipment columns starting from column index 5
+        const newCols: Stage4Column[] = [];
+        for (let colIdx = 5; colIdx < row1.length; colIdx++) {
+          const name = String(row1[colIdx] || '').trim();
+          const code = String(row2[colIdx] || '').trim() || `403-MAT-010${colIdx}`;
+          if (name || code) {
+            newCols.push({
+              id: `col-${colIdx}-${Date.now()}`,
+              name: name || `Equipment ${colIdx - 4}`,
+              code: code
+            });
+          }
+        }
+
+        const effectiveCols = newCols.length > 0 ? newCols : columns;
+
+        // Parse data rows starting from row index 2
+        const parsedRows: Stage4Row[] = [];
+        for (let rowIdx = 2; rowIdx < data.length; rowIdx++) {
+          const row = data[rowIdx];
+          if (!row || row.length === 0) continue;
+          const reg = String(row[0] || '').trim();
+          const zone = String(row[1] || '').trim();
+          const woreda = String(row[2] || '').trim();
+          const facility = String(row[3] || '').trim();
+          const pkg = String(row[4] || '').trim() || 'MCH';
+
+          if (!facility && !reg && !zone) continue; // Skip empty rows
+
+          const quantities: Record<string, number> = {};
+          effectiveCols.forEach((col, idx) => {
+            const rawVal = row[5 + idx];
+            quantities[col.id] = parseInt(rawVal, 10) || 0;
+          });
+
+          parsedRows.push({
+            id: `s4-import-${rowIdx}-${Date.now()}`,
+            region: reg || 'Oromia',
+            zone: zone || 'Addis ketema',
+            woreda: woreda || '01',
+            healthFacility: facility || `Health Center ${rowIdx - 1}`,
+            packages: pkg,
+            quantities
+          });
+        }
+
+        if (parsedRows.length > 0) {
+          setColumns(effectiveCols);
+          setRows(parsedRows);
+          notifyChange(effectiveCols, parsedRows);
+          showToast(`✓ Successfully imported ${parsedRows.length} facilities and ${effectiveCols.length} equipment columns!`);
+        } else {
+          alert('No valid facility rows found in the uploaded file.');
+        }
+      } catch (err) {
+        console.error('Error importing file:', err);
+        alert('Failed to parse uploaded Excel file. Please ensure it follows the two-tier header template.');
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  return (
+    <div className={`space-y-4 ${isFullScreen ? 'fixed inset-0 z-50 bg-slate-50 p-6 overflow-y-auto' : ''}`}>
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 size={16} className="text-emerald-400" />
+          <span className="text-xs font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Header Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-sm">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-slate-900 tracking-tight">{title}</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                Official MoH Two-Tier Format
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="Import Excel or CSV matching this format"
+          >
+            <Upload size={14} />
+            <span>Upload / Import Matrix</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="Export to Excel with two-tier headers"
+          >
+            <FileSpreadsheet size={14} />
+            <span>Export Excel (.xlsx)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            title="Download blank Excel template"
+          >
+            <Download size={14} className="text-purple-600" />
+            <span>Download Template</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsEditingMode(!isEditingMode)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+              isEditingMode
+                ? 'bg-purple-50 border-purple-300 text-purple-800'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Edit3 size={14} />
+            <span>{isEditingMode ? 'Finish Editing' : 'Edit Matrix'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsFullScreen(!isFullScreen)}
+            className="p-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 cursor-pointer transition"
+            title={isFullScreen ? 'Exit full screen' : 'Expand full screen'}
+          >
+            {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Stats Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtered Region</div>
+          <div className="text-sm font-black font-mono text-purple-700 mt-0.5 flex items-center gap-1.5">
+            <Building2 size={14} className="text-purple-600" />
+            <span>{selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter}</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Allocated Health Facilities</div>
+          <div className="text-sm font-black font-mono text-indigo-700 mt-0.5">
+            {filteredRows.length} Center{filteredRows.length !== 1 ? 's' : ''} (of {rows.length})
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Equipment Types</div>
+          <div className="text-sm font-black font-mono text-slate-800 mt-0.5">
+            {columns.length} Items Configured
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Quantity Earmarked</div>
+          <div className="text-sm font-black font-mono text-emerald-700 mt-0.5">
+            {formatNumber(grandTotalUnits)} Units
+          </div>
+        </div>
+      </div>
+
+      {/* Controls & Column Picker Strip */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full sm:w-60">
+            <Search size={14} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search facility, zone, woreda, package..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <select
+            value={selectedRegionFilter}
+            onChange={(e) => setSelectedRegionFilter(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
+          >
+            <option value="all">All Regions ({uniqueRegions.length})</option>
+            {uniqueRegions.map(reg => (
+              <option key={reg} value={reg}>{reg}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedZone}
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
+          >
+            <option value="all">All Zones ({uniqueZones.length})</option>
+            {uniqueZones.map(z => (
+              <option key={z} value={z}>{z}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedPackage}
+            onChange={(e) => setSelectedPackage(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
+          >
+            <option value="all">All Packages ({uniquePackages.length})</option>
+            {uniquePackages.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Buttons to Add Row & Columns */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAddRow}
+            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+            title="Add a new health facility row"
+          >
+            <Plus size={14} />
+            <span>+ Add Facility Row</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsColumnPickerOpen(!isColumnPickerOpen)}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <Layers size={14} />
+            <span>{isColumnPickerOpen ? 'Close Equipment' : 'Manage Equipment (' + columns.length + ')'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Column Configurator Drawer */}
+      {isColumnPickerOpen && (
+        <div className="bg-white border border-purple-200 rounded-xl p-3 text-xs space-y-3 animate-in fade-in duration-200 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <span className="font-bold text-slate-900 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-purple-600" />
+              <span>Current Equipment Columns ({columns.length})</span>
+            </span>
+            <span className="text-[10px] text-slate-500">Click &times; to delete column or add new item below</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {columns.map(col => (
+              <div
+                key={col.id}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-slate-800 font-mono text-[11px]"
+              >
+                <span className="font-bold text-purple-900">{col.name}</span>
+                <span className="text-[10px] text-slate-500">({col.code})</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveColumn(col.id)}
+                  className="ml-1 p-0.5 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
+                  title="Remove column"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-100">
+            <input
+              type="text"
+              placeholder="New Equipment Description (e.g. Suction Machine)..."
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500"
+            />
+            <input
+              type="text"
+              placeholder="SAP Material Code (e.g. 403-XRRD-0101)..."
+              value={newColumnCode}
+              onChange={(e) => setNewColumnCode(e.target.value)}
+              className="w-full sm:w-48 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-purple-500"
+            />
+            <button
+              type="button"
+              onClick={handleAddColumn}
+              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs cursor-pointer shadow-sm"
+            >
+              Add Column
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SPREADSHEET TABLE: Matching Exact User Attachment Format */}
+      <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse font-sans">
+            <thead>
+              {/* Header Row 1: Peach / Yellow / Light Blue Styled Matching Image 1 */}
+              <tr className="border-b border-slate-300 text-xs font-medium">
+                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px]">
+                  Region
+                </th>
+                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[130px]">
+                  Zone
+                </th>
+                <th className="p-2.5 italic bg-[#fef08a] text-slate-900 border-r border-slate-300 font-semibold min-w-[80px] text-center">
+                  Woreda
+                </th>
+                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[200px]">
+                  Name of health facility
+                </th>
+                <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[130px] text-center">
+                  List of Packeges
+                </th>
+                {columns.map(col => (
+                  <th
+                    key={col.id}
+                    className="p-2.5 bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold text-left min-w-[170px] max-w-[210px] leading-tight"
+                  >
+                    {isEditingMode ? (
+                      <input
+                        type="text"
+                        value={col.name}
+                        onChange={(e) => handleUpdateColumnHeader(col.id, e.target.value, col.code)}
+                        className="w-full bg-white border border-purple-300 rounded p-1 text-xs font-bold text-slate-900 focus:outline-none focus:border-purple-500"
+                        placeholder="Item Description..."
+                      />
+                    ) : (
+                      <div className="line-clamp-2" title={col.name}>{col.name}</div>
+                    )}
+                  </th>
+                ))}
+                {isEditingMode && (
+                  <th className="p-2 bg-slate-100 text-center text-slate-500 font-bold min-w-[60px]">
+                    Action
+                  </th>
+                )}
+              </tr>
+
+              {/* Header Row 2: Sub-headers with SAP Material Numbers & Light Blue Subheader */}
+              <tr className="border-b border-slate-300 bg-white text-[11px] font-mono">
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#fef9c3] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold text-center">
+                  List of Packeges
+                </th>
+                {columns.map(col => (
+                  <th
+                    key={col.id}
+                    className="p-2 bg-white text-slate-800 border-r border-slate-300 font-mono text-[11px] font-bold text-left tracking-tight"
+                  >
+                    {isEditingMode ? (
+                      <input
+                        type="text"
+                        value={col.code}
+                        onChange={(e) => handleUpdateColumnHeader(col.id, col.name, e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded p-0.5 text-[11px] font-mono text-slate-800 focus:outline-none focus:border-purple-500"
+                        placeholder="SAP Code..."
+                      />
+                    ) : (
+                      <div className="font-mono">{col.code}</div>
+                    )}
+                  </th>
+                ))}
+                {isEditingMode && (
+                  <th className="p-2 bg-slate-100 text-center"></th>
+                )}
+              </tr>
+            </thead>
+
+            {/* Table Body */}
+            <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
+              {filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + (isEditingMode ? 6 : 5)} className="py-12 text-center text-slate-400">
+                    No matching facilities found in this filter. Click "+ Add Facility Row" to add a new record.
+                  </td>
+                </tr>
+              ) : (
+                filteredRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Region */}
+                    <td className="p-2 border-r border-slate-200">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.region}
+                          onChange={(e) => handleRowFieldChange(row.id, 'region', e.target.value)}
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs"
+                        />
+                      ) : (
+                        <span className="font-medium">{row.region}</span>
+                      )}
+                    </td>
+
+                    {/* Zone */}
+                    <td className="p-2 border-r border-slate-200">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.zone}
+                          onChange={(e) => handleRowFieldChange(row.id, 'zone', e.target.value)}
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs"
+                        />
+                      ) : (
+                        <span>{row.zone}</span>
+                      )}
+                    </td>
+
+                    {/* Woreda */}
+                    <td className="p-2 border-r border-slate-200 text-center font-mono">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.woreda}
+                          onChange={(e) => handleRowFieldChange(row.id, 'woreda', e.target.value)}
+                          className="w-full text-center bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-mono"
+                        />
+                      ) : (
+                        <span>{row.woreda}</span>
+                      )}
+                    </td>
+
+                    {/* Name of health facility */}
+                    <td className="p-2 border-r border-slate-200">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.healthFacility}
+                          onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900"
+                        />
+                      ) : (
+                        <span className="font-semibold text-slate-900">{row.healthFacility}</span>
+                      )}
+                    </td>
+
+                    {/* List of Packeges (light blue background matching screenshot) */}
+                    <td className="p-2 border-r border-slate-200 text-center bg-[#eff6ff] font-semibold text-blue-900">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.packages}
+                          onChange={(e) => handleRowFieldChange(row.id, 'packages', e.target.value)}
+                          className="w-full text-center bg-white border border-blue-200 rounded px-1 py-0.5 text-xs font-bold text-blue-900"
+                        />
+                      ) : (
+                        <span>{row.packages}</span>
+                      )}
+                    </td>
+
+                    {/* Equipment Quantities Cells */}
+                    {columns.map(col => (
+                      <td key={col.id} className="p-2 border-r border-slate-200 text-right font-mono font-medium">
+                        {isEditingMode ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.quantities[col.id] !== undefined ? row.quantities[col.id] : 0}
+                            onChange={(e) => handleQuantityChange(row.id, col.id, e.target.value)}
+                            className="w-full text-right bg-transparent border-0 border-b border-transparent hover:border-purple-300 focus:border-purple-600 focus:bg-purple-50/50 px-1 py-0.5 rounded font-mono font-bold text-slate-900"
+                          />
+                        ) : (
+                          <span className={row.quantities[col.id] > 0 ? 'font-bold text-slate-900' : 'text-slate-300'}>
+                            {row.quantities[col.id] || 0}
+                          </span>
+                        )}
+                      </td>
+                    ))}
+
+                    {/* Delete Row Action */}
+                    {isEditingMode && (
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRow(row.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer transition"
+                          title="Delete row"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+
+            {/* Total Footer Row */}
+            <tfoot>
+              <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
+                <td colSpan={4} className="p-2.5 border-r border-slate-300">
+                  <div className="flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-[11px] font-black text-slate-700">Total Approved Allocation</span>
+                    <span className="text-[11px] font-mono text-slate-600">{filteredRows.length} Health Facilities</span>
+                  </div>
+                </td>
+                <td className="p-2.5 border-r border-slate-300 text-center bg-[#dbeafe] text-blue-900 font-mono font-bold">
+                  TOTAL
+                </td>
+                {columns.map(col => (
+                  <td key={col.id} className="p-2.5 border-r border-slate-300 text-right font-mono font-black text-purple-900">
+                    {formatNumber(columnTotals[col.id] || 0)}
+                  </td>
+                ))}
+                {isEditingMode && <td className="p-2.5 bg-slate-100"></td>}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

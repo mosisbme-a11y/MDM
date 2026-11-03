@@ -1,0 +1,379 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Print-Friendly Report Stylesheet */
+@media print {
+  @page {
+    margin: 12mm 10mm;
+    size: landscape;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive / non-printable UI */
+  header,
+  nav,
+  input,
+  select,
+  button,
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force display of print headers and containers */
+  .print\:block {
+    display: block !important;
+  }
+
+  .print\:flex {
+    display: flex !important;
+  }
+
+  .print\:table-row-group {
+    display: table-row-group !important;
+  }
+
+  /* Table formatting for clean multi-page printing */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th, td {
+    padding: 6px 8px !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 8.5pt !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+  }
+
+  /* Card and container border resets */
+  .border,
+  .rounded-xl,
+  .rounded-2xl {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Prevent awkward page cuts */
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
+/* Clean High-Contrast Executive Clinical Color Styles (Non-Black, Professional White) */
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Invert and replace all dark/black utility classes with professional white and clean slate */
+.dark {
+  background-color: #f8fafc !important;
+}
+
+.dark body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.dark .bg-white {
+  background-color: #ffffff !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #f1f5f9 !important;
+}
+
+.dark .bg-slate-200 {
+  background-color: #e2e8f0 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+/* Eliminate deep black/dark gray containers across all system data components */
+.dark .bg-black,
+.dark .bg-slate-950,
+.dark .bg-slate-900,
+.dark .bg-zinc-950,
+.dark .bg-zinc-900,
+.dark .bg-gray-900 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Text overrides for clinical high-contrast */
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #0f172a !important;
+}
+
+.dark .text-slate-600 {
+  color: #334155 !important;
+}
+
+.dark .text-slate-500 {
+  color: #64748b !important;
+}
+
+.dark .text-slate-400 {
+  color: #475569 !important;
+}
+
+.dark .text-slate-950 {
+  color: #020617 !important;
+}
+
+/* Borders for sterile, clear demarcation of elements */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Inputs & Form controls inside clinical workflows */
+.dark input[type="text"],
+.dark input[type="number"],
+.dark select,
+.dark textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.dark input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Dropdowns, select options */
+.dark option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Hover transitions inside lists */
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/20:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Dividers */
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Specific interactive buttons inside widgets */
+.dark .bg-slate-50\/50 {
+  background-color: #f8fafc !important;
+}
+.dark .text-slate-800\/90 {
+  color: #1e293b !important;
+}
+.dark .text-slate-700\/80 {
+  color: #334155 !important;
+}
+
+/* Recharts / SVG high contrast adjustments */
+.dark text {
+  fill: #334155 !important;
+}
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: #e2e8f0 !important;
+}
+.dark .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+
+
+
+/* Hide specific dashboard elements */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div#dashboard-analytics-charts-grid:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div#dashboard-analytics-charts-grid:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div#dashboard-analytics-charts-grid:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) {
+  display: none !important;
+}
+
+/* Hide specific dashboard element */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
+  display: none !important;
+}
+
+/* Active for All Dashboard Views: Primary Unified Filters Command Bar - Smart 3D Tactile Styling & Multi-Filter Feature */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) {
+  border: 2px solid rgba(99, 102, 241, 0.4) !important;
+  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.18), 0 8px 10px -6px rgba(79, 70, 229, 0.1), inset 0 2px 4px rgba(255, 255, 255, 0.9), inset 0 -2px 4px rgba(0, 0, 0, 0.04) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+  border-radius: 1.25rem !important;
+  transform: translateY(-1px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) button,
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) select {
+  box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #cbd5e1 !important;
+  transition: all 0.15s ease-in-out;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px -2px rgba(79, 70, 229, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Active multi-selection styling for the selected element */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
+  border: 2px solid rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), 0 8px 20px -4px rgba(16, 185, 129, 0.25) !important;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  border-radius: 1rem !important;
+  position: relative;
+}
+
+
+
+/* Remove Assets Table in Multiple Stock button from Dashboard View without deleting it */
+#tab-view-dashboard .btn-assets-table-multiple-stock,
+#tab-view-dashboard #btn-navigate-to-multiple-stock-assets {
+  display: none !important;
+}
+
+/* Remove selected elements from dashboard view without deleting them */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  display: none !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2) > span:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > p:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(4) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(4) > span:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div#multiple-stock-rdf-hp-circle-graph:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div#multiple-stock-rdf-hp-circle-graph:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > p:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div#multiple-stock-charts-container:nth-of-type(5) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > p:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-dashboard:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div#dashboard-analytics-charts-grid:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div#receiving-bar-chart-card:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > p:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(3),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(4),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(3),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(4),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(4),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(4),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(3) > svg:nth-of-type(1) > rect:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div#tab-view-inventory:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(3) {
+  display: none !important;
+}
+
+/* Global Dynamic Font Scaling for Interface Accessibility */
+html.font-scale-compact {
+  font-size: 14px;
+}
+
+html.font-scale-normal {
+  font-size: 16px;
+}
+
+html.font-scale-large {
+  font-size: 18.5px;
+}
+
+html.font-scale-maximize {
+  font-size: 22px;
+}
+
+/* Maximize Mode: Enhance micro-labels and tiny utility classes across tables & cards */
+html.font-scale-maximize [class*="text-[8px]"],
+html.font-scale-maximize [class*="text-[9px]"],
+html.font-scale-maximize [class*="text-[10px]"],
+html.font-scale-maximize [class*="text-[11px]"] {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+html.font-scale-maximize [class*="text-xs"] {
+  font-size: 15.5px !important;
+  line-height: 1.45 !important;
+}
+
+html.font-scale-maximize [class*="text-sm"] {
+  font-size: 17.5px !important;
+  line-height: 1.5 !important;
+}
+
+html.font-scale-maximize [class*="text-base"] {
+  font-size: 19.5px !important;
+  line-height: 1.5 !important;
+}
+
+/* Large Mode: Proportional boost for micro-labels */
+html.font-scale-large [class*="text-[8px]"],
+html.font-scale-large [class*="text-[9px]"],
+html.font-scale-large [class*="text-[10px]"],
+html.font-scale-large [class*="text-[11px]"] {
+  font-size: 12.5px !important;
+  line-height: 1.35 !important;
+}
+
+html.font-scale-large [class*="text-xs"] {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+
+
+
+

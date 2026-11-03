@@ -1,0 +1,6 @@
+{
+  "name": "MEDICAL DEVICE MANAGEMENT SYSTEM",
+  "description": "MEDICAL DEVICE MANAGEMENT SYSTEM - Master Inventory & Medical Device Dashboard created by Mosisa Berhanu, featuring instant live synchronization, FYA Features, automated Google Sheets integration, and maintenance tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

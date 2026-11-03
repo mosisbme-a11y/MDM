@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // System Master Data collection shared across all users, devices and browsers
+    match /system_master_data/{docId} {
+      allow read, write: if true;
+    }
+
+    // User-specific workspaces with fallback synchronization
+    match /users/{userId} {
+      allow read, write: if true;
+      
+      match /{allPaths=**} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

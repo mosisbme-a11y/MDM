@@ -1,0 +1,2650 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  ShoppingBag,
+  Send,
+  FileText,
+  Building2,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Download,
+  Search,
+  Filter,
+  ArrowRight,
+  Layers,
+  Hospital,
+  Warehouse,
+  ChevronRight,
+  ExternalLink,
+  PlusCircle,
+  FileCheck,
+  Printer,
+  BadgeAlert,
+  ArrowUpRight,
+  Sparkles,
+  Share2,
+  Plus,
+  Archive,
+  FileSpreadsheet,
+  Zap,
+  Hourglass,
+  Calendar,
+  UserCheck,
+  Check,
+  X,
+  BellRing,
+  Mail,
+  MessageCircle,
+  Eye,
+  Copy,
+  BarChart3,
+  TrendingUp,
+  GitMerge
+} from 'lucide-react';
+import {
+  FunnelChart,
+  Funnel,
+  LabelList,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from 'recharts';
+import { DSPRequestModal } from './DSPRequestModal';
+import { BreakdownRequestModal } from './BreakdownRequestModal';
+import { RegionBreakdownModal } from './RegionBreakdownModal';
+import { RegionalSubmittedDataView } from './RegionalSubmittedDataView';
+import { 
+  RegionBreakdownMatrixTable, 
+  DEFAULT_STAGE_3_COLUMNS,
+  DEFAULT_STAGE_3_ROWS
+} from './RegionBreakdownMatrixTable';
+import {
+  Stage4MohSubmittedMatrixTable,
+  Stage4MatrixData,
+  DEFAULT_STAGE_4_COLUMNS,
+  DEFAULT_STAGE_4_ROWS
+} from './Stage4MohSubmittedMatrixTable';
+import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
+import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
+import { StageSourceDataModal } from './StageSourceDataModal';
+import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
+import { 
+    MedicalDeviceItem, 
+    EpssSubTab, 
+    MultipleStockRecord, 
+    DeviceDocument, 
+    HealthFacilityRecord,
+    DspWorkflowRecord,
+    RegionBreakdownMatrixData,
+    RegionBreakdownColumn,
+    RegionBreakdownRow
+} from '../types';
+import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
+import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
+import { DEFAULT_MASTER_STOCK_RECORDS } from '../data/defaultInventoryItems';
+import { db } from '../lib/firebase';
+import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
+
+export interface DateCountInfo {
+  days: number;
+  label: string;
+  sublabel: string;
+  statusText: string;
+  badgeClass: string;
+  isActionTaken: boolean;
+  actionDate?: string;
+  actionBy?: string;
+  actionType?: string;
+  turnaroundDays?: number;
+}
+
+/**
+ * Calculates calendar days elapsed between submission date and action date (or today if pending)
+ */
+export function computeDateCount(
+  dateSubmitted: string,
+  actionDate?: string,
+  status?: string,
+  actionBy?: string,
+  actionType?: string,
+  recordedTurnaround?: number
+): DateCountInfo {
+  if (!dateSubmitted) {
+    return {
+      days: 0,
+      label: 'No Send Date',
+      sublabel: 'Pending dispatch',
+      statusText: 'Unsent',
+      badgeClass: 'bg-slate-50 text-slate-600 border-slate-200',
+      isActionTaken: false
+    };
+  }
+
+  const parseToMidnight = (dStr: string) => {
+    try {
+      const clean = dStr.split('T')[0];
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          return new Date(y, m - 1, d).getTime();
+        }
+      }
+      const parsed = new Date(dStr).getTime();
+      return isNaN(parsed) ? Date.now() : parsed;
+    } catch {
+      return Date.now();
+    }
+  };
+
+  const startMs = parseToMidnight(dateSubmitted);
+  const isActionTaken = !!actionDate || status === 'Endorsed & Approved' || status === 'Dispatched to Plants';
+
+  if (isActionTaken) {
+    const endMs = actionDate ? parseToMidnight(actionDate) : parseToMidnight(new Date().toISOString().split('T')[0]);
+    const computedDays = recordedTurnaround !== undefined ? recordedTurnaround : Math.max(0, Math.floor((endMs - startMs) / (1000 * 60 * 60 * 24)));
+
+    return {
+      days: computedDays,
+      turnaroundDays: computedDays,
+      label: `${computedDays} Day${computedDays === 1 ? '' : 's'} Turnaround`,
+      sublabel: actionDate ? `Action on ${actionDate}` : 'Action Completed',
+      statusText: actionType || 'Endorsed & Approved',
+      badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      isActionTaken: true,
+      actionDate: actionDate || dateSubmitted,
+      actionBy,
+      actionType
+    };
+  }
+
+  // Active date count while waiting to Take action
+  const nowMs = parseToMidnight(new Date().toISOString().split('T')[0]);
+  const diffDays = Math.max(0, Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24)));
+
+  if (diffDays === 0) {
+    return {
+      days: 0,
+      label: 'Sent Today (Day 0)',
+      sublabel: 'Awaiting MOH Action',
+      statusText: 'Dispatched Today',
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+      isActionTaken: false
+    };
+  } else if (diffDays <= 2) {
+    return {
+      days: diffDays,
+      label: `Day ${diffDays} (${diffDays}d Elapsed)`,
+      sublabel: 'Within Normal SLA',
+      statusText: 'Awaiting Action',
+      badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200',
+      isActionTaken: false
+    };
+  } else if (diffDays <= 5) {
+    return {
+      days: diffDays,
+      label: `Day ${diffDays} (${diffDays}d Elapsed)`,
+      sublabel: 'Follow-Up Recommended',
+      statusText: 'Action Due',
+      badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+      isActionTaken: false
+    };
+  } else {
+    return {
+      days: diffDays,
+      label: `Day ${diffDays} (${diffDays}d Elapsed)`,
+      sublabel: 'Urgent • Action Overdue',
+      statusText: 'Overdue (>5 Days)',
+      badgeClass: 'bg-rose-50 text-rose-800 border-rose-300 font-bold',
+      isActionTaken: false
+    };
+  }
+}
+
+
+export interface DspWorkflowViewProps {
+  currentSubTab?: EpssSubTab;
+  onSelectSubTab?: (tab: EpssSubTab) => void;
+  items?: MedicalDeviceItem[];
+  onSelectItem?: (item: MedicalDeviceItem) => void;
+  multipleStockItems?: MultipleStockRecord[];
+  setMultipleStockItems?: React.Dispatch<React.SetStateAction<MultipleStockRecord[]>>;
+  onAddDocument?: (doc: DeviceDocument) => void;
+  userId?: string;
+  hfListItems?: HealthFacilityRecord[];
+  setHfListItems?: React.Dispatch<React.SetStateAction<HealthFacilityRecord[]>>;
+  dspRecords?: DspWorkflowRecord[];
+  setDspRecords?: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
+  onTriggerCloudSync?: (
+    successMsg: string,
+    mutation: {
+      type: 'CREATE' | 'UPDATE' | 'STATUS_CHANGE' | 'DELIVERY_UPDATE' | 'DELETE' | 'MAINTENANCE_LOG';
+      title: string;
+      payload?: any;
+    }
+  ) => void;
+}
+
+export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
+  currentSubTab = 'dsp-mgmt',
+  onSelectSubTab,
+  items = [],
+  onSelectItem,
+  multipleStockItems = [],
+  setMultipleStockItems,
+  onAddDocument,
+  userId,
+  hfListItems = [],
+  setHfListItems,
+  dspRecords = [],
+  setDspRecords,
+  onTriggerCloudSync
+}) => {
+const ALL_ETHIOPIAN_REGIONS = [
+  'Oromia',
+  'Amhara',
+  'Sidama',
+  'Somali',
+  'Tigray',
+  'Afar',
+  'South Ethiopia',
+  'Central Ethiopia',
+  'South West Ethiopia',
+  'SNNPR',
+  'Benishangul-Gumuz',
+  'Gambella',
+  'Harari',
+  'Addis Ababa',
+  'Dire Dawa'
+];
+
+  const records = dspRecords;
+  const setRecords = setDspRecords || (() => {});
+  const [selectedRecord, setSelectedRecord] = useState<DspWorkflowRecord | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [agingFilter, setAgingFilter] = useState<'all' | 'pending' | 'overdue' | 'completed'>('all');
+  const [selectedRegionsFilter, setSelectedRegionsFilter] = useState<string[]>([...ALL_ETHIOPIAN_REGIONS]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [isRegionBreakdownModalOpen, setIsRegionBreakdownModalOpen] = useState(false);
+  const [isSavedDraftsManagerOpen, setIsSavedDraftsManagerOpen] = useState(false);
+  const [stage3ViewMode, setStage3ViewMode] = useState<'matrix' | 'ledger'>('matrix');
+  const [stage4ViewMode, setStage4ViewMode] = useState<'matrix' | 'ledger'>('matrix');
+  const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
+
+  // Take Action modal state for EPSS to MOH requests
+  const [actionTargetRecord, setActionTargetRecord] = useState<DspWorkflowRecord | null>(null);
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [actionDecision, setActionDecision] = useState<'Endorsed & Approved' | 'Proceed to Stage 2 Breakdown' | 'Under MOH Technical Review' | 'Revision Requested'>('Endorsed & Approved');
+  const [actionFormDate, setActionFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [actionFormOfficer, setActionFormOfficer] = useState('Dr. Bethlehem (MOH PMD Directorate)');
+  const [actionFormLetterRef, setActionFormLetterRef] = useState('');
+  const [actionFormNotes, setActionFormNotes] = useState('DSP allocation quota endorsed and validated as per national priority distribution guidelines.');
+  const [actionFormRegions, setActionFormRegions] = useState<string[]>([]);
+  const [actionFeedbackToast, setActionFeedbackToast] = useState<string | null>(null);
+
+  // Quick WhatsApp Dispatch Modal State for Stage 2 Breakdown Dossiers
+  const [quickWhatsAppModal, setQuickWhatsAppModal] = useState<{
+    record: DspWorkflowRecord;
+    phone: string;
+    messageText: string;
+    copied: boolean;
+  } | null>(null);
+
+  const handleOpenBreakdownEmail = (rec: DspWorkflowRecord) => {
+    const targetRegs = rec.targetedRegions?.length > 0 ? rec.targetedRegions.join(', ') : 'Regional Health Bureaus';
+    const subject = `Official Regional Breakdown Request - ${targetRegs} (${rec.dateSubmitted}) [Ref: ${rec.dspRefNumber}]`;
+    const deviceList = rec.itemsIncluded.map((it, idx) => `${idx + 1}. ${it.description} (${it.material}) — ${it.quantity} Units`).join('\n');
+    const body = `Dear Regional Health Bureau Leadership,\n\nOfficial Medical Equipment Allocation Breakdown Request from Ministry of Health (MOH) Pharmaceuticals & Medical Devices Directorate.\n\nSummary:\n- Reference: ${rec.dspRefNumber}\n- Official Letter: ${rec.officialLetterRef}\n- Date: ${rec.dateSubmitted}\n- Target Regions: ${targetRegs}\n- Total Allocated Units: ${rec.totalQuantity.toLocaleString()} Units\n- Valuation: ${formatCurrency(rec.totalValuationETB)}\n\nAllocated Equipment Groups:\n${deviceList}\n\nPlease proceed to submit your Health Facility Allocation Matrix (Stage 3).\n\nAuthorized Signatory: ${rec.signatory} (${rec.signatoryRole})`;
+
+    const mailto = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent('rhb.logistics@moh.gov.et')}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailto, '_blank');
+    setActionFeedbackToast(`✓ Opened Gmail Composer for Breakdown Request ${rec.dspRefNumber}!`);
+    setTimeout(() => setActionFeedbackToast(null), 3500);
+  };
+
+  const handleOpenBreakdownWhatsApp = (rec: DspWorkflowRecord) => {
+    const phone = localStorage.getItem('epss_dsp_official_phone') || '+251911234567';
+    const targetRegs = rec.targetedRegions?.length > 0 ? rec.targetedRegions.join(', ') : 'Regional Health Bureaus';
+    const deviceList = rec.itemsIncluded.map((it, idx) => `• ${it.description} (${it.material}): ${it.quantity} Units`).join('\n');
+    const message = `*MINISTRY OF HEALTH (MOH) — ETHIOPIA*
+*OFFICIAL REGIONAL MEDICAL EQUIPMENT BREAKDOWN REQUEST*
+
+*Breakdown Ref:* ${rec.dspRefNumber}
+*Official Letter:* ${rec.officialLetterRef}
+*Date:* ${rec.dateSubmitted}
+*Target Regions:* ${targetRegs}
+*Total Units:* ${rec.totalQuantity.toLocaleString()} Units
+*Valuation:* ${formatCurrency(rec.totalValuationETB)}
+
+*ALLOCATED MEDICAL DEVICES (${rec.itemsIncluded.length}):*
+${deviceList}
+
+*Signatory:* ${rec.signatory} (${rec.signatoryRole})
+_Protocol: Official Institutional Dispatch via WhatsApp_`;
+
+    setQuickWhatsAppModal({
+      record: rec,
+      phone,
+      messageText: message,
+      copied: false
+    });
+  };
+
+  const handleOpenActionModal = (rec: DspWorkflowRecord) => {
+    setActionTargetRecord(rec);
+    setActionDecision(rec.actionType || 'Endorsed & Approved');
+    setActionFormDate(rec.actionTakenDate || new Date().toISOString().split('T')[0]);
+    setActionFormOfficer(rec.actionTakenBy || 'Dr. Bethlehem (MOH PMD Directorate)');
+    setActionFormLetterRef(rec.actionLetterRef || `MOH/PMD/ACT/2026/${Math.floor(100 + Math.random() * 900)}`);
+    setActionFormNotes(rec.actionNotes || 'DSP allocation quota endorsed and validated as per national priority distribution guidelines.');
+    setActionFormRegions(rec.targetedRegions || []);
+    setIsActionModalOpen(true);
+  };
+
+  const handleSaveAction = () => {
+    if (!actionTargetRecord) return;
+
+    const turnaround = computeDateCount(actionTargetRecord.dateSubmitted, actionFormDate).days;
+    let newStatus: DspWorkflowRecord['status'] = actionTargetRecord.status;
+
+    if (actionDecision === 'Endorsed & Approved' || actionDecision === 'Proceed to Stage 2 Breakdown') {
+      newStatus = 'Endorsed & Approved';
+    } else if (actionDecision === 'Under MOH Technical Review') {
+      newStatus = 'Under Review';
+    } else if (actionDecision === 'Revision Requested') {
+      newStatus = 'Draft';
+    }
+
+    const updatedRecord: DspWorkflowRecord = {
+      ...actionTargetRecord,
+      status: newStatus,
+      approvedDate: actionDecision.includes('Approved') || actionDecision.includes('Breakdown') ? actionFormDate : actionTargetRecord.approvedDate,
+      actionTakenDate: actionFormDate,
+      actionTakenBy: actionFormOfficer,
+      actionType: actionDecision,
+      actionLetterRef: actionFormLetterRef,
+      actionNotes: actionFormNotes,
+      targetedRegions: actionDecision === 'Proceed to Stage 2 Breakdown' ? actionFormRegions : actionTargetRecord.targetedRegions,
+      turnaroundDays: turnaround
+    };
+
+    setRecords(prev => {
+      const updated = prev.map(r => r.id === actionTargetRecord.id ? updatedRecord : r);
+      saveDspRecordsToIndexedDB(updated);
+      syncDspRecordToFirestore(updatedRecord);
+      return updated;
+    });
+
+    if (selectedRecord && selectedRecord.id === actionTargetRecord.id) {
+      setSelectedRecord(updatedRecord);
+    }
+
+    if (onTriggerCloudSync) {
+      onTriggerCloudSync(
+        `✓ Action recorded on ${actionTargetRecord.dspRefNumber} (Turnaround: ${turnaround} days) and synced to cloud!`,
+        {
+          type: 'STATUS_CHANGE',
+          title: `Action on ${actionTargetRecord.dspRefNumber}`,
+          payload: updatedRecord
+        }
+      );
+    }
+
+    setIsActionModalOpen(false);
+    setActionFeedbackToast(`Action recorded on ${actionTargetRecord.dspRefNumber}! Turnaround: ${turnaround} days.`);
+    setTimeout(() => setActionFeedbackToast(null), 4000);
+
+    // If user chose to proceed to Stage 2 Breakdown Request
+    if (actionDecision === 'Proceed to Stage 2 Breakdown') {
+      if (onSelectSubTab) {
+        onSelectSubTab('dsp-breakdown-moh-rhb');
+      }
+      setIsBreakdownModalOpen(true);
+    }
+    setActionTargetRecord(null);
+  };
+
+  const sanitizeDspRecordForFirestore = (rec: DspWorkflowRecord) => {
+    const clean: any = { ...rec };
+    if (clean.excelFile) clean.excelFile = { name: clean.excelFile.name };
+    if (clean.pdfFile) clean.pdfFile = { name: clean.pdfFile.name };
+    if (clean.zipFile) clean.zipFile = { name: clean.zipFile.name };
+    return clean;
+  };
+
+  const syncDspRecordToFirestore = async (record: DspWorkflowRecord) => {
+    if (!userId || !record.id) return;
+    try {
+      const docRef = doc(db, 'users', userId, 'dspWorkflows', String(record.id));
+      await setDoc(docRef, sanitizeDspRecordForFirestore(record), { merge: true });
+    } catch (err) {
+      console.warn('Failed to sync DSP record to Firestore:', err);
+    }
+  };
+
+
+  const handleToggleRegion = (reg: string) => {
+    setSelectedRegionsFilter(prev => {
+      const exists = prev.some(r => r.toLowerCase() === reg.toLowerCase());
+      if (exists) {
+        if (prev.length <= 1) return prev;
+        return prev.filter(r => r.toLowerCase() !== reg.toLowerCase());
+      } else {
+        return [...prev, reg];
+      }
+    });
+  };
+
+  const handleSelectAllRegions = () => setSelectedRegionsFilter([...ALL_ETHIOPIAN_REGIONS]);
+  const handleClearAllRegions = () => setSelectedRegionsFilter([ALL_ETHIOPIAN_REGIONS[0]]);
+
+
+  // Map subTab to stage
+  const currentStage = useMemo(() => {
+    switch (currentSubTab) {
+      case 'dsp-request-moh-epss': return 'moh-to-epss';
+      case 'dsp-breakdown-moh-rhb': return 'moh-to-rhb';
+      case 'dsp-submitted-rhb-moh': return 'rhb-to-moh';
+      case 'dsp-submitted-moh-epss-ho': return 'moh-to-epss-ho';
+      case 'dsp-aggregation-epss-ho': return 'epss-ho-aggregation';
+      case 'dsp-submitted-epss-branch': return 'epss-to-branch';
+      default: return 'all';
+    }
+  }, [currentSubTab]);
+
+  const stagesList = [
+    { id: 'dsp-request-moh-epss', stageKey: 'moh-to-epss', label: '1. DSP Request EPSS to MOH', color: 'from-blue-600 to-cyan-600', count: records.filter(r => r.stage === 'moh-to-epss').length },
+    { id: 'dsp-breakdown-moh-rhb', stageKey: 'moh-to-rhb', label: '2. Breakdown Request MOH to RHB', color: 'from-cyan-600 to-teal-600', count: records.filter(r => r.stage === 'moh-to-rhb').length },
+    { id: 'dsp-submitted-rhb-moh', stageKey: 'rhb-to-moh', label: '3. DSP Submitted RHB to MOH', color: 'from-amber-600 to-orange-600', count: records.filter(r => r.stage === 'rhb-to-moh').length },
+    { id: 'dsp-submitted-moh-epss-ho', stageKey: 'moh-to-epss-ho', label: '4. DSP Submitted MOH to EPSS HO', color: 'from-purple-600 to-indigo-600', count: records.filter(r => r.stage === 'moh-to-epss-ho').length },
+    { id: 'dsp-aggregation-epss-ho', stageKey: 'epss-ho-aggregation', label: '5. DSP Aggregation (EPSS HO)', color: 'from-emerald-600 to-teal-600', count: records.filter(r => r.stage === 'epss-ho-aggregation').length },
+    { id: 'dsp-submitted-epss-branch', stageKey: 'epss-to-branch', label: '6. DSP Submitted EPSS.HO to Plant', color: 'from-rose-600 to-pink-600', count: records.filter(r => r.stage === 'epss-to-branch').length },
+  ];
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const matchStage = currentStage === 'all' || r.stage === currentStage;
+      const matchSearch =
+        r.dspRefNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.officialLetterRef.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.senderOrg.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.recipientOrg.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchStatus = statusFilter === 'all' || r.status === statusFilter;
+
+      // Aging SLA Filter
+      let matchAging = true;
+      if (agingFilter === 'pending') {
+        matchAging = !r.actionTakenDate && r.status !== 'Endorsed & Approved';
+      } else if (agingFilter === 'overdue') {
+        matchAging = !r.actionTakenDate && r.status !== 'Endorsed & Approved' && computeDateCount(r.dateSubmitted).days > 3;
+      } else if (agingFilter === 'completed') {
+        matchAging = !!r.actionTakenDate || r.status === 'Endorsed & Approved';
+      }
+
+      const matchRegion = selectedRegionsFilter.length === 0 || 
+        selectedRegionsFilter.length === ALL_ETHIOPIAN_REGIONS.length ||
+        r.targetedRegions.some(reg => 
+          selectedRegionsFilter.some(sel => sel.toLowerCase() === reg.toLowerCase() || reg.toLowerCase().includes(sel.toLowerCase()))
+        );
+
+      const matchStageFilter = stageFilter === 'all' || r.stage === stageFilter;
+
+      return matchStage && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
+    });
+  }, [records, currentStage, searchQuery, statusFilter, agingFilter, selectedRegionsFilter, stageFilter]);
+
+  const totalValuation = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalValuationETB, 0), [filteredRecords]);
+  const totalUnits = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalQuantity, 0), [filteredRecords]);
+  const totalFacilities = useMemo(() => filteredRecords.reduce((s, r) => s + r.targetedFacilitiesCount, 0), [filteredRecords]);
+
+  const regionalFrequencyData = useMemo(() => {
+    const freq: Record<string, number> = {};
+    ALL_ETHIOPIAN_REGIONS.forEach(r => { freq[r] = 0; });
+    
+    records.forEach(r => {
+      if (r.targetedRegions && r.targetedRegions.length > 0) {
+        r.targetedRegions.forEach(reg => {
+          if (freq[reg] !== undefined) {
+            freq[reg]++;
+          } else {
+            const match = ALL_ETHIOPIAN_REGIONS.find(ar => ar.toLowerCase() === reg.toLowerCase());
+            if (match) freq[match]++;
+          }
+        });
+      }
+    });
+    
+    return Object.entries(freq)
+      .map(([region, count]) => ({ region, count }))
+      .filter(d => d.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [records, ALL_ETHIOPIAN_REGIONS]);
+
+  // Stage 1 Specific Date Count & Action KPI Metrics
+  const epssToMohRecords = useMemo(() => records.filter(r => r.stage === 'moh-to-epss'), [records]);
+  const stage1PendingCount = useMemo(() => epssToMohRecords.filter(r => !r.actionTakenDate && r.status !== 'Endorsed & Approved').length, [epssToMohRecords]);
+  const stage1OverdueCount = useMemo(() => {
+    return epssToMohRecords.filter(r => {
+      if (r.actionTakenDate || r.status === 'Endorsed & Approved') return false;
+      return computeDateCount(r.dateSubmitted).days > 3;
+    }).length;
+  }, [epssToMohRecords]);
+
+  const avgTurnaroundDays = useMemo(() => {
+    const completed = epssToMohRecords.filter(r => r.actionTakenDate || r.turnaroundDays !== undefined || r.status === 'Endorsed & Approved');
+    if (completed.length === 0) return 0;
+    const total = completed.reduce((sum, r) => {
+      const count = computeDateCount(r.dateSubmitted, r.actionTakenDate, r.status, r.actionTakenBy, r.actionType, r.turnaroundDays);
+      return sum + count.days;
+    }, 0);
+    return Math.round((total / completed.length) * 10) / 10;
+  }, [epssToMohRecords]);
+
+  const handleExportCSV = () => {
+    const data = filteredRecords.map((r, idx) => {
+      const dateInfo = computeDateCount(r.dateSubmitted, r.actionTakenDate || r.approvedDate, r.status, r.actionTakenBy, r.actionType, r.turnaroundDays);
+      return {
+        '#': idx + 1,
+        'DSP Reference': r.dspRefNumber,
+        'Workflow Stage': r.stageTitle,
+        'From (Sender)': r.senderOrg,
+        'To (Recipient)': r.recipientOrg,
+        'Official Letter Ref': r.officialLetterRef,
+        'Status': r.status,
+        'Submission Date': r.dateSubmitted,
+        'Date Count / Turnaround': `${dateInfo.days} Days (${dateInfo.isActionTaken ? 'Action Taken' : 'Pending Action'})`,
+        'Action Taken Date': r.actionTakenDate || r.approvedDate || 'Pending',
+        'Action Taken By': r.actionTakenBy || 'N/A',
+        'Action Decision': r.actionType || r.status,
+        'Total Quantity': r.totalQuantity,
+        'Valuation (ETB)': r.totalValuationETB,
+        'Targeted Facilities': r.targetedFacilitiesCount,
+        'Signatory': `${r.signatory} (${r.signatoryRole})`
+      };
+    });
+    downloadCSV(`EPSS_DSP_Workflow_Ledger_${new Date().toISOString().split('T')[0]}.csv`, data);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Top Workflow Header */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+            <ShoppingBag className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
+                DSP Management & Institutional Distribution Workflow
+              </h2>
+              <span className="text-[10px] font-bold text-amber-600 font-mono tracking-widest uppercase">
+                • MOH ⇄ EPSS ⇄ RHB ⇄ Plants
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              End-to-end tracking of Distribution Suggestion Plans, official quota requests, regional breakdowns, and plant release orders
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {currentStage === 'moh-to-epss' && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Request DSP (EPSS to MOH)</span>
+            </button>
+          )}
+          {currentStage === 'moh-to-rhb' && (
+            <button
+              onClick={() => setIsBreakdownModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Breakdown Request (MOH to Region)</span>
+            </button>
+          )}
+          {currentStage === 'rhb-to-moh' && (
+            <button
+              onClick={() => setIsRegionBreakdownModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Submit Region Breakdown (Region to MOH)</span>
+            </button>
+          )}
+          {currentStage === 'epss-ho-aggregation' && (
+            <button
+              onClick={() => setStage5ViewMode('hub-aggregation')}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <GitMerge className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Map HF to Hub (HF Master)</span>
+            </button>
+          )}
+          <button
+            onClick={handleExportCSV}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-500" />
+            <span>Export DSP Dossier</span>
+          </button>
+          <button
+            onClick={() => setIsSavedDraftsManagerOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-amber-200 shadow-xs relative"
+          >
+            <Archive className="w-3.5 h-3.5 text-amber-600" />
+            <span>Saved Drafts</span>
+            {records.filter(r => (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft').length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {records.filter(r => (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft').length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+      <DSPRequestModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        items={multipleStockItems}
+        hfListItems={hfListItems}
+        onSubmit={(data) => {
+            console.log('DSP Submitted:', data);
+            setIsCreateModalOpen(false);
+        }}
+        onSuccess={(removedItems, metadata) => {
+          // Remove selected items from inventory for EPSS to MOH request as requested
+          if (setMultipleStockItems) {
+            setMultipleStockItems(prev => prev.filter(item => 
+              !removedItems.some(removed => removed.id === item.id)
+            ));
+          }
+
+          // 2. Record what file i sent with date on my system (Workflow Record)
+          const totalQty = removedItems.reduce((acc, i) => acc + i.unrestrictedStock, 0);
+          const totalVal = removedItems.reduce((acc, i) => acc + i.currentValueOfUnrestrictedStock, 0);
+          const refNum = `EPSS/MD-DSP/2026/${Math.floor(100 + Math.random() * 900)}`;
+
+          const newRecord: DspWorkflowRecord = {
+            id: `dsp-${Date.now().toString().slice(-6)}`,
+            dspRefNumber: refNum,
+            stage: 'moh-to-epss',
+            stageTitle: '1. DSP Request EPSS to MOH',
+            senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+            recipientOrg: metadata.recipient,
+            subject: metadata.subject,
+            status: 'Submitted & Pending',
+            dateSubmitted: metadata.date,
+            totalDevices: removedItems.length,
+            totalQuantity: totalQty,
+            totalValuationETB: totalVal,
+            targetedRegions: [...new Set(removedItems.map(i => i.plant))].filter(Boolean) as string[],
+            targetedFacilitiesCount: 0,
+            officialLetterRef: `REF-${Date.now().toString().slice(-4)}`,
+            signatory: 'Mosisa (Authorized User)',
+            signatoryRole: 'Directorate Technical Lead',
+            itemsIncluded: removedItems.map(i => ({
+              material: i.material,
+              description: i.materialDescription,
+              quantity: i.unrestrictedStock,
+              plant: i.plant
+            })),
+            notes: `Dossier transmitted via Gmail background dispatch. Files: ${metadata.excelName}, ${metadata.letterName}${metadata.zipName ? `, ${metadata.zipName}` : ''}`,
+            excelFile: { name: metadata.excelName, blob: metadata.excelBlob },
+            pdfFile: { name: metadata.letterName, blob: metadata.letterBlob },
+            zipFile: metadata.zipName && metadata.zipBlob ? { name: metadata.zipName, blob: metadata.zipBlob } : undefined
+          };
+
+          setRecords(prev => {
+            const updated = [newRecord, ...prev];
+            saveDspRecordsToIndexedDB(updated); // Persist to IndexedDB
+            syncDspRecordToFirestore(newRecord);
+            return updated;
+          });
+
+          if (onTriggerCloudSync) {
+            onTriggerCloudSync(
+              `✓ DSP Request ${refNum} successfully transmitted and synced to cloud!`,
+              {
+                type: 'CREATE',
+                title: `DSP Request ${refNum}`,
+                payload: newRecord
+              }
+            );
+          }
+
+          // 3. Record to Document Archive
+          if (onAddDocument) {
+            const docRecord: DeviceDocument = {
+              id: `SENT-${Date.now().toString().slice(-5)}`,
+              referenceNumber: refNum,
+              title: metadata.subject,
+              deviceModel: removedItems.length > 1 ? `${removedItems[0].materialDescription} (+${removedItems.length - 1} items)` : removedItems[0]?.materialDescription || 'Medical Equipment Fleet',
+              type: 'Official EPSS-MOH Dossier (Transmitted)',
+              category: 'Official MoH Letters',
+              manufacturer: 'EPSS HEAD OFFICE',
+              senderFacility: 'EPSS Medical Equipment Directorate',
+              recipientFacility: metadata.recipient,
+              lastUpdated: metadata.date,
+              issuedDate: metadata.date,
+              driveLink: 'https://mail.google.com',
+              status: 'Dispatched',
+              officialSeal: true,
+              notes: metadata.body,
+              fileSize: 'Generated on Send',
+              fileType: metadata.zipName ? 'PDF' : 'XLSX', // Mixed payload
+              contentPreview: `DSP TRANSMISSION LOG\nDate: ${metadata.date}\nTo: ${metadata.recipient}\nSubject: ${metadata.subject}\n\nFILES SENT:\n1. ${metadata.excelName}\n2. ${metadata.letterName}${metadata.zipName ? `\n3. ${metadata.zipName}` : ''}\n\nSENT FROM: ${metadata.sender}`
+            };
+            onAddDocument(docRecord);
+          }
+        }}
+      />
+      <BreakdownRequestModal
+        isOpen={isBreakdownModalOpen}
+        onClose={() => setIsBreakdownModalOpen(false)}
+        items={multipleStockItems && multipleStockItems.length > 0 ? multipleStockItems : DEFAULT_MASTER_STOCK_RECORDS}
+        epssToMohRecords={records.filter(r => r.stage === 'moh-to-epss')}
+        onSaveDraft={(data) => {
+          const refNum = `DRAFT-BRK-${Date.now().toString().slice(-6)}`;
+          const draftRecord: DspWorkflowRecord = {
+            id: `dsp-brk-${Date.now().toString().slice(-6)}`,
+            dspRefNumber: refNum,
+            stage: 'moh-to-rhb',
+            stageTitle: '2. Breakdown Request MOH to Region',
+            senderOrg: 'Ministry of Health (PMD Directorate)',
+            recipientOrg: 'Regional Health Bureaus',
+            subject: 'Draft: Regional Medical Equipment Breakdown Request',
+            status: 'Draft',
+            dateSubmitted: data.date,
+            totalDevices: data.selectedDevices.length,
+            totalQuantity: Object.values(data.regionRows).reduce((acc: number, row: any) => acc + Object.values(row.quantities).reduce((accQ: number, q: any) => accQ + (Number(q) || 0), 0), 0),
+            totalValuationETB: 0,
+            targetedRegions: Array.from(new Set(data.regionRows.map((r: any) => r.region as string))),
+            targetedFacilitiesCount: data.regionRows.length,
+            officialLetterRef: 'PENDING',
+            signatory: 'Authorized User',
+            signatoryRole: 'Technical Lead',
+            itemsIncluded: data.selectedDevices.map((d: any) => ({
+              material: d.material,
+              description: d.materialDescription,
+              quantity: 0,
+              plant: d.plant
+            })),
+            notes: 'Draft breakdown request.',
+            facilityMatrixData: {
+              date: data.date,
+              region: data.regionRows[0]?.region || 'All',
+              columns: data.selectedDevices.map((d: any) => ({ id: d.id, name: d.materialDescription, code: d.material })),
+              rows: data.regionRows
+            }
+          };
+          setRecords(prev => {
+            const updated = [...prev, draftRecord];
+            saveDspRecordsToIndexedDB(updated);
+            return updated;
+          });
+          setActionFeedbackToast(`✓ Draft saved as ${refNum}!`);
+          setTimeout(() => setActionFeedbackToast(null), 3000);
+        }}
+        onSubmit={(data) => {
+          setIsBreakdownModalOpen(false);
+          if (data) {
+            const refNum = `MOH/PMD-BRK/2026/${Math.floor(100 + Math.random() * 900)}`;
+            const newRecord: DspWorkflowRecord = {
+              id: `dsp-brk-${Date.now().toString().slice(-6)}`,
+              dspRefNumber: refNum,
+              stage: 'moh-to-rhb',
+              stageTitle: '2. Breakdown Request MOH to Region',
+              senderOrg: 'Ministry of Health (PMD Directorate)',
+              recipientOrg: (data.targetedRegions && data.targetedRegions.length > 0) ? `${data.targetedRegions.join(', ')} Regional Health Bureaus` : 'All Regional Health Bureaus',
+              subject: data.subject || 'Medical Device Regional Breakdown & Allocation Quota Request',
+              status: 'Submitted & Pending',
+              dateSubmitted: data.date || new Date().toISOString().split('T')[0],
+              totalDevices: data.itemsIncluded?.length || 1,
+              totalQuantity: data.totalQuantity || 0,
+              totalValuationETB: data.totalValuationETB || 0,
+              targetedRegions: data.targetedRegions || [],
+              targetedFacilitiesCount: data.targetedFacilitiesCount || 0,
+              officialLetterRef: data.officialLetterRef || `MOH/LET/${Date.now().toString().slice(-4)}`,
+              signatory: data.signatory || 'Dr. Dereje (MOH State Minister)',
+              signatoryRole: 'State Minister of Health',
+              itemsIncluded: data.itemsIncluded || [],
+              notes: data.notes || 'Stage 2 Breakdown allocation dossier transmitted.',
+              excelFile: data.excelFile,
+              pdfFile: data.pdfFile,
+              zipFile: data.zipFile
+            };
+
+            setRecords(prev => {
+              const updated = [newRecord, ...prev];
+              saveDspRecordsToIndexedDB(updated);
+              syncDspRecordToFirestore(newRecord);
+              return updated;
+            });
+
+            if (onTriggerCloudSync) {
+              onTriggerCloudSync(
+                `✓ Stage 2 Breakdown Request ${refNum} transmitted and synced to cloud!`,
+                {
+                  type: 'CREATE',
+                  title: `Breakdown Request ${refNum}`,
+                  payload: newRecord
+                }
+              );
+            }
+          }
+        }}
+        onSuccess={(removedItems, metadata) => {
+          setIsBreakdownModalOpen(false);
+          if (metadata) {
+            const refNum = `MOH/PMD-BRK/2026/${Math.floor(100 + Math.random() * 900)}`;
+            const totalQty = removedItems.reduce((acc, i) => acc + (i.unrestrictedStock || 0), 0);
+            const totalVal = removedItems.reduce((acc, i) => acc + (i.currentValueOfUnrestrictedStock || 0), 0);
+
+            const newRecord: DspWorkflowRecord = {
+              id: `dsp-brk-${Date.now().toString().slice(-6)}`,
+              dspRefNumber: refNum,
+              stage: 'moh-to-rhb',
+              stageTitle: '2. Breakdown Request MOH to Region',
+              senderOrg: 'Ministry of Health (PMD Directorate)',
+              recipientOrg: metadata.recipient || 'Regional Health Bureaus',
+              subject: metadata.subject || 'Medical Device Regional Breakdown & Allocation Quota Request',
+              status: 'Submitted & Pending',
+              dateSubmitted: metadata.date || new Date().toISOString().split('T')[0],
+              totalDevices: removedItems.length,
+              totalQuantity: totalQty,
+              totalValuationETB: totalVal,
+              targetedRegions: [...new Set(removedItems.map(i => i.plant))].filter(Boolean) as string[],
+              targetedFacilitiesCount: 0,
+              officialLetterRef: `MOH/LET/${Date.now().toString().slice(-4)}`,
+              signatory: 'Dr. Dereje (MOH State Minister)',
+              signatoryRole: 'State Minister of Health',
+              itemsIncluded: removedItems.map(i => ({
+                material: i.material,
+                description: i.materialDescription,
+                quantity: i.unrestrictedStock,
+                plant: i.plant
+              })),
+              notes: `Stage 2 Breakdown dossier transmitted via ${metadata.recipient?.includes('@') ? 'Gmail' : 'WhatsApp'} background dispatch. Files: ${metadata.excelName}, ${metadata.letterName}${metadata.zipName ? `, ${metadata.zipName}` : ''}`,
+              excelFile: metadata.excelBlob ? { name: metadata.excelName, blob: metadata.excelBlob } : undefined,
+              pdfFile: metadata.letterBlob && metadata.letterName ? { name: metadata.letterName, blob: metadata.letterBlob } : undefined,
+              zipFile: metadata.zipName && metadata.zipBlob ? { name: metadata.zipName, blob: metadata.zipBlob } : undefined
+            };
+
+            setRecords(prev => {
+              const updated = [newRecord, ...prev];
+              saveDspRecordsToIndexedDB(updated);
+              syncDspRecordToFirestore(newRecord);
+              return updated;
+            });
+
+            if (onTriggerCloudSync) {
+              onTriggerCloudSync(
+                `✓ Stage 2 Breakdown Request ${refNum} transmitted and synced to cloud!`,
+                {
+                  type: 'CREATE',
+                  title: `Breakdown Request ${refNum}`,
+                  payload: newRecord
+                }
+              );
+            }
+          }
+        }}
+      />
+      <RegionBreakdownModal
+        isOpen={isRegionBreakdownModalOpen}
+        onClose={() => setIsRegionBreakdownModalOpen(false)}
+        hfListItems={hfListItems}
+        onSubmit={(newRecord) => {
+          setRecords(prev => {
+            const updated = [newRecord, ...prev];
+            saveDspRecordsToIndexedDB(updated);
+            syncDspRecordToFirestore(newRecord);
+            return updated;
+          });
+
+          if (onTriggerCloudSync) {
+            onTriggerCloudSync(
+              `✓ Stage 3 Regional Breakdown ${newRecord.dspRefNumber} submitted and synced to cloud!`,
+              {
+                type: 'CREATE',
+                title: `Regional Breakdown ${newRecord.dspRefNumber}`,
+                payload: newRecord
+              }
+            );
+          }
+        }}
+      />
+
+      {/* 6-Stage Interactive Visual Pipeline Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-x-auto">
+        <div className="text-[11px] font-bold text-slate-500 mb-2 px-1 flex items-center justify-between">
+          <span>DSP INTER-INSTITUTIONAL WORKFLOW STAGES</span>
+          <span className="text-[10px] text-amber-600 font-normal italic">Click to filter • Double-click any stage card to inspect source dossiers</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 min-w-[720px]">
+          {stagesList.map((stg) => {
+            const isSelected = currentSubTab === stg.id || (currentSubTab === 'dsp-mgmt' && stg.stageKey === 'moh-to-epss');
+            return (
+              <button
+                key={stg.id}
+                onClick={() => onSelectSubTab?.(stg.id as any)}
+                onDoubleClick={() => setInspectStageInfo({ stageKey: stg.stageKey, stageTitle: stg.label })}
+                title="Double-click to view stage source data"
+                className={`p-2.5 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-slate-50 border-amber-500/60 shadow-sm ring-1 ring-amber-500/30'
+                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${stg.color}`} />
+                  <span className="text-[10px] font-mono font-bold text-slate-400">{stg.count} Dossiers</span>
+                </div>
+                <div className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                  {stg.label}
+                </div>
+                {isSelected && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Workflow Volume Visualization Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Dossier Volume Distribution Funnel</h3>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">Click or double-click any funnel segment to view detailed source dossiers & DSP requests</p>
+            </div>
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-100">
+               <span className="text-[10px] font-bold text-indigo-600 px-2 uppercase font-mono">Interactive Stage Inspection</span>
+            </div>
+          </div>
+          
+          <div className="h-[320px] w-full" onDoubleClick={() => setInspectStageInfo({ stageKey: stagesList[0].stageKey, stageTitle: stagesList[0].label })}>
+            <ResponsiveContainer width="100%" height="100%">
+              <FunnelChart>
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                  cursor={{ fill: 'transparent' }}
+                />
+                <Funnel
+                  data={stagesList.map(stg => ({
+                    name: stg.label.split('. ')[1] || stg.label,
+                    value: stg.count || 0,
+                    fill: stg.color.includes('blue') ? '#2563eb' : 
+                          stg.color.includes('cyan') ? '#0891b2' : 
+                          stg.color.includes('amber') ? '#d97706' : 
+                          stg.color.includes('purple') ? '#9333ea' : 
+                          stg.color.includes('emerald') ? '#059669' : '#e11d48'
+                  }))}
+                  dataKey="value"
+                  onClick={(data: any, index: number) => {
+                    if (stagesList[index]) {
+                      setInspectStageInfo({ stageKey: stagesList[index].stageKey, stageTitle: stagesList[index].label });
+                    }
+                  }}
+                >
+                  <LabelList position="right" fill="#64748b" stroke="none" dataKey="name" fontSize={11} fontWeight={600} />
+                  <LabelList position="center" fill="#fff" stroke="none" dataKey="value" fontSize={14} fontWeight={900} />
+                </Funnel>
+              </FunnelChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Stage Conversion Efficiency</h3>
+          </div>
+          
+          <div className="space-y-4">
+            {stagesList.map((stg, idx) => {
+              const prevCount = idx > 0 ? stagesList[idx-1].count : stg.count;
+              const conversion = prevCount === 0 ? 0 : Math.round((stg.count / prevCount) * 100);
+              
+              return (
+                <div key={stg.id} className="relative">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">{stg.label.split('. ')[1]?.split(' ')[0] || 'Stage'} Status</span>
+                    <span className="text-[10px] font-mono font-bold text-slate-700">{stg.count} Active</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full bg-gradient-to-r ${stg.color} transition-all duration-1000`} 
+                      style={{ width: `${Math.min(100, (stg.count / (records.length || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  {idx > 0 && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${conversion > 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                        {conversion}% Progression
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-medium font-mono">System Utilization</span>
+              <span className="text-indigo-600 font-black">HIGH (94.2%)</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 leading-relaxed italic">
+              Efficiency metric based on the ratio of successfully dispatched dossiers versus total requests initiated in the current cycle.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Regional Breakdown Frequency Analytics */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm" onDoubleClick={() => setInspectStageInfo({ stageKey: 'rhb-to-moh', stageTitle: 'Regional Breakdown Frequency Source Data' })}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-amber-600" />
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Regional Breakdown Frequency</h3>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">Click or double-click any regional bar to inspect detailed source breakdown dossiers</p>
+          </div>
+          <div className="flex items-center gap-1.5 bg-amber-50 p-1 rounded-lg border border-amber-100">
+             <span className="text-[10px] font-bold text-amber-600 px-2 uppercase font-mono tracking-tighter">RHB Engagement Distribution</span>
+          </div>
+        </div>
+
+        <div className="h-[280px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart 
+              data={regionalFrequencyData} 
+              margin={{ top: 10, right: 30, left: 20, bottom: 40 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis 
+                dataKey="region" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
+                angle={-45}
+                textAnchor="end"
+                interval={0}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
+                allowDecimals={false}
+              />
+              <Tooltip 
+                cursor={{ fill: '#f8fafc' }}
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
+              />
+              <Bar 
+                dataKey="count" 
+                name="Dossier Count"
+                radius={[4, 4, 0, 0]} 
+                barSize={32}
+                onClick={(data: any) => {
+                  const regName = data?.region || data?.activePayload?.[0]?.payload?.region || 'Regional';
+                  setInspectStageInfo({ stageKey: 'rhb-to-moh', stageTitle: `Regional Breakdown Frequency - ${regName}` });
+                }}
+              >
+                {regionalFrequencyData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={index % 2 === 0 ? '#4f46e5' : '#6366f1'} 
+                    fillOpacity={0.85}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* KPI Cards for Current Selection */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold text-slate-500">Total DSP Dossiers</div>
+            <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">{filteredRecords.length} Documents</div>
+            <div className="text-[10px] text-amber-600 font-medium mt-0.5">Active in Current Stage</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
+            <FileText className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold text-slate-500">Allocated Medical Devices</div>
+            <div className="text-xl font-black text-cyan-600 mt-0.5 font-mono">{totalUnits.toLocaleString()} Units</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">Physical Devices Earmarked</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600">
+            <Layers className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-semibold text-slate-500">Total Distribution Valuation</div>
+            <div className="text-xl font-black text-emerald-600 mt-0.5 font-mono">{formatCurrency(totalValuation)}</div>
+            <div className="text-[10px] text-emerald-600/80 mt-0.5 font-medium">Program & Capital Value</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        {currentStage === 'moh-to-epss' ? (
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">MOH Action & Turnaround Tracker</div>
+              <div className="text-xl font-black text-amber-600 mt-0.5 font-mono">
+                {stage1PendingCount} Pending Action
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                <span className={stage1OverdueCount > 0 ? "text-rose-600 font-bold" : "text-emerald-600 font-medium"}>
+                  {stage1OverdueCount > 0 ? `• ${stage1OverdueCount} Overdue (>3d)` : `• All within SLA`}
+                </span>
+                <span>| Avg {avgTurnaroundDays}d turnaround</span>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
+              <Clock className="w-5 h-5" />
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Recipient Health Facilities</div>
+              <div className="text-xl font-black text-purple-600 mt-0.5 font-mono">{totalFacilities} Centers</div>
+              <div className="text-[10px] text-purple-600/80 mt-0.5 font-medium">Hospitals & Health Centers</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-100 text-purple-600">
+              <Hospital className="w-5 h-5" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Notification Banner */}
+      {actionFeedbackToast && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{actionFeedbackToast}</span>
+          </div>
+          <button
+            onClick={() => setActionFeedbackToast(null)}
+            className="text-emerald-600 hover:text-emerald-800 text-xs font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Region Multi-Select Filter Bar */}
+      {currentStage === 'moh-to-rhb' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-lg">
+                <Filter className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Ethiopian Regions Dynamic Filter ({selectedRegionsFilter.length}/{ALL_ETHIOPIAN_REGIONS.length} Selected)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px]">
+              <button
+                onClick={handleSelectAllRegions}
+                className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-amber-700 font-bold transition cursor-pointer border border-slate-200"
+              >
+                Select All (15 Regions)
+              </button>
+              <button
+                onClick={handleClearAllRegions}
+                className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold transition cursor-pointer border border-slate-200"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {ALL_ETHIOPIAN_REGIONS.map((reg) => {
+              const isSelected = selectedRegionsFilter.some(r => r.toLowerCase() === reg.toLowerCase());
+              return (
+                <button
+                  key={reg}
+                  onClick={() => handleToggleRegion(reg)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                  <span>{reg}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Stage 3 Format Switcher */}
+      {currentStage === 'rhb-to-moh' && (
+        <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-800">Stage 3 Display Format:</span>
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
+              <button
+                onClick={() => setStage3ViewMode('matrix')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage3ViewMode === 'matrix'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Facility Breakdown Matrix (Official Format)</span>
+              </button>
+              <button
+                onClick={() => setStage3ViewMode('ledger')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage3ViewMode === 'ledger'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Dossiers Ledger</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+            Two-tier Header: Region / Zone / Woreda / Facility / Packages / Equipment
+          </div>
+        </div>
+      )}
+
+      {/* Stage 4 Format Switcher */}
+      {currentStage === 'moh-to-epss-ho' && (
+        <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-800">Stage 4 Display Format:</span>
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
+              <button
+                onClick={() => setStage4ViewMode('matrix')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage4ViewMode === 'matrix'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Facility Breakdown Matrix (Official Format)</span>
+              </button>
+              <button
+                onClick={() => setStage4ViewMode('ledger')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage4ViewMode === 'ledger'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Dossiers Ledger</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-purple-700 font-semibold bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+            Two-tier Header: Region / Zone / Woreda / Name of health facility / List of Packeges / Equipment
+          </div>
+        </div>
+      )}
+
+      {/* Stage 5 Format Switcher */}
+      {currentStage === 'epss-ho-aggregation' && (
+        <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-800">Stage 5 Display Format:</span>
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
+              <button
+                onClick={() => setStage5ViewMode('hub-aggregation')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage5ViewMode === 'hub-aggregation'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <GitMerge className="w-3.5 h-3.5" />
+                <span>Map HF to Hub based on HF Master data</span>
+              </button>
+              <button
+                onClick={() => setStage5ViewMode('ledger')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  stage5ViewMode === 'ledger'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Dossiers Ledger</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Master Data Mapping: Delivering Plant (EPSS Hub) Assignment</span>
+          </div>
+        </div>
+      )}
+
+      {/* Render Facility Breakdown Matrix directly when in Stage 3 and matrix mode */}
+      {currentStage === 'rhb-to-moh' && stage3ViewMode === 'matrix' ? (
+        <RegionBreakdownMatrixTable
+          data={
+            selectedRecord?.facilityMatrixData ||
+            records.find(r => r.stage === 'rhb-to-moh' && r.facilityMatrixData)?.facilityMatrixData || {
+              date: '2026-10-27',
+              region: 'Oromia',
+              columns: DEFAULT_STAGE_3_COLUMNS,
+              rows: DEFAULT_STAGE_3_ROWS
+            }
+          }
+          hfListItems={hfListItems}
+          isEditable={true}
+          breakdownRequests={records}
+          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh')?.id || ''}
+          onSelectBreakdownRequest={(reqId) => {
+            const req = records.find(r => r.id === reqId);
+            if (req) {
+              setSelectedRecord(req);
+            }
+          }}
+          onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
+          onUpdateData={(updated) => {
+            setRecords(prev => {
+              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'rhb-to-moh')?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'rhb-to-moh');
+              if (existingIdx >= 0) {
+                const updatedRec = {
+                  ...prev[existingIdx],
+                  facilityMatrixData: updated,
+                  targetedFacilitiesCount: updated.rows.length,
+                  totalQuantity: updated.rows.reduce((sum, r) => {
+                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+                  }, 0)
+                };
+                const copy = [...prev];
+                copy[existingIdx] = updatedRec;
+                saveDspRecordsToIndexedDB(copy);
+                syncDspRecordToFirestore(updatedRec);
+                return copy;
+              }
+              return prev;
+            });
+          }}
+          title="3. DSP Submitted Region to MOH - Health Facility Breakdown Matrix"
+          subtitle="Official two-tier template showing medical device allocations per health facility across zones and woredas"
+        />
+      ) : currentStage === 'rhb-to-moh' && stage3ViewMode === 'ledger' ? (
+        <RegionalSubmittedDataView records={records} />
+      ) : currentStage === 'moh-to-epss-ho' && stage4ViewMode === 'matrix' ? (
+        <Stage4MohSubmittedMatrixTable
+          data={
+            selectedRecord?.stage4MatrixData ||
+            records.find(r => r.stage === 'moh-to-epss-ho' && r.stage4MatrixData)?.stage4MatrixData || {
+              date: '2026-10-28',
+              region: 'Oromia',
+              columns: DEFAULT_STAGE_4_COLUMNS,
+              rows: DEFAULT_STAGE_4_ROWS
+            }
+          }
+          hfListItems={hfListItems}
+          isEditable={true}
+          dossiers={records.filter(r => r.stage === 'moh-to-epss-ho')}
+          selectedDossierId={selectedRecord?.id || records.find(r => r.stage === 'moh-to-epss-ho')?.id || ''}
+          onSelectDossier={(dId) => {
+            const req = records.find(r => r.id === dId);
+            if (req) {
+              setSelectedRecord(req);
+            }
+          }}
+          onUpdateData={(updated) => {
+            setRecords(prev => {
+              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'moh-to-epss-ho')?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'moh-to-epss-ho');
+              if (existingIdx >= 0) {
+                const updatedRec = {
+                  ...prev[existingIdx],
+                  stage4MatrixData: updated,
+                  targetedFacilitiesCount: updated.rows.length,
+                  totalQuantity: updated.rows.reduce((sum, r) => {
+                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+                  }, 0)
+                };
+                const copy = [...prev];
+                copy[existingIdx] = updatedRec;
+                saveDspRecordsToIndexedDB(copy);
+                syncDspRecordToFirestore(updatedRec);
+                return copy;
+              }
+              return prev;
+            });
+          }}
+          title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
+          subtitle="Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers"
+        />
+      ) : currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation' ? (
+        <Stage5EpssHoAggregationView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          setHfListItems={setHfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : currentStage === 'epss-to-branch' ? (
+        <Stage6EpssBranchDispatchView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (
+        <>
+          {/* Filter and Search Bar */}
+          <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search DSP ref, letter number, subject, organization..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {/* Aging & Date Count SLA Filter */}
+              <select
+                value={agingFilter}
+                onChange={(e) => setAgingFilter(e.target.value as any)}
+                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
+              >
+                <option value="all">All Date Counts & Aging</option>
+                <option value="pending">⏳ Awaiting Action (Active Count)</option>
+                <option value="overdue">⚠️ Action Overdue (&gt;3 Days)</option>
+                <option value="completed">✓ Action Completed (Turnaround)</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
+              >
+                <option value="all">All Approval Statuses</option>
+                <option value="Draft">Draft</option>
+                <option value="Submitted & Pending">Submitted & Pending</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Endorsed & Approved">Endorsed & Approved</option>
+                <option value="Dispatched to Plants">Dispatched to Plants</option>
+              </select>
+
+              <select
+                value={stageFilter}
+                onChange={(e) => setStageFilter(e.target.value)}
+                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
+              >
+                <option value="all">All Workflow Stages</option>
+                {stagesList.map(s => (
+                  <option key={s.id} value={s.stageKey}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+      {/* DSP Dossier Records Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4">DSP Reference & Letter</th>
+                <th className="py-3 px-4">Stage & Routing Flow</th>
+                <th className="py-3 px-4">Subject / Scope</th>
+                <th className="py-3 px-4 text-center">Allocated Units</th>
+                <th className="py-3 px-4 text-right">Valuation (ETB)</th>
+                <th className="py-3 px-4 text-center">
+                  <div className="flex items-center justify-center gap-1 text-slate-700 font-black">
+                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Date Count & SLA</span>
+                  </div>
+                </th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-600">
+              {filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Archive className="w-8 h-8 text-slate-200" />
+                      <p className="text-slate-400 font-medium">No DSP workflow dossiers found in this stage or filter.</p>
+                      <p className="text-[10px] text-slate-300">New records will appear here after submission.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredRecords.map((rec) => (
+                  <tr
+                    key={rec.id}
+                    className="hover:bg-slate-50 transition-colors group"
+                  >
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-bold text-indigo-600 group-hover:text-indigo-700">{rec.dspRefNumber}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Letter: {rec.officialLetterRef}</div>
+                      <div className="text-[10px] text-slate-400">{rec.dateSubmitted}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900 text-[11px]">{rec.stageTitle}</div>
+                      <div className="text-[10px] text-slate-500 truncate max-w-xs">
+                        From: <span className="text-slate-700 font-medium">{rec.senderOrg}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate max-w-xs">
+                        To: <span className="text-slate-700 font-medium">{rec.recipientOrg}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 max-w-xs">
+                      <div className="font-medium text-slate-700 truncate">{rec.subject}</div>
+                      <div className="text-[10px] text-slate-500 font-semibold">Signatory: {rec.signatory}</div>
+                    </td>
+                    <td className="py-3 px-4 text-center font-mono font-black text-cyan-700">
+                      {rec.totalQuantity.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-black text-emerald-700">
+                      {formatCurrency(rec.totalValuationETB)}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {(() => {
+                        const dateInfo = computeDateCount(
+                          rec.dateSubmitted,
+                          rec.actionTakenDate || rec.approvedDate,
+                          rec.status,
+                          rec.actionTakenBy,
+                          rec.actionType,
+                          rec.turnaroundDays
+                        );
+                        return (
+                          <div className="inline-flex flex-col items-center">
+                            <div className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold flex items-center gap-1.5 ${dateInfo.badgeClass}`}>
+                              {dateInfo.isActionTaken ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              ) : dateInfo.days > 3 ? (
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 animate-pulse" />
+                              ) : (
+                                <Hourglass className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              )}
+                              <span>{dateInfo.label}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-medium mt-0.5">
+                              {dateInfo.sublabel}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span className={`text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 ${
+                          rec.status === 'Endorsed & Approved'
+                            ? 'text-emerald-600'
+                            : rec.status === 'Dispatched to Plants'
+                            ? 'text-purple-600'
+                            : rec.status === 'Under Review'
+                            ? 'text-amber-600'
+                            : 'text-cyan-600'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            rec.status === 'Endorsed & Approved' ? 'bg-emerald-500' :
+                            rec.status === 'Dispatched to Plants' ? 'bg-purple-500' :
+                            rec.status === 'Under Review' ? 'bg-amber-500' : 'bg-cyan-500'
+                          }`} />
+                          {rec.status}
+                        </span>
+
+                        {/* Visual Badge / Alert Label for days elapsed since sent to MOH */}
+                        {(() => {
+                          const dateInfo = computeDateCount(
+                            rec.dateSubmitted,
+                            rec.actionTakenDate || rec.approvedDate,
+                            rec.status,
+                            rec.actionTakenBy,
+                            rec.actionType,
+                            rec.turnaroundDays
+                          );
+
+                          if (dateInfo.isActionTaken) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>{dateInfo.days}d to Action</span>
+                              </span>
+                            );
+                          }
+
+                          if (dateInfo.days === 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                                <Clock className="w-3 h-3 text-blue-600" />
+                                <span>Sent Today (0d)</span>
+                              </span>
+                            );
+                          } else if (dateInfo.days <= 2) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-50 text-cyan-800 border border-cyan-200 shadow-2xs">
+                                <Hourglass className="w-3 h-3 text-cyan-600" />
+                                <span>{dateInfo.days}d Elapsed</span>
+                              </span>
+                            );
+                          } else if (dateInfo.days <= 5) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                                <AlertCircle className="w-3 h-3 text-amber-600" />
+                                <span>⚠️ {dateInfo.days}d at MOH</span>
+                              </span>
+                            );
+                          } else {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs animate-pulse">
+                                <AlertCircle className="w-3 h-3 text-rose-600" />
+                                <span>🚨 {dateInfo.days}d Overdue</span>
+                              </span>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {rec.stage === 'moh-to-epss' && (
+                          <button
+                            onClick={() => handleOpenActionModal(rec)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-sm ${
+                              rec.actionTakenDate || rec.status === 'Endorsed & Approved'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                            }`}
+                            title="Take action on this DSP request"
+                          >
+                            <Zap className={`w-3 h-3 ${rec.actionTakenDate || rec.status === 'Endorsed & Approved' ? 'text-emerald-600' : 'text-amber-300'}`} />
+                            <span>{rec.actionTakenDate || rec.status === 'Endorsed & Approved' ? 'Action Taken' : 'Take Action'}</span>
+                          </button>
+                        )}
+                        {rec.stage === 'moh-to-rhb' && (
+                          <>
+                            <button
+                              onClick={() => handleOpenBreakdownEmail(rec)}
+                              className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Send or re-dispatch breakdown via Email"
+                            >
+                              <Mail className="w-3 h-3 text-indigo-600" />
+                              <span>Email</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenBreakdownWhatsApp(rec)}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Send or re-dispatch breakdown via WhatsApp"
+                            >
+                              <MessageCircle className="w-3 h-3 text-emerald-600" />
+                              <span>WhatsApp</span>
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => setSelectedRecord(rec)}
+                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold transition cursor-pointer border border-slate-200 shadow-sm"
+                        >
+                          View Dossier
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </>
+      )}
+
+      {/* Detailed DSP Dossier Modal */}
+      {selectedRecord && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`bg-white border border-slate-200 rounded-2xl ${selectedRecord.facilityMatrixData ? 'max-w-5xl' : 'max-w-2xl'} w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4`}>
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold text-amber-600 tracking-widest uppercase">
+                    • {selectedRecord.dspRefNumber}
+                  </span>
+                  <span className="text-xs font-bold text-slate-900">{selectedRecord.stageTitle}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">{selectedRecord.subject}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedRecord(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Official Letter Routing Card */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">ISSUING SENDER</span>
+                  <span className="text-slate-900 font-semibold">{selectedRecord.senderOrg}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">RECIPIENT BODY</span>
+                  <span className="text-slate-900 font-semibold">{selectedRecord.recipientOrg}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">OFFICIAL LETTER REFERENCE</span>
+                  <span className="text-cyan-700 font-mono font-black">{selectedRecord.officialLetterRef}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">SUBMISSION DATE</span>
+                  <span className="text-slate-700 font-medium">{selectedRecord.dateSubmitted}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Count & Action Turnaround Card */}
+            {(() => {
+              const dateInfo = computeDateCount(
+                selectedRecord.dateSubmitted,
+                selectedRecord.actionTakenDate || selectedRecord.approvedDate,
+                selectedRecord.status,
+                selectedRecord.actionTakenBy,
+                selectedRecord.actionType,
+                selectedRecord.turnaroundDays
+              );
+              return (
+                <div className={`p-3.5 rounded-xl border ${dateInfo.badgeClass} flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs`}>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-white/90 rounded-xl shadow-2xs shrink-0 mt-0.5">
+                      {dateInfo.isActionTaken ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          {dateInfo.isActionTaken ? 'MOH Action Completed & Turnaround Finalized' : 'Active Date Count Tracker (MOH/RHB to MOH)'}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/80 border border-current">
+                          {dateInfo.label}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-700 font-medium mt-1">
+                        {dateInfo.isActionTaken ? (
+                          <>
+                            Action Decision: <span className="font-bold text-slate-900">{selectedRecord.actionType || 'Endorsed & Approved'}</span> on <span className="font-mono font-bold text-slate-900">{selectedRecord.actionTakenDate || selectedRecord.dateSubmitted}</span> by <span className="font-semibold text-slate-900">{selectedRecord.actionTakenBy || 'Authorized Officer'}</span>
+                            {selectedRecord.actionLetterRef && (
+                              <div className="text-[11px] font-mono text-cyan-800 mt-0.5">
+                                Memo/Ref: {selectedRecord.actionLetterRef}
+                              </div>
+                            )}
+                            {selectedRecord.actionNotes && (
+                              <div className="text-[11px] text-slate-600 italic mt-0.5">
+                                &ldquo;{selectedRecord.actionNotes}&rdquo;
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            Transmitted on <span className="font-bold font-mono">{selectedRecord.dateSubmitted}</span>. Date counter is actively running while awaiting MOH review & action.
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedRecord.stage === 'moh-to-epss' && (
+                    <button
+                      onClick={() => handleOpenActionModal(selectedRecord)}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shrink-0"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>{dateInfo.isActionTaken ? 'Update Action' : 'Take Action Now'}</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Device Allocation Breakdown: Professional Smart Table */}
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-slate-700 flex items-center justify-between px-1">
+                <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-black">
+                  <FileText className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Exact Source Data — Medical Device Breakdown List</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+                    {selectedRecord.itemsIncluded.length} Material Groups
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csv = selectedRecord.itemsIncluded.map((item, idx) => ({
+                        'No': idx + 1,
+                        'Material Code': item.material,
+                        'Description': item.description,
+                        'Allocated Facility': item.allocatedFacility || 'N/A',
+                        'Plant': item.plant,
+                        'Quantity': item.quantity
+                      }));
+                      downloadCSV(`dossier-${selectedRecord.dspRefNumber}-items.csv`, csv);
+                    }}
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-64 overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold">
+                      <th className="p-2 border-r border-slate-300 w-10 text-center">#</th>
+                      <th className="p-2 border-r border-slate-300 min-w-[120px]">Material Code</th>
+                      <th className="p-2 border-r border-slate-300 min-w-[200px]">Item Description</th>
+                      <th className="p-2 border-r border-slate-300 min-w-[160px]">Allocated Facility</th>
+                      <th className="p-2 border-r border-slate-300 min-w-[90px] text-center">Plant</th>
+                      <th className="p-2 text-right min-w-[90px]">Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {selectedRecord.itemsIncluded.map((item, idx) => {
+                      const isNew = idx < 2;
+                      return (
+                        <tr 
+                          key={idx} 
+                          className={`transition-all duration-300 ${
+                            isNew ? 'bg-amber-50/80 border-l-4 border-amber-500 font-semibold' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">
+                            {idx + 1}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
+                            {item.material}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-slate-800">
+                            <div className="flex items-center gap-1.5">
+                              <span>{item.description}</span>
+                              {isNew && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 font-mono animate-pulse">
+                                  ✨ NEW
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-cyan-800 font-medium">
+                            {item.allocatedFacility || 'Regional Hub Allocation'}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">
+                            {item.plant || 'HO01'}
+                          </td>
+                          <td className="p-2 text-right font-mono font-black text-cyan-700">
+                            {formatNumber(item.quantity)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Regional Health Facility Breakdown Matrix (if present) */}
+            {selectedRecord.facilityMatrixData && (
+              <div className="space-y-2 border-t border-slate-200 pt-3">
+                <RegionBreakdownMatrixTable
+                  data={selectedRecord.facilityMatrixData}
+                  isEditable={false}
+                  title="Official Regional Health Facility Breakdown"
+                  subtitle="Two-tier equipment allocation matrix submitted by Regional Health Bureau to MOH"
+                />
+              </div>
+            )}
+
+            {/* Stage 4 MOH to EPSS Breakdown Matrix (if present) */}
+            {selectedRecord.stage4MatrixData && (
+              <div className="space-y-2 border-t border-slate-200 pt-3">
+                <Stage4MohSubmittedMatrixTable
+                  data={selectedRecord.stage4MatrixData}
+                  isEditable={false}
+                  title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
+                  subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS"
+                />
+              </div>
+            )}
+
+            {/* Signatory Footnote */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold">AUTHORIZED SIGNATORY</span>
+                <span className="font-bold text-slate-900">{selectedRecord.signatory}</span>
+                <span className="text-[10px] text-slate-500 block font-medium">{selectedRecord.signatoryRole}</span>
+              </div>
+              <div className="text-right flex flex-col items-end">
+                <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">STATUS & DURATION</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`text-xs font-black uppercase tracking-wider ${
+                    selectedRecord.status === 'Endorsed & Approved' ? 'text-emerald-600' :
+                    selectedRecord.status === 'Under Review' ? 'text-amber-600' : 'text-cyan-600'
+                  }`}>
+                    {selectedRecord.status}
+                  </span>
+                  {(() => {
+                    const dateInfo = computeDateCount(
+                      selectedRecord.dateSubmitted,
+                      selectedRecord.actionTakenDate || selectedRecord.approvedDate,
+                      selectedRecord.status,
+                      selectedRecord.actionTakenBy,
+                      selectedRecord.actionType,
+                      selectedRecord.turnaroundDays
+                    );
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${dateInfo.badgeClass}`}>
+                        {dateInfo.isActionTaken ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>{dateInfo.days}d to Action</span>
+                          </>
+                        ) : dateInfo.days > 5 ? (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-rose-600 animate-pulse" />
+                            <span>🚨 {dateInfo.days}d Overdue</span>
+                          </>
+                        ) : dateInfo.days > 2 ? (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            <span>⚠️ {dateInfo.days}d at MOH</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="w-3 h-3 text-cyan-600" />
+                            <span>{dateInfo.days}d Elapsed</span>
+                          </>
+                        )}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+            
+            {/* Transmitted Files Archive */}
+            {(selectedRecord.excelFile || selectedRecord.pdfFile || selectedRecord.zipFile) && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 px-1">
+                  <Archive size={12} className="text-amber-500" />
+                  <span>Transmitted Files Archive</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {selectedRecord.excelFile && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-sm">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600 shrink-0 border border-emerald-100">
+                          <FileSpreadsheet size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[11px] font-bold text-slate-900 truncate">{selectedRecord.excelFile.name}</div>
+                          <div className="text-[9px] text-slate-500 font-mono font-medium">Excel Dataset</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={async () => {
+                            const file = new File([selectedRecord.excelFile!.blob], selectedRecord.excelFile!.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                              try {
+                                await navigator.share({ title: selectedRecord.excelFile!.name, files: [file] });
+                              } catch (e) {}
+                            } else if (navigator.share) {
+                              try {
+                                await navigator.share({ title: selectedRecord.excelFile!.name, text: `EPSS DSP Excel: ${selectedRecord.excelFile!.name}` });
+                              } catch (e) {}
+                            } else if (navigator.clipboard && (window as any).ClipboardItem) {
+                              try {
+                                const item = new (window as any).ClipboardItem({ [file.type]: file });
+                                await navigator.clipboard.write([item]);
+                                alert(`Copied ${file.name} to clipboard for pasting!`);
+                              } catch (e) {
+                                alert(`Ready: ${file.name}`);
+                              }
+                            }
+                          }}
+                          className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer transition shadow-sm"
+                          title="Share Excel File via OS Native Share Sheet"
+                        >
+                          <Share2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const url = URL.createObjectURL(selectedRecord.excelFile!.blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = selectedRecord.excelFile!.name;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg cursor-pointer transition shadow-sm"
+                          title="Download Excel Backup"
+                        >
+                          <Download size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {selectedRecord.pdfFile && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-sm">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600 shrink-0 border border-indigo-100">
+                          <FileText size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[11px] font-bold text-slate-900 truncate">{selectedRecord.pdfFile.name}</div>
+                          <div className="text-[9px] text-slate-500 font-mono font-medium">Official PDF Letter</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={async () => {
+                            const file = new File([selectedRecord.pdfFile!.blob], selectedRecord.pdfFile!.name, { type: 'application/pdf' });
+                            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                              try {
+                                await navigator.share({ title: selectedRecord.pdfFile!.name, files: [file] });
+                              } catch (e) {}
+                            } else if (navigator.share) {
+                              try {
+                                await navigator.share({ title: selectedRecord.pdfFile!.name, text: `EPSS DSP Letter: ${selectedRecord.pdfFile!.name}` });
+                              } catch (e) {}
+                            }
+                          }}
+                          className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg cursor-pointer transition shadow-sm"
+                          title="Share PDF Letter via OS Native Share Sheet"
+                        >
+                          <Share2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const url = URL.createObjectURL(selectedRecord.pdfFile!.blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = selectedRecord.pdfFile!.name;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg cursor-pointer transition shadow-sm"
+                          title="Download PDF Letter Backup"
+                        >
+                          <Download size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedRecord.zipFile && (
+                  <button
+                    onClick={() => {
+                      const url = URL.createObjectURL(selectedRecord.zipFile!.blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = selectedRecord.zipFile!.name;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-purple-50 border border-purple-200 flex items-center gap-3 hover:bg-purple-100 transition group cursor-pointer shadow-sm"
+                  >
+                    <div className="p-1.5 bg-white border border-purple-200 rounded-lg text-purple-600 group-hover:scale-110 transition-transform">
+                      <Archive size={16} />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="text-[11px] font-bold text-purple-900 truncate">{selectedRecord.zipFile.name}</div>
+                      <div className="text-[9px] text-purple-600 font-mono font-medium uppercase tracking-tighter">Batch Archived Bundle (Full Package)</div>
+                    </div>
+                    <Download size={14} className="ml-auto text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              {selectedRecord.stage === 'moh-to-epss' && (
+                <button
+                  onClick={() => handleOpenActionModal(selectedRecord)}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{selectedRecord.actionTakenDate || selectedRecord.status === 'Endorsed & Approved' ? 'Update MOH Action' : 'Take Action on Request'}</span>
+                </button>
+              )}
+              {selectedRecord.stage === 'moh-to-rhb' && (
+                <>
+                  <button
+                    onClick={() => handleOpenBreakdownEmail(selectedRecord)}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Send via Email</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenBreakdownWhatsApp(selectedRecord)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Send via WhatsApp</span>
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => setSelectedRecord(null)}
+                className="px-4 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition cursor-pointer border border-slate-200 shadow-sm"
+              >
+                Close Dossier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Take Action on DSP Request (EPSS to MOH) Modal */}
+      {isActionModalOpen && actionTargetRecord && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-md">
+                    <Zap className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Take Action: DSP Request (EPSS to MOH)
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Ref: <span className="font-mono font-bold text-indigo-600">{actionTargetRecord.dspRefNumber}</span> • Letter: <span className="font-mono text-slate-700">{actionTargetRecord.officialLetterRef}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsActionModalOpen(false);
+                  setActionTargetRecord(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Date Count & Aging Status Banner */}
+            {(() => {
+              const dateInfo = computeDateCount(
+                actionTargetRecord.dateSubmitted,
+                actionFormDate,
+                actionTargetRecord.status,
+                actionTargetRecord.actionTakenBy,
+                actionTargetRecord.actionType,
+                actionTargetRecord.turnaroundDays
+              );
+              return (
+                <div className={`p-3.5 rounded-xl border ${dateInfo.badgeClass} flex items-center justify-between gap-3`}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/80 rounded-lg shadow-2xs">
+                      {dateInfo.isActionTaken ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-black uppercase tracking-wider">
+                        {dateInfo.isActionTaken ? 'Action Decision Finalized' : 'Active Date Count Tracker'}
+                      </div>
+                      <div className="text-sm font-black font-mono mt-0.5">
+                        {dateInfo.label}
+                      </div>
+                      <div className="text-[11px] font-medium opacity-90">
+                        {dateInfo.isActionTaken 
+                          ? `Recording action on ${actionFormDate} sets turnaround to ${dateInfo.days} calendar days.`
+                          : `Sent on ${actionTargetRecord.dateSubmitted} (${dateInfo.days} days elapsed awaiting MOH decision).`}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Action Reminder Trigger */}
+                  {!dateInfo.isActionTaken && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const subject = `URGENT FOLLOW-UP: DSP Quota Request ${actionTargetRecord.dspRefNumber} (${dateInfo.days} Days Elapsed)`;
+                        const body = `Dear MOH Directorate of Pharmaceuticals and Medical Devices,\n\nThis is an official follow-up reminder regarding DSP Allocation Request Ref: ${actionTargetRecord.dspRefNumber} (Official Letter: ${actionTargetRecord.officialLetterRef}), which was transmitted on ${actionTargetRecord.dateSubmitted}.\n\nIt has been ${dateInfo.days} days since transmittal and is currently awaiting your endorsement / action.\n\nSummary:\n- Allocated Units: ${actionTargetRecord.totalQuantity.toLocaleString()} Units\n- Valuation: ${formatCurrency(actionTargetRecord.totalValuationETB)}\n- Scope: ${actionTargetRecord.subject}\n\nPlease take action or endorse the allocation plan.\n\nThank you,\nEPSS Medical Equipment Directorate`;
+                        const mailto = `mailto:${encodeURIComponent(actionTargetRecord.recipientOrg || 'moh@ethiopia.gov.et')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                        window.open(mailto, '_blank');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-[10px] font-bold shadow-2xs transition flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Send official reminder with current elapsed days count"
+                    >
+                      <BellRing className="w-3 h-3 text-amber-600" />
+                      <span>Send Reminder</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Allocation Overview */}
+            <div className="grid grid-cols-3 gap-2 bg-slate-50 border border-slate-100 p-2.5 rounded-xl text-xs">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">TOTAL UNITS</span>
+                <span className="font-mono font-black text-cyan-700">{actionTargetRecord.totalQuantity.toLocaleString()} Units</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">VALUATION</span>
+                <span className="font-mono font-black text-emerald-700">{formatCurrency(actionTargetRecord.totalValuationETB)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">RECIPIENT BODY</span>
+                <span className="font-semibold text-slate-800 truncate block">{actionTargetRecord.recipientOrg}</span>
+              </div>
+            </div>
+
+            {/* Action Form */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Select MOH Action Decision
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    {
+                      id: 'Endorsed & Approved',
+                      title: 'Endorse & Approve Quota',
+                      desc: 'MOH officially endorses allocation quota as transmitted.',
+                      icon: CheckCircle2,
+                      color: 'text-emerald-600',
+                      border: 'border-emerald-200',
+                      bg: 'bg-emerald-50/50'
+                    },
+                    {
+                      id: 'Proceed to Stage 2 Breakdown',
+                      title: 'Endorse & Launch Breakdown',
+                      desc: 'Approve & immediately transition into Stage 2 Regional Breakdown.',
+                      icon: ArrowRight,
+                      color: 'text-teal-600',
+                      border: 'border-teal-200',
+                      bg: 'bg-teal-50/50'
+                    },
+                    {
+                      id: 'Under MOH Technical Review',
+                      title: 'Mark Under Technical Review',
+                      desc: 'MOH technical committee review is actively ongoing.',
+                      icon: Clock,
+                      color: 'text-amber-600',
+                      border: 'border-amber-200',
+                      bg: 'bg-amber-50/50'
+                    },
+                    {
+                      id: 'Revision Requested',
+                      title: 'Request Revision / Inquiry',
+                      desc: 'Return to EPSS with technical comments or quantity inquiries.',
+                      icon: AlertCircle,
+                      color: 'text-rose-600',
+                      border: 'border-rose-200',
+                      bg: 'bg-rose-50/50'
+                    }
+                  ].map(act => (
+                    <button
+                      key={act.id}
+                      type="button"
+                      onClick={() => setActionDecision(act.id as any)}
+                      className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-start gap-2.5 ${
+                        actionDecision === act.id
+                          ? `${act.bg} ${act.border} ring-2 ring-indigo-500/20 shadow-xs`
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <act.icon className={`w-4 h-4 shrink-0 mt-0.5 ${act.color}`} />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">{act.title}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">{act.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {actionDecision === 'Proceed to Stage 2 Breakdown' && (
+                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Select Regions for Breakdown Request
+                    </label>
+                    <div className="flex gap-2">
+                       <button 
+                        type="button"
+                        onClick={() => setActionFormRegions([...ALL_ETHIOPIAN_REGIONS])}
+                        className="text-[9px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                       >
+                         Select All
+                       </button>
+                       <button 
+                        type="button"
+                        onClick={() => setActionFormRegions([])}
+                        className="text-[9px] font-bold text-slate-500 hover:underline cursor-pointer"
+                       >
+                         Clear
+                       </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 max-h-32 overflow-y-auto pr-2 scrollbar-thin">
+                    {ALL_ETHIOPIAN_REGIONS.map(reg => (
+                      <label key={reg} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-white/60 transition cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={actionFormRegions.includes(reg)}
+                          onChange={(e) => {
+                            if (e.target.checked) setActionFormRegions(prev => [...prev, reg]);
+                            else setActionFormRegions(prev => prev.filter(r => r !== reg));
+                          }}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <span className={`text-[11px] font-medium transition-colors ${actionFormRegions.includes(reg) ? 'text-indigo-900 font-bold' : 'text-slate-500'}`}>
+                          {reg}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {actionFormRegions.length === 0 && (
+                    <div className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
+                      <AlertCircle size={10} />
+                      At least one region must be selected to proceed.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                    Action Date (Stops Active Date Count)
+                  </label>
+                  <input
+                    type="date"
+                    value={actionFormDate}
+                    onChange={(e) => setActionFormDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10px] text-indigo-600 font-semibold block mt-0.5">
+                    Calculated Turnaround: {computeDateCount(actionTargetRecord.dateSubmitted, actionFormDate).days} calendar days
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                    MOH Action / Letter Ref Number
+                  </label>
+                  <input
+                    type="text"
+                    value={actionFormLetterRef}
+                    onChange={(e) => setActionFormLetterRef(e.target.value)}
+                    placeholder="e.g. MOH/PMD/ACT/2026/044"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                  Authorized Action Officer / Approver
+                </label>
+                <input
+                  type="text"
+                  value={actionFormOfficer}
+                  onChange={(e) => setActionFormOfficer(e.target.value)}
+                  placeholder="e.g. Dr. Bethlehem (MOH Pharmaceuticals & Medical Devices Director)"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                  Action Decision Remarks / Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={actionFormNotes}
+                  onChange={(e) => setActionFormNotes(e.target.value)}
+                  placeholder="Official decision remarks regarding quota approval, facility readiness, or regional allocation criteria..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsActionModalOpen(false);
+                  setActionTargetRecord(null);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold border border-slate-200 cursor-pointer transition"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAction}
+                className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Confirm Action & Record Turnaround</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick WhatsApp Dispatch Modal for Stage 2 Breakdown Request */}
+      {quickWhatsAppModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">WhatsApp Regional Breakdown Dispatch</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Ref: <span className="font-mono font-bold text-indigo-600">{quickWhatsAppModal.record.dspRefNumber}</span> • {quickWhatsAppModal.record.targetedRegions.join(', ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setQuickWhatsAppModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                  Recipient WhatsApp Phone Number
+                </label>
+                <input
+                  type="text"
+                  value={quickWhatsAppModal.phone}
+                  onChange={(e) => setQuickWhatsAppModal({ ...quickWhatsAppModal, phone: e.target.value })}
+                  placeholder="+251911234567"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Formatted WhatsApp Message Body
+                  </label>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(quickWhatsAppModal.messageText);
+                      setQuickWhatsAppModal({ ...quickWhatsAppModal, copied: true });
+                      setTimeout(() => setQuickWhatsAppModal(prev => prev ? { ...prev, copied: false } : null), 2500);
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition border border-emerald-200"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{quickWhatsAppModal.copied ? 'Copied!' : 'Copy Text'}</span>
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  rows={8}
+                  value={quickWhatsAppModal.messageText}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 font-mono focus:outline-none resize-none shadow-inner leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setQuickWhatsAppModal(null)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer transition"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const waUrl = `https://wa.me/${quickWhatsAppModal.phone.replace(/\D/g, '')}?text=${encodeURIComponent(quickWhatsAppModal.messageText)}`;
+                  window.open(waUrl, '_blank');
+                  setActionFeedbackToast(`✓ Dispatched Breakdown Request ${quickWhatsAppModal.record.dspRefNumber} to WhatsApp!`);
+                  setTimeout(() => setActionFeedbackToast(null), 3500);
+                  setQuickWhatsAppModal(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Open in WhatsApp & Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inspectStageInfo && (
+        <StageSourceDataModal
+          isOpen={!!inspectStageInfo}
+          onClose={() => setInspectStageInfo(null)}
+          stageKey={inspectStageInfo.stageKey}
+          stageTitle={inspectStageInfo.stageTitle}
+          records={records}
+        />
+      )}
+
+      <SavedDraftsManagerModal
+        isOpen={isSavedDraftsManagerOpen}
+        onClose={() => setIsSavedDraftsManagerOpen(false)}
+        records={records}
+        onUpdateRecord={(updatedRecord) => {
+          setRecords(prev => {
+            const updated = prev.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+            saveDspRecordsToIndexedDB(updated);
+            return updated;
+          });
+        }}
+        onDeleteRecord={(id) => {
+          setRecords(prev => {
+            const updated = prev.filter(r => r.id !== id);
+            saveDspRecordsToIndexedDB(updated);
+            return updated;
+          });
+        }}
+        onSubmitDraft={(draftRecord) => {
+          const submittedRecord = {
+            ...draftRecord,
+            status: 'Submitted & Pending' as const,
+            dateSubmitted: new Date().toISOString().split('T')[0]
+          };
+          setRecords(prev => {
+            const updated = [submittedRecord, ...prev.filter(r => r.id !== draftRecord.id)];
+            saveDspRecordsToIndexedDB(updated);
+            return updated;
+          });
+        }}
+      />
+    </div>
+  );
+};
