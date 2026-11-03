@@ -37,7 +37,8 @@ import {
   BarChart2,
   PackageCheck,
   Package,
-  Users
+  Users,
+  CloudUpload
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -112,6 +113,7 @@ interface HeaderProps {
   receivingAlertCount?: number;
   isAdmin?: boolean;
   fileCount?: number;
+  onOpenUploadAllVisibleSql?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -173,7 +175,8 @@ export const Header: React.FC<HeaderProps> = ({
   setDashboardWbsFilter,
   availablePlants,
   availableGroups,
-  receivingAlertCount = 0
+  receivingAlertCount = 0,
+  onOpenUploadAllVisibleSql
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -360,12 +363,24 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-2">
-          {/* File Count Info */}
-          <div className="flex items-center gap-3">
+          {/* File Count Info & Cloud Sync Button */}
+          <div className="flex items-center gap-2.5">
              <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded-lg">
                 <Database className="w-3.5 h-3.5" />
                 {fileCount} Files Stored
               </span>
+
+            {onOpenUploadAllVisibleSql && (
+              <button
+                onClick={onOpenUploadAllVisibleSql}
+                className="text-[11px] text-cyan-200 hover:text-white font-semibold flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-700/80 to-indigo-700/80 hover:from-blue-600 hover:to-indigo-600 border border-blue-400/40 rounded-lg shadow-sm transition-all cursor-pointer"
+                title="Save all visible tables to cloud or generate Supabase SQL code"
+              >
+                <CloudUpload className="w-3.5 h-3.5 text-cyan-300" />
+                <span className="hidden sm:inline">Upload All Visible (Cloud & SQL)</span>
+                <span className="sm:hidden">Upload All</span>
+              </button>
+            )}
           </div>
 
           {/* Navigation Modules (Tabs Only) */}

@@ -45,6 +45,7 @@ import { PrintReportModal } from './components/PrintReportModal';
 import { PrintLandscapeConfirmModal } from './components/PrintLandscapeConfirmModal';
 import { LowStockConfigModal } from './components/LowStockConfigModal';
 import { MultipleDataUploadModal } from './components/MultipleDataUploadModal';
+import { UploadAllVisibleSqlModal } from './components/UploadAllVisibleSqlModal';
 import { ConfirmedDataNavBanner } from './components/ConfirmedDataNavBanner';
 import { HFListView } from './components/HFListView';
 import { ETHIOPIAN_HEALTH_FACILITIES_7500 } from './data/ethiopianHealthFacilities7500';
@@ -249,6 +250,7 @@ export function App() {
   const [deliverySubTab, setDeliverySubTab] = useState<'cdss' | 'agreement' | 'hp' | 'donation' | 'supply' | 'workflow'>('cdss');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [isCdssDropdownOpen, setIsCdssDropdownOpen] = useState(false);
+  const [isUploadAllVisibleModalOpen, setIsUploadAllVisibleModalOpen] = useState(false);
   const cdssDropdownRef = useRef<HTMLDivElement>(null);
 
   // Global Dashboard Filters
@@ -2208,7 +2210,12 @@ export function App() {
       } catch {}
     };
     window.addEventListener('epss:documents:updated', handleDocsUpdated);
-    return () => window.removeEventListener('epss:documents:updated', handleDocsUpdated);
+    const handleOpenUploadAllSql = () => setIsUploadAllVisibleModalOpen(true);
+    window.addEventListener('epss:open_upload_all_sql', handleOpenUploadAllSql);
+    return () => {
+      window.removeEventListener('epss:documents:updated', handleDocsUpdated);
+      window.removeEventListener('epss:open_upload_all_sql', handleOpenUploadAllSql);
+    };
   }, []);
 
   const [alerts, setAlerts] = useState<AlertNotification[]>(initialAlerts);
@@ -3413,6 +3420,7 @@ export function App() {
             availableGroups={availableGroups}
             isAdmin={isAdmin}
             fileCount={fileCount}
+            onOpenUploadAllVisibleSql={() => setIsUploadAllVisibleModalOpen(true)}
           />
         ) : (
           /* Mobile-only compact top bar for vertical layout */
@@ -4095,6 +4103,29 @@ export function App() {
         onUploadBatches={handleUploadBatches}
         onAcceptAndConfirmBatch={(confirmedBatch) => handleUploadBatches([], confirmedBatch)}
         onUploadMultipleStockData={handleUploadMultipleStockData}
+      />
+
+      {/* Unified All-Visible Cloud Upload & Supabase SQL Modal */}
+      <UploadAllVisibleSqlModal
+        isOpen={isUploadAllVisibleModalOpen}
+        onClose={() => setIsUploadAllVisibleModalOpen(false)}
+        items={items}
+        healthFacilities={hfListItems}
+        materialMasterItems={materialMasterItems}
+        multipleStockItems={multipleStockItems}
+        receivingDataRecords={receivingDataRecords}
+        distributionDataRecords={distributionDataRecords}
+        dspRecords={dspRecords}
+        currentUser={currentUser}
+        onUploadAllSuccess={(summary) => {
+          triggerCloudSyncToast(
+            `✓ Successfully uploaded all ${summary.totalUploaded.toLocaleString()} visible records to persistent cloud!`,
+            {
+              type: 'CREATE',
+              title: `Unified All-Table Ingestion (${summary.totalUploaded.toLocaleString()} Records)`
+            }
+          );
+        }}
       />
 
       {/* Login Cross-Browser Master Data Update Notification Modal */}

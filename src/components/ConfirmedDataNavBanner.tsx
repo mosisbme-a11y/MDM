@@ -10,7 +10,8 @@ import {
   FileSpreadsheet,
   X,
   ExternalLink,
-  Tag
+  Tag,
+  Database
 } from 'lucide-react';
 import { ConfirmedUploadBatch } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
@@ -107,6 +108,14 @@ export const ConfirmedDataNavBanner: React.FC<ConfirmedDataNavBannerProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('epss:open_upload_all_sql'))}
+            className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Upload all visible records to cloud and export Supabase SQL"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Upload All Visible (SQL)</span>
+          </button>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 border border-slate-300 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"

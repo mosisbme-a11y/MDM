@@ -1393,6 +1393,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {/* TAB CONTENT: 5. BACKUP, RESTORE & DATA STORAGE */}
       {activeSection === 'backup' && (
         <div className="space-y-6">
+          {/* Supabase & Cloud SQL Hub Banner */}
+          <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 rounded-2xl p-6 border border-blue-500/30 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-blue-800/50 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-300">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    PostgreSQL & Supabase SQL Hub
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                      13 Tables Configured
+                    </span>
+                  </h3>
+                  <p className="text-xs text-blue-200/70">
+                    Upload all visible data in one click or export complete SQL DDL & seeds for Supabase
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('epss:open_upload_all_sql'))}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/50 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Open Unified Upload & SQL Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-blue-100">
+              <div className="p-3 rounded-xl bg-blue-900/30 border border-blue-700/40">
+                <span className="font-bold text-white block">1. One-Click Cloud Upload</span>
+                <p className="text-blue-200/80 mt-1">
+                  Uploads all visible records from inventory, facilities, multiple stock, receiving, and distribution in one operation.
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-blue-900/30 border border-blue-700/40">
+                <span className="font-bold text-white block">2. Complete Supabase Schema</span>
+                <p className="text-blue-200/80 mt-1">
+                  Ready-to-run <code className="text-cyan-300">/supabase_schema.sql</code> script with RLS policies and high-speed B-Tree indexes.
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-blue-900/30 border border-blue-700/40">
+                <span className="font-bold text-white block">3. Drizzle ORM Sync</span>
+                <p className="text-blue-200/80 mt-1">
+                  All 13 tables are mapped in <code className="text-cyan-300">src/db/schema.ts</code> for TypeScript type safety.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Export Settings & Local Cache Backup */}
             <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
