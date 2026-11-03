@@ -20,8 +20,7 @@ import {
 import * as XLSX from 'xlsx';
 import { HealthFacilityRecord } from '../types';
 import { downloadCSV } from '../utils/formatters';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { uploadAndRecordFile } from '../utils/fileUploadService';
 import { fuzzyMatch, matchHealthFacility } from '../utils/fuzzyMatcher';
 import { ETHIOPIAN_HEALTH_FACILITIES_7500, ALL_HF_NAMES } from '../data/ethiopianHealthFacilities7500';
 
@@ -768,12 +767,10 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
       fileLabels.push(file.name);
       
       try {
-        const storageRef = ref(storage, `hf_uploads/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        newUploadedFiles.push({ name: file.name, url: downloadURL });
+        const rec = await uploadAndRecordFile(file, 'HF Master List', 0);
+        if (rec) newUploadedFiles.push({ name: file.name, url: rec.downloadUrl });
       } catch (err) {
-        console.warn('Storage upload bypassed (offline or rules restricted):', err);
+        console.warn('Cloud storage upload skipped:', err);
       }
 
       const rows = await readFilePromise(file);
