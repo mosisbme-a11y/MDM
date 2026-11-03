@@ -378,7 +378,7 @@ export interface DeviceDocument {
   officialSeal?: boolean;
   contentPreview?: string;
   fileType?: 'PDF' | 'XLSX' | 'DOCX';
-  fileUrl?: string; // URL of the file in Firebase Storage
+  fileUrl?: string; // URL of the file in Supabase Storage
   notes?: string;
 }
 
