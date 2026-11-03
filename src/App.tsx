@@ -1299,8 +1299,8 @@ export function App() {
     setHfListItems(updated);
     saveHFListToIndexedDB(updated);
     safeLocalStorageSetItem('epss_hf_list_items', JSON.stringify(updated));
-    syncCollectionToFirestore('healthFacilities', updated);
-    saveHFMasterListToServer(updated, 'append');
+    // (Old Firestore copy of the HF list removed: it re-uploaded all facilities one by one and slowed every upload)
+    // HF list is saved to Supabase by pushCentralMasterData below (a second parallel save raced with it)
 
     // Record to Master Data Log
     if (files && files.length > 0) {
