@@ -88,6 +88,7 @@ import {
   applyFontScaleToDOM,
 } from './utils/systemSettings';
 import { LoginView } from './components/LoginView';
+import { SupabaseSyncBadge } from './components/SupabaseSyncBadge';
 import { restoreSession, signOut as supabaseSignOut, onSignedOut } from './utils/authService';
 import { inventoryData } from './data/inventoryData';
 import { DEFAULT_MASTER_STOCK_RECORDS, DEFAULT_MASTER_MEDICAL_DEVICES } from './data/defaultInventoryItems';
@@ -3320,6 +3321,8 @@ export function App() {
       <div className={`flex-1 flex flex-col min-w-0 min-h-screen transition-all duration-300 ${
         systemLayout === 'vertical' ? (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-76') : ''
       }`}>
+        <SupabaseSyncBadge />
+
         {/* Toast Notification */}
         {toastMessage && (
           <div className={`fixed top-16 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border transition-all duration-300 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-200 select-none max-w-sm sm:max-w-md ${
