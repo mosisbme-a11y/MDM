@@ -180,8 +180,6 @@ import {
   fetchHFMasterListFromServer
 } from './utils/centralSyncService';
 
-import { db } from './lib/firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, getDocs, writeBatch, deleteDoc, getCountFromServer } from 'firebase/firestore';
 
 // Background Renderer for Image/Video Themes
 const BackgroundRenderer: React.FC<{ themeId: string }> = ({ themeId }) => {
@@ -372,108 +370,55 @@ export function App() {
     };
     setMasterDataLogs(prev => [newLog, ...prev].slice(0, 100));
     
-    if (userId) {
-      try {
-        const docRef = doc(db, 'users', userId, 'masterDataLogs', newLog.id);
-        await setDoc(docRef, newLog);
-      } catch (err) {
-        console.warn('Failed to save log to Firestore:', err);
-      }
-    }
-  };
-
-  const clearCollectionFromFirestore = async (collectionName: string) => {
-    const userId = getActiveUserId();
-    if (!userId) return;
     try {
-      const q = query(collection(db, 'users', userId, collectionName));
-      const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      snapshot.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
+      await fetch('/api/master-data-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ log: newLog })
+      });
+      window.dispatchEvent(new Event('epss:master_logs_updated'));
     } catch (err) {
-      console.warn(`Failed to clear collection ${collectionName}:`, err);
-    }
-  };
-
-  const deleteDocFromFirestore = async (collectionName: string, docId: string) => {
-    const userId = getActiveUserId();
-    if (!userId) return;
-    try {
-      const docRef = doc(db, 'users', userId, collectionName, docId);
-      await deleteDoc(docRef);
-    } catch (err) {
-      console.warn(`Failed to delete doc ${docId} from ${collectionName}:`, err);
+      console.warn('Failed to save master data log:', err);
     }
   };
 
   const getActiveUserId = () => currentUser?.uid || currentUser?.id || 'epss_master_admin';
 
   const fetchFileCount = async () => {
-    const userId = getActiveUserId();
-    if (!userId) return;
     try {
-      const q = collection(db, 'users', userId, 'uploadedFiles');
-      const snapshot = await getCountFromServer(q);
-      setFileCount(snapshot.data().count);
+      const res = await fetch('/api/uploaded-files');
+      if (res.ok) {
+        const data = await res.json();
+        setFileCount(Array.isArray(data.files) ? data.files.length : 0);
+        return;
+      }
     } catch (err) {
-      console.warn('Could not fetch file count from Firestore server, falling back to local files:', err);
-      try {
-        const local = localStorage.getItem('epss_uploaded_files');
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (Array.isArray(parsed)) setFileCount(parsed.length);
-        }
-      } catch {}
+      console.warn('Could not fetch file count from server, falling back to local files:', err);
     }
+    try {
+      const local = localStorage.getItem('epss_uploaded_files');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed)) setFileCount(parsed.length);
+      }
+    } catch {}
   };
 
   useEffect(() => {
     fetchFileCount();
   }, [currentUser?.uid, currentUser?.id]);
 
-  const isSyncingFirestoreRef = useRef<Record<string, boolean>>({});
-
-  const sanitizeItemForFirestore = (item: any) => {
-    if (!item || typeof item !== 'object') return item;
-    const clean: any = {};
-    Object.keys(item).forEach(key => {
-      const val = item[key];
-      if (val instanceof Blob) {
-        clean[key] = { name: (val as any).name || 'attachment' };
-      } else if (val !== undefined) {
-        clean[key] = val;
-      }
+  // DSP workflows are shared through the central Supabase store. Remote copy wins per record id;
+  // records that only exist locally are kept. dspSyncReadyRef stays false until the first cloud load
+  // finished so a fresh browser can never overwrite the cloud copy with its default demo data.
+  const dspSyncReadyRef = useRef(false);
+  const mergeRemoteDsp = (remote: DspWorkflowRecord[]) => {
+    setDspRecords(prev => {
+      const remoteMap = new Map(remote.map(r => [r.id, r]));
+      const merged = [...remote, ...prev.filter(r => !remoteMap.has(r.id))];
+      saveDspRecordsToIndexedDB(merged).catch(() => {});
+      return merged;
     });
-    return clean;
-  };
-
-  const syncCollectionToFirestore = async (subCollectionName: string, items: any[]) => {
-    const userId = getActiveUserId();
-    if (!userId || !items || !Array.isArray(items)) return;
-    isSyncingFirestoreRef.current[subCollectionName] = true;
-    try {
-      // Process all items in chunks of 500 (Firestore batch limit)
-      for (let i = 0; i < items.length; i += 500) {
-        const batch = writeBatch(db);
-        const chunk = items.slice(i, i + 500);
-        chunk.forEach(item => {
-          if (item && item.id) {
-            const docRef = doc(db, 'users', userId, subCollectionName, String(item.id));
-            batch.set(docRef, sanitizeItemForFirestore(item), { merge: true });
-          }
-        });
-        await batch.commit();
-      }
-    } catch (err) {
-      console.warn(`Failed to sync ${subCollectionName} to Firestore:`, err);
-    } finally {
-      // Extend delay for large datasets (e.g., 9000 items) to allow Firestore listeners to stabilize
-      const delay = Math.max(2000, Math.min(15000, items.length * 0.5));
-      setTimeout(() => {
-        isSyncingFirestoreRef.current[subCollectionName] = false;
-      }, delay);
-    }
   };
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
@@ -486,6 +431,10 @@ export function App() {
       try {
         const centralData = await fetchCentralMasterData();
         if (!isMounted || !centralData) return;
+        if (centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) {
+          mergeRemoteDsp(centralData.dspWorkflowRecords);
+        }
+        dspSyncReadyRef.current = true;
 
         const hasCentralRecords = (
           (centralData.items && centralData.items.length > 0) ||
@@ -642,6 +591,10 @@ export function App() {
         });
       }
 
+      if (remoteData.dspWorkflowRecords && remoteData.dspWorkflowRecords.length > 0) {
+        mergeRemoteDsp(remoteData.dspWorkflowRecords);
+      }
+
       if (remoteData.counts) {
         setCentralSyncStatus({
           version: remoteData.version,
@@ -652,7 +605,7 @@ export function App() {
           counts: remoteData.counts
         });
       }
-    }, 2500);
+    }, 10000); // Supabase Realtime pushes changes instantly; this is only a safety-net poll
 
     // 3. Fallback broadcast listener for same-browser multi-tab events (silent)
     const cleanupBroadcast = initializeAutoSyncListener((updateInfo) => {
@@ -951,7 +904,6 @@ export function App() {
       localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
 
-    syncCollectionToFirestore('programMdRecords', updated);
     pushCentralMasterData({
       programMdRecords: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -982,7 +934,7 @@ export function App() {
 
     // 4. Notify user
     triggerCloudSyncToast(
-      `✓ Successfully saved ${processedRecords.length} Program MD records to Firestore (Total: ${updated.length}).`,
+      `✓ Successfully saved ${processedRecords.length} Program MD records to the cloud (Total: ${updated.length}).`,
       {
         type: 'CREATE',
         title: `Upload ${processedRecords.length} Program MD Records`,
@@ -997,7 +949,6 @@ export function App() {
     try {
       localStorage.removeItem('epss_program_md_records');
     } catch {}
-    clearCollectionFromFirestore('programMdRecords');
     pushCentralMasterData({
       programMdRecords: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1015,7 +966,6 @@ export function App() {
     try {
       localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
-    syncCollectionToFirestore('programMdRecords', updated);
     pushCentralMasterData({
       programMdRecords: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1041,7 +991,6 @@ export function App() {
     try {
       localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
-    syncCollectionToFirestore('programMdRecords', updated);
     pushCentralMasterData({
       programMdRecords: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1060,7 +1009,6 @@ export function App() {
     try {
       localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
-    deleteDocFromFirestore('programMdRecords', id);
     pushCentralMasterData({
       programMdRecords: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1090,7 +1038,25 @@ export function App() {
   });
   const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>([]);
 
-  // Hydrate DSP Workflows from IndexedDB & Firestore
+  // Save DSP workflow changes to Supabase (debounced; unchanged chunks are skipped automatically)
+  useEffect(() => {
+    if (!currentUser || !dspSyncReadyRef.current || dspRecords.length === 0) return;
+    const timer = setTimeout(() => {
+      const clean = dspRecords.map(rec => {
+        const c: any = { ...rec };
+        ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
+        return c;
+      });
+      pushCentralMasterData({
+        dspWorkflowRecords: clean,
+        updatedBy: currentUser.name || currentUser.email,
+        updateKind: 'DSP Workflow Update'
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [dspRecords, currentUser?.id]);
+
+  // Hydrate DSP Workflows from IndexedDB (cloud copy arrives via central Supabase sync)
   useEffect(() => {
     const userId = getActiveUserId();
     if (!userId) return;
@@ -1118,22 +1084,7 @@ export function App() {
       }
     });
 
-    // 2. Real-time Sync from Firestore
-    const q = query(collection(db, 'users', userId, 'dspWorkflows'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const firestoreRecords = snapshot.docs.map(docSnap => docSnap.data() as DspWorkflowRecord);
-      if (firestoreRecords.length > 0) {
-        setDspRecords(prev => {
-          const remoteMap = new Map(firestoreRecords.map(r => [r.id, r]));
-          const localOnly = prev.filter(r => !remoteMap.has(r.id));
-          const merged = [...firestoreRecords, ...localOnly];
-          saveDspRecordsToIndexedDB(merged).catch(() => {});
-          return merged;
-        });
-      }
-    });
-
-    return () => unsubscribe();
+    // 2. Cross-browser sync of DSP workflows is handled by the central Supabase sync below.
   }, [currentUser?.uid, currentUser?.id]);
 
   // Automatically hydrate Health Facilities from IndexedDB on startup to support 10,000+ facilities
@@ -1187,7 +1138,6 @@ export function App() {
       // ignore
     }
     clearHFListFromIndexedDB();
-    clearCollectionFromFirestore('healthFacilities');
     pushCentralMasterData({
       hfListItems: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1213,7 +1163,6 @@ export function App() {
     } catch (e) {
       console.warn('Error clearing IndexedDB:', e);
     }
-    clearCollectionFromFirestore('inventory');
     pushCentralMasterData({
       items: [],
       noBkdItems: [],
@@ -1232,21 +1181,6 @@ export function App() {
       setToastMessage('🔒 Access Restricted: Data upload is strictly reserved for authorized Inventory Administrators.');
       setTimeout(() => setToastMessage(null), 4000);
       return;
-    }
-
-    // Store file references in Firestore (non-blocking)
-    if (files && files.length > 0) {
-        const userId = getActiveUserId();
-        if (userId) {
-          try {
-            const batch = writeBatch(db);
-            files.forEach(file => {
-                const docRef = doc(collection(db, 'users', userId, 'uploadedFiles'));
-                batch.set(docRef, { ...file, uploadedAt: new Date().toISOString() });
-            });
-            batch.commit().then(() => fetchFileCount()).catch(() => {});
-          } catch {}
-        }
     }
 
     // Capture initial count for sanity check
@@ -1299,7 +1233,6 @@ export function App() {
     setHfListItems(updated);
     saveHFListToIndexedDB(updated);
     safeLocalStorageSetItem('epss_hf_list_items', JSON.stringify(updated));
-    // (Old Firestore copy of the HF list removed: it re-uploaded all facilities one by one and slowed every upload)
     // HF list is saved to Supabase by pushCentralMasterData below (a second parallel save raced with it)
 
     // Record to Master Data Log
@@ -1350,7 +1283,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist hf list to localStorage', e);
     }
-    syncCollectionToFirestore('healthFacilities', updated);
     pushCentralMasterData({
       hfListItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1375,7 +1307,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist hf list', e);
     }
-    deleteDocFromFirestore('healthFacilities', id);
     pushCentralMasterData({
       hfListItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1433,7 +1364,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist material master to localStorage', e);
     }
-    syncCollectionToFirestore('materialMaster', updated);
 
     // Record to Master Data Log
     if (files && files.length > 0) {
@@ -1482,7 +1412,6 @@ export function App() {
     } catch {
       // ignore
     }
-    clearCollectionFromFirestore('materialMaster');
     pushCentralMasterData({
       materialMasterItems: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1502,7 +1431,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist material master item', e);
     }
-    syncCollectionToFirestore('materialMaster', updated);
     pushCentralMasterData({
       materialMasterItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1526,7 +1454,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist material master after update', e);
     }
-    syncCollectionToFirestore('materialMaster', updated);
     pushCentralMasterData({
       materialMasterItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1550,7 +1477,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist material master after deletion', e);
     }
-    deleteDocFromFirestore('materialMaster', id);
     pushCentralMasterData({
       materialMasterItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1633,7 +1559,6 @@ export function App() {
     } catch (e) {
       console.warn('LocalStorage limit reached; all data is safely preserved in IndexedDB', e);
     }
-    syncCollectionToFirestore('multipleStock', updated);
 
     // Record to Master Data Log
     if (files && files.length > 0) {
@@ -1682,7 +1607,6 @@ export function App() {
     } catch {
       // ignore
     }
-    clearCollectionFromFirestore('multipleStock');
     pushCentralMasterData({
       multipleStockItems: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1704,7 +1628,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist multiple stock item', e);
     }
-    syncCollectionToFirestore('multipleStock', updated);
     pushCentralMasterData({
       multipleStockItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1730,7 +1653,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist multiple stock after deletion', e);
     }
-    deleteDocFromFirestore('multipleStock', id);
     pushCentralMasterData({
       multipleStockItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1755,7 +1677,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist multiple stock item', e);
     }
-    syncCollectionToFirestore('multipleStock', updated);
     pushCentralMasterData({
       multipleStockItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1820,7 +1741,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist receiving records to localStorage', e);
     }
-    syncCollectionToFirestore('receivingData', updated);
 
     // Record to Master Data Log
     if (files && files.length > 0) {
@@ -1868,7 +1788,6 @@ export function App() {
     } catch {
       // ignore
     }
-    clearCollectionFromFirestore('receivingData');
     pushCentralMasterData({
       receivingDataRecords: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1921,7 +1840,6 @@ export function App() {
     } catch (e) {
       console.warn('Failed to persist distribution records to localStorage', e);
     }
-    syncCollectionToFirestore('distributionData', updated);
 
     // Record to Master Data Log
     if (files && files.length > 0) {
@@ -1968,7 +1886,6 @@ export function App() {
     } catch {
       // ignore
     }
-    clearCollectionFromFirestore('distributionData');
     pushCentralMasterData({
       distributionDataRecords: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -2934,7 +2851,6 @@ export function App() {
       const updated = [newDoc, ...filtered];
       try {
         localStorage.setItem('epss_documents_archive', JSON.stringify(updated));
-        syncCollectionToFirestore('documents', updated);
       } catch {}
       return updated;
     });
@@ -3088,7 +3004,6 @@ export function App() {
           try {
             localStorage.setItem('epss_inventory_items', JSON.stringify(parsedItems.slice(0, 1500)));
           } catch {}
-          syncCollectionToFirestore('inventory', parsedItems);
           recordMasterDataLog({
             type: 'Master Inventory',
             fileName: file.name,
@@ -3151,7 +3066,6 @@ export function App() {
       try {
         localStorage.setItem('epss_inventory_items', JSON.stringify(updated));
       } catch {}
-      syncCollectionToFirestore('inventory', updated);
       recordMasterDataLog({
         type: 'Master Inventory',
         fileName: batches.map((b) => b.fileName).filter(Boolean).join(', ') || 'Batch Ingestion',
