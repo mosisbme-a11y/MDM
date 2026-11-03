@@ -495,52 +495,52 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     { 
       id: 'head-office-dsp', 
       stageKey: 'head-office-dsp', 
-      label: '1. Head Office DSP Management', 
+      label: 'Head Office DSP Management', 
       color: 'from-blue-600 to-cyan-600', 
       count: records.filter(r => r.stage === 'head-office-dsp' || r.stage === 'moh-to-epss' || r.stage === 'epss-ho-aggregation').length,
       subSteps: [
-        { id: '1.1', label: '1.1 DSP request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
-        { id: '1.2', label: '1.2 DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
-        { id: '1.3.1', label: '1.3.1 Map HF to Hubs', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
-        { id: '1.3.2', label: '1.3.2 Send DSP to Hubs / Submit', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
-        { id: '1.3.3', label: '1.3.3 Item Aggregation', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
-        { id: '1.3.4', label: '1.3.4 Order Process', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
+        { id: '1.1', label: 'DSP Request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
+        { id: '1.2', label: 'DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
+        { id: '1.3.1', label: 'Map HF to Hubs', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
+        { id: '1.3.2', label: 'Send DSP to Hubs / Submit', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
+        { id: '1.3.3', label: 'Item Aggregation', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
+        { id: '1.3.4', label: 'Order Process', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
       ]
     },
     { 
       id: 'moh-osp-management', 
       stageKey: 'moh-osp-management', 
-      label: '2. MOH OSP Management', 
+      label: 'MOH OSP Management', 
       color: 'from-cyan-600 to-teal-600', 
       count: records.filter(r => r.stage === 'moh-osp-management' || r.stage === 'moh-to-rhb' || r.stage === 'moh-to-epss-ho').length,
       subSteps: [
-        { id: '2.1', label: '2.1 DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
-        { id: '2.2', label: '2.2 DSP Break down request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
-        { id: '2.3', label: '2.3 Break down Received from RHB', subTab: 'dsp-moh-2-3' as EpssSubTab },
-        { id: '2.4', label: '2.4 Break down Aggregation by RHB', subTab: 'dsp-moh-2-4' as EpssSubTab },
-        { id: '2.5', label: '2.5 DSP Agr. DSP Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
+        { id: '2.1', label: 'DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
+        { id: '2.2', label: 'DSP Breakdown Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
+        { id: '2.3', label: 'Breakdown Received from RHB', subTab: 'dsp-moh-2-3' as EpssSubTab },
+        { id: '2.4', label: 'Breakdown Aggregation by RHB', subTab: 'dsp-moh-2-4' as EpssSubTab },
+        { id: '2.5', label: 'DSP Agr. DSP Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
       ]
     },
     { 
       id: 'rhb-breakdown-management', 
       stageKey: 'rhb-breakdown-management', 
-      label: '3. RHB Breakdown Management', 
+      label: 'RHB Breakdown Management', 
       color: 'from-amber-600 to-orange-600', 
       count: records.filter(r => r.stage === 'rhb-breakdown-management' || r.stage === 'rhb-to-moh').length,
       subSteps: [
-        { id: '3.1', label: '3.1 Break down Received from MOH', subTab: 'dsp-rhb-3-1' as EpssSubTab },
-        { id: '3.2', label: '3.2 Submit Break down to MOH', subTab: 'dsp-rhb-3-2' as EpssSubTab },
+        { id: '3.1', label: 'Breakdown Received from MOH', subTab: 'dsp-rhb-3-1' as EpssSubTab },
+        { id: '3.2', label: 'Submit Breakdown to MOH', subTab: 'dsp-rhb-3-2' as EpssSubTab },
       ]
     },
     { 
       id: 'branches-dsp-management', 
       stageKey: 'branches-dsp-management', 
-      label: '4. Branches DSP Management', 
+      label: 'Branches DSP Management', 
       color: 'from-purple-600 to-indigo-600', 
       count: records.filter(r => r.stage === 'branches-dsp-management' || r.stage === 'epss-to-branch').length,
       subSteps: [
-        { id: '4.1', label: '4.1 Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
-        { id: '4.2', label: '4.2 Analysis and Comparing with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
+        { id: '4.1', label: 'Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
+        { id: '4.2', label: 'Analysis and Comparing with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
       ]
     },
   ];
@@ -565,7 +565,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       let matchSubStep = true;
       if (currentSubStep && currentSubStep !== 'all') {
         if (r.subStage) {
-          matchSubStep = r.subStage === currentSubStep || r.subStage.startsWith(currentSubStep);
+          matchSubStep = r.subStage === currentSubStep || r.subStage.startsWith(currentSubStep) || currentSubStep.startsWith(r.subStage);
+        } else {
+          // Fallback if subStage is not explicitly tagged on older or mock records:
+          // Keep stage records visible so data is always displayed when clicking hierarchy
+          matchSubStep = matchStage;
         }
       }
 

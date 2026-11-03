@@ -3662,12 +3662,17 @@ export function App() {
                 onSelectItem={(item) => setSelectedDevice(item)}
               />
             ) : epssSubTab === 'dsp-mgmt' ||
+               epssSubTab === 'head-office-dsp' ||
+               epssSubTab === 'moh-osp-management' ||
+               epssSubTab === 'rhb-breakdown-management' ||
+               epssSubTab === 'branches-dsp-management' ||
                epssSubTab === 'dsp-request-moh-epss' ||
                epssSubTab === 'dsp-breakdown-moh-rhb' ||
                epssSubTab === 'dsp-submitted-rhb-moh' ||
                epssSubTab === 'dsp-submitted-moh-epss-ho' ||
                epssSubTab === 'dsp-aggregation-epss-ho' ||
-               epssSubTab === 'dsp-submitted-epss-branch' ? (
+               epssSubTab === 'dsp-submitted-epss-branch' ||
+               (typeof epssSubTab === 'string' && epssSubTab.startsWith('dsp-')) ? (
               <DspWorkflowView
                 currentSubTab={epssSubTab}
                 onSelectSubTab={(tab) => setEpssSubTab(tab)}

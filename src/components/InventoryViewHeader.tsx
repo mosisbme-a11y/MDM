@@ -156,7 +156,12 @@ export const InventoryViewHeader: React.FC<InventoryViewHeaderProps> = ({
         currentSubTab === 'dsp-submitted-rhb-moh' ||
         currentSubTab === 'dsp-submitted-moh-epss-ho' ||
         currentSubTab === 'dsp-aggregation-epss-ho' ||
-        currentSubTab === 'dsp-submitted-epss-branch'
+        currentSubTab === 'dsp-submitted-epss-branch' ||
+        currentSubTab === 'head-office-dsp' ||
+        currentSubTab === 'moh-osp-management' ||
+        currentSubTab === 'rhb-breakdown-management' ||
+        currentSubTab === 'branches-dsp-management' ||
+        (typeof currentSubTab === 'string' && currentSubTab.startsWith('dsp-'))
       ? 'dsp-mgmt'
       : currentSubTab === 'plant-receiving-dsp' ||
         currentSubTab === 'plant-distribution-status' ||

@@ -699,6 +699,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         onClick={() => {
                           setActiveTab('inventory');
+                          if (!isDspMgmtOpen) {
+                            onSelectEpssSubTab?.('head-office-dsp');
+                          }
                           setIsDspMgmtOpen(prev => !prev);
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
@@ -729,7 +732,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       {/* Visible only when expanded / clicked */}
                       {isDspMgmtOpen && (
                         <div className="ml-3 pl-2.5 border-l-2 border-amber-500/30 space-y-1 py-0.5">
-                          {/* 1. Head office DSP management */}
+                          {/* Head office DSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
@@ -742,10 +745,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Send className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span className="truncate">1. Head Office DSP Mgmt</span>
+                            <span className="truncate">Head Office DSP Mgmt</span>
                           </button>
 
-                          {/* 2. MOH OSP management */}
+                          {/* MOH OSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
@@ -758,10 +761,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <FileText className="w-3 h-3 text-cyan-400 shrink-0" />
-                            <span className="truncate">2. MOH OSP Management</span>
+                            <span className="truncate">MOH OSP Management</span>
                           </button>
 
-                          {/* 3. RHB Break down management */}
+                          {/* RHB Break down management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
@@ -774,10 +777,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Building2 className="w-3 h-3 text-orange-400 shrink-0" />
-                            <span className="truncate">3. RHB Breakdown Mgmt</span>
+                            <span className="truncate">RHB Breakdown Mgmt</span>
                           </button>
 
-                          {/* 4. Branches DSP management */}
+                          {/* Branches DSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
@@ -790,7 +793,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Warehouse className="w-3 h-3 text-purple-400 shrink-0" />
-                            <span className="truncate">4. Branches DSP Mgmt</span>
+                            <span className="truncate">Branches DSP Mgmt</span>
                           </button>
                         </div>
                       )}
