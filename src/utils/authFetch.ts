@@ -23,15 +23,19 @@ export function installAuthFetch(): void {
     }
   };
 
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (!isOwnApi(input)) return originalFetch(input, init);
-    const token = await getAccessToken();
-    if (!token) return originalFetch(input, init);
+  Object.defineProperty(window, 'fetch', {
+    value: async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!isOwnApi(input)) return originalFetch(input, init);
+      const token = await getAccessToken();
+      if (!token) return originalFetch(input, init);
 
-    const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-    if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
-    return originalFetch(input, { ...init, headers });
-  };
+      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+      if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+      return originalFetch(input, { ...init, headers });
+    },
+    writable: true,
+    configurable: true
+  });
 
   // Download links to files stored on the server
   document.addEventListener(

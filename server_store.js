@@ -28,7 +28,9 @@ const ARRAY_FIELDS = [
   'programMdRecords',
   'noBkdItems',
   'confirmedBatches',
-  'dspWorkflowRecords'
+  'dspWorkflowRecords',
+  'agreements',
+  'uploadedAgreementBatches'
 ];
 // Object dataset
 const OBJECT_FIELDS = ['categoryThresholds'];
@@ -43,7 +45,9 @@ const COUNT_KEY = {
   programMdRecords: 'programMd',
   noBkdItems: 'noBkd',
   confirmedBatches: 'confirmedBatches',
-  dspWorkflowRecords: 'dspWorkflows'
+  dspWorkflowRecords: 'dspWorkflows',
+  agreements: 'agreements',
+  uploadedAgreementBatches: 'uploadedAgreementBatches'
 };
 
 const EMPTY_COUNTS = Object.fromEntries(Object.values(COUNT_KEY).map((k) => [k, 0]));
@@ -56,15 +60,41 @@ const DEFAULT_META = () => ({
   counts: { ...EMPTY_COUNTS }
 });
 
-function requireClient() {
-  if (!supabaseAdmin) {
-    throw new Error('Supabase is not configured on the server (missing SUPABASE_SERVICE_ROLE_KEY).');
+function readLocalStore() {
+  try {
+    if (fs.existsSync(LEGACY_STORE_FILE)) {
+      const raw = fs.readFileSync(LEGACY_STORE_FILE, 'utf-8');
+      if (raw && raw.trim()) return JSON.parse(raw);
+    }
+  } catch {}
+  const def = DEFAULT_META();
+  for (const f of ARRAY_FIELDS) def[f] = [];
+  def.categoryThresholds = {};
+  def.uploaded_files_registry = [];
+  def.master_data_logs = [];
+  return def;
+}
+
+function writeLocalStore(storeData) {
+  try {
+    const dir = path.dirname(LEGACY_STORE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(LEGACY_STORE_FILE, JSON.stringify(storeData, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to write local store:', err);
   }
+}
+
+function requireClient() {
   return supabaseAdmin;
 }
 
 async function readMeta() {
   const client = requireClient();
+  if (!client) {
+    const local = readLocalStore();
+    return { ...DEFAULT_META(), ...local, counts: { ...EMPTY_COUNTS, ...(local.counts || {}) } };
+  }
   const { data, error } = await client.from(TABLE).select('payload').eq('dataset', META_KEY).maybeSingle();
   if (error) throw new Error(`Supabase read (_meta) failed: ${error.message}`);
   if (!data || !data.payload) return DEFAULT_META();
@@ -76,8 +106,22 @@ async function readMeta() {
  */
 export async function getMasterData() {
   const client = requireClient();
+  if (!client) {
+    const local = readLocalStore();
+    const result = { ...DEFAULT_META(), ...local };
+    for (const f of ARRAY_FIELDS) {
+      if (!Array.isArray(result[f])) result[f] = [];
+    }
+    result.categoryThresholds = result.categoryThresholds || {};
+    result.counts = { ...EMPTY_COUNTS, ...(result.counts || {}) };
+    return result;
+  }
+
   const { data, error } = await client.from(TABLE).select('dataset,payload');
-  if (error) throw new Error(`Supabase read failed: ${error.message}`);
+  if (error) {
+    console.error(`[DEBUG] Supabase read failed: ${error.message}`);
+    throw new Error(`Supabase read failed: ${error.message}`);
+  }
 
   const result = { ...DEFAULT_META() };
   for (const f of ARRAY_FIELDS) result[f] = [];
@@ -195,6 +239,41 @@ async function writeChunked(client, field, records, now) {
 
 async function doSave(updates) {
   const client = requireClient();
+  if (!client) {
+    const store = readLocalStore();
+    const now = new Date().toISOString();
+    const isExplicitClear = Boolean(updates.updateKind && /clear/i.test(updates.updateKind));
+    const counts = { ...store.counts };
+
+    for (const field of ARRAY_FIELDS) {
+      const incoming = updates[field];
+      if (!Array.isArray(incoming)) continue;
+      if (incoming.length === 0 && !isExplicitClear) continue;
+      store[field] = incoming;
+      counts[COUNT_KEY[field]] = incoming.length;
+    }
+    for (const field of OBJECT_FIELDS) {
+      const incoming = updates[field];
+      if (incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
+        store[field] = incoming;
+      }
+    }
+    store.version = (store.version || 0) + 1;
+    store.lastUpdated = now;
+    store.lastUpdatedBy = updates.updatedBy || store.lastUpdatedBy || 'Inventory Administrator';
+    store.updateKind = updates.updateKind || 'Master Data Update';
+    store.counts = counts;
+    writeLocalStore(store);
+    return {
+      success: true,
+      version: store.version,
+      lastUpdated: store.lastUpdated,
+      lastUpdatedBy: store.lastUpdatedBy,
+      updateKind: store.updateKind,
+      counts
+    };
+  }
+
   const meta = await readMeta();
   const now = new Date().toISOString();
   const isExplicitClear = Boolean(updates.updateKind && /clear/i.test(updates.updateKind));
@@ -461,6 +540,10 @@ const REGISTRY_KEY = 'uploaded_files_registry';
 
 export async function getUploadRegistry() {
   const client = requireClient();
+  if (!client) {
+    const store = readLocalStore();
+    return Array.isArray(store.uploaded_files_registry) ? store.uploaded_files_registry : [];
+  }
   const { data, error } = await client.from(TABLE).select('payload').eq('dataset', REGISTRY_KEY).maybeSingle();
   if (error) throw new Error(`Supabase read (registry) failed: ${error.message}`);
   return data && Array.isArray(data.payload) ? data.payload : [];
@@ -468,6 +551,13 @@ export async function getUploadRegistry() {
 
 export async function addUploadRecord(record) {
   const client = requireClient();
+  if (!client) {
+    const store = readLocalStore();
+    store.uploaded_files_registry = Array.isArray(store.uploaded_files_registry) ? store.uploaded_files_registry : [];
+    store.uploaded_files_registry.unshift(record);
+    writeLocalStore(store);
+    return record;
+  }
   const registry = await getUploadRegistry();
   registry.unshift(record);
   const { error } = await client
@@ -485,6 +575,10 @@ const MAX_LOGS = 200;
 
 export async function getMasterDataLogs() {
   const client = requireClient();
+  if (!client) {
+    const store = readLocalStore();
+    return Array.isArray(store.master_data_logs) ? store.master_data_logs : [];
+  }
   const { data, error } = await client.from(TABLE).select('payload').eq('dataset', LOGS_KEY).maybeSingle();
   if (error) throw new Error(`Supabase read (logs) failed: ${error.message}`);
   return data && Array.isArray(data.payload) ? data.payload : [];
@@ -492,6 +586,14 @@ export async function getMasterDataLogs() {
 
 export async function addMasterDataLog(log) {
   const client = requireClient();
+  if (!client) {
+    const store = readLocalStore();
+    store.master_data_logs = Array.isArray(store.master_data_logs) ? store.master_data_logs : [];
+    store.master_data_logs.unshift(log);
+    if (store.master_data_logs.length > MAX_LOGS) store.master_data_logs = store.master_data_logs.slice(0, MAX_LOGS);
+    writeLocalStore(store);
+    return log;
+  }
   const logs = await getMasterDataLogs();
   logs.unshift(log);
   const { error } = await client

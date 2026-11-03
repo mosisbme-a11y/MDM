@@ -61,6 +61,7 @@ import { AgreementDetailModal } from './AgreementDetailModal';
 import { AddAgreementModal } from './AddAgreementModal';
 import { AgreementStatusBadge } from './AgreementStatusBadge';
 import { MultipleAgreementUploadModal } from './MultipleAgreementUploadModal';
+import { pushCentralMasterData } from '../utils/centralSyncService';
 
 export interface TotalDeliveryAgreementSectionProps {
   items: MedicalDeviceItem[];
@@ -550,19 +551,21 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
     }
   }, [currentSubTab]);
 
-  // Save agreements to localStorage
+  // Save agreements to localStorage and push to Supabase
   useEffect(() => {
     try {
       localStorage.setItem('epss_medical_device_agreements', JSON.stringify(agreements));
+      pushCentralMasterData({ agreements, updateKind: `Agreements Sync (${agreements.length} items)` });
     } catch (err) {
       console.error('Failed to cache agreements to localStorage:', err);
     }
   }, [agreements]);
 
-  // Save uploaded batches to localStorage
+  // Save uploaded batches to localStorage and push to Supabase
   useEffect(() => {
     try {
       localStorage.setItem('epss_medical_device_uploaded_batches', JSON.stringify(uploadedBatches));
+      pushCentralMasterData({ uploadedAgreementBatches: uploadedBatches, updateKind: `Uploaded Batches Sync (${uploadedBatches.length} batches)` });
     } catch (err) {
       console.error('Failed to cache uploaded batches to localStorage:', err);
     }

@@ -9,7 +9,9 @@ import {
   NoBkdItem,
   ConfirmedUploadBatch,
   CategoryThreshold,
-  DspWorkflowRecord
+  DspWorkflowRecord,
+  MedicalDeviceAgreement,
+  UploadedAgreementBatch
 } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -24,6 +26,8 @@ export interface CentralMasterDataCounts {
   noBkd?: number;
   confirmedBatches?: number;
   dspWorkflows?: number;
+  agreements?: number;
+  uploadedAgreementBatches?: number;
 }
 
 export interface CentralMasterData {
@@ -42,6 +46,8 @@ export interface CentralMasterData {
   noBkdItems?: NoBkdItem[];
   confirmedBatches?: ConfirmedUploadBatch[];
   dspWorkflowRecords?: DspWorkflowRecord[];
+  agreements?: MedicalDeviceAgreement[];
+  uploadedAgreementBatches?: UploadedAgreementBatch[];
   categoryThresholds?: Record<string, CategoryThreshold>;
   counts?: CentralMasterDataCounts;
 }
@@ -118,7 +124,9 @@ const ARRAY_FIELDS = [
   'programMdRecords',
   'noBkdItems',
   'confirmedBatches',
-  'dspWorkflowRecords'
+  'dspWorkflowRecords',
+  'agreements',
+  'uploadedAgreementBatches'
 ] as const;
 type ArrayField = typeof ARRAY_FIELDS[number];
 

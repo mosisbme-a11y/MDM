@@ -429,6 +429,28 @@ END;
 $$;
 
 -- ==============================================================================
+-- TABLE 14: SYSTEM MASTER DATA (Chunked Store)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS system_master_data (
+  dataset TEXT PRIMARY KEY,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE system_master_data ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read access to all" ON system_master_data;
+CREATE POLICY "Allow read access to all" ON system_master_data FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow full access to service and authenticated" ON system_master_data;
+CREATE POLICY "Allow full access to service and authenticated" ON system_master_data FOR ALL USING (true) WITH CHECK (true);
+
+-- Insert initial metadata if it doesn't exist
+INSERT INTO system_master_data (dataset, payload)
+VALUES ('_meta', '{"version": 0, "lastUpdated": "2026-11-03T00:00:00.000Z", "updateKind": "Initial Setup", "counts": {}}')
+ON CONFLICT (dataset) DO NOTHING;
+
+-- ==============================================================================
 -- SUCCESS MESSAGE
 -- ==============================================================================
-SELECT 'EPSS & MOH Medical Device Management Schema created successfully with 13 tables, performance indexes, and RLS policies!' AS result;
+SELECT 'EPSS & MOH Medical Device Management Schema created successfully with 14 tables, performance indexes, and RLS policies!' AS result;

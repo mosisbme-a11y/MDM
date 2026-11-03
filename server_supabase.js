@@ -1,10 +1,25 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Server-side Supabase client using the SERVICE ROLE key.
-// This key bypasses Row Level Security: it must only ever live in the server's
-// environment (.env on the server / hosting dashboard), never in the browser
-// bundle and never in a committed file.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.join(__dirname, '.env');
+const envExamplePath = path.join(__dirname, 'env.example');
+
+if (!fs.existsSync(envPath) && fs.existsSync(envExamplePath)) {
+  try {
+    fs.copyFileSync(envExamplePath, envPath);
+    // Reload dotenv config
+    const dotenv = await import('dotenv');
+    dotenv.config({ path: envPath });
+  } catch (err) {
+    console.warn('[Supabase] Could not auto-create .env from env.example:', err);
+  }
+}
+
 const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
 const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 

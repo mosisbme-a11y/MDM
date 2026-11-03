@@ -35,7 +35,19 @@ export const SupabaseSyncBadge: React.FC = () => {
   if (status.state === 'syncing') {
     return (
       <div className={`${base} bg-slate-900 text-cyan-300 border-cyan-500/40`} role="status">
-        <CloudUpload className="w-4 h-4 animate-pulse" />
+        <div className="relative flex items-center justify-center w-5 h-5">
+          <CloudUpload className="w-4 h-4" />
+          <div className="absolute inset-0 border-2 border-cyan-400 rounded-full animate-ping opacity-75" />
+        </div>
+        <div className="flex gap-0.5 overflow-hidden mx-1">
+          {[...Array(3)].map((_, i) => (
+            <div 
+              key={i} 
+              className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" 
+              style={{ animationDelay: `${i * 0.2}s` }} 
+            />
+          ))}
+        </div>
         <span>
           Syncing to Supabase...{status.pending > 1 ? ` (${status.pending} uploads)` : ''}
         </span>

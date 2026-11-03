@@ -326,7 +326,7 @@ const REGIONS_DATA: RegionData[] = [
  */
 export function generate7500EthiopianHealthFacilities(): HealthFacilityRecord[] {
   const records: HealthFacilityRecord[] = [];
-  const targetCount = 7500;
+  const targetCount = 9641;
   let currentIdIndex = 1;
 
   const facilityTypeWeights = [
