@@ -1,158 +1,195 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { supabaseAdmin } from './server_supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-console.log('[Server Store] __dirname:', __dirname);
 
-const DATA_DIR = path.join(__dirname, 'server_data');
-const STORE_FILE = path.join(DATA_DIR, 'epss_master_store.json');
+// Legacy disk store (pre-Supabase). Only read once, to import old data.
+const LEGACY_STORE_FILE = path.join(__dirname, 'server_data', 'epss_master_store.json');
 
-// Ensure directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.warn('[Server Store] Failed to create server_data directory:', err);
-  }
-}
+const TABLE = 'system_master_data';
+const META_KEY = '_meta';
 
-const DEFAULT_STORE = {
+// Array datasets stored one row each in public.system_master_data
+const ARRAY_FIELDS = [
+  'items',
+  'multipleStockItems',
+  'receivingDataRecords',
+  'distributionDataRecords',
+  'materialMasterItems',
+  'hfListItems',
+  'programMdRecords',
+  'noBkdItems',
+  'confirmedBatches'
+];
+// Object dataset
+const OBJECT_FIELDS = ['categoryThresholds'];
+
+const COUNT_KEY = {
+  items: 'items',
+  multipleStockItems: 'multipleStock',
+  receivingDataRecords: 'receiving',
+  distributionDataRecords: 'distribution',
+  materialMasterItems: 'materialMaster',
+  hfListItems: 'hfList',
+  programMdRecords: 'programMd',
+  noBkdItems: 'noBkd',
+  confirmedBatches: 'confirmedBatches'
+};
+
+const EMPTY_COUNTS = Object.fromEntries(Object.values(COUNT_KEY).map((k) => [k, 0]));
+
+const DEFAULT_META = () => ({
   version: 0,
   lastUpdated: new Date().toISOString(),
   lastUpdatedBy: 'EPSS System Initializer',
   updateKind: 'Initial Master Repository',
-  items: [],
-  multipleStockItems: [],
-  receivingDataRecords: [],
-  distributionDataRecords: [],
-  materialMasterItems: [],
-  hfListItems: [],
-  noBkdItems: [],
-  confirmedBatches: [],
-  categoryThresholds: {},
-  users: []
-};
+  counts: { ...EMPTY_COUNTS }
+});
 
-/**
- * Reads the master store from disk.
- */
-export function getMasterData() {
-  try {
-    if (fs.existsSync(STORE_FILE)) {
-      const content = fs.readFileSync(STORE_FILE, 'utf-8');
-      if (content && content.trim()) {
-        const parsed = JSON.parse(content);
-        return {
-          ...DEFAULT_STORE,
-          ...parsed
-        };
-      }
-    }
-  } catch (err) {
-    console.error('[Server Store] Error reading store file:', err);
+function requireClient() {
+  if (!supabaseAdmin) {
+    throw new Error('Supabase is not configured on the server (missing SUPABASE_SERVICE_ROLE_KEY).');
   }
-  return { ...DEFAULT_STORE };
+  return supabaseAdmin;
+}
+
+async function readMeta() {
+  const client = requireClient();
+  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', META_KEY).maybeSingle();
+  if (error) throw new Error(`Supabase read (_meta) failed: ${error.message}`);
+  if (!data || !data.payload) return DEFAULT_META();
+  return { ...DEFAULT_META(), ...data.payload, counts: { ...EMPTY_COUNTS, ...(data.payload.counts || {}) } };
 }
 
 /**
- * Computes record counts summary.
+ * Returns the complete central dataset (all datasets + meta).
  */
-function computeCounts(data) {
-  return {
-    items: Array.isArray(data.items) ? data.items.length : 0,
-    multipleStock: Array.isArray(data.multipleStockItems) ? data.multipleStockItems.length : 0,
-    receiving: Array.isArray(data.receivingDataRecords) ? data.receivingDataRecords.length : 0,
-    distribution: Array.isArray(data.distributionDataRecords) ? data.distributionDataRecords.length : 0,
-    materialMaster: Array.isArray(data.materialMasterItems) ? data.materialMasterItems.length : 0,
-    hfList: Array.isArray(data.hfListItems) ? data.hfListItems.length : 0,
-    programMd: Array.isArray(data.programMdRecords) ? data.programMdRecords.length : 0,
-    noBkd: Array.isArray(data.noBkdItems) ? data.noBkdItems.length : 0,
-    confirmedBatches: Array.isArray(data.confirmedBatches) ? data.confirmedBatches.length : 0
-  };
+export async function getMasterData() {
+  const client = requireClient();
+  const { data, error } = await client.from(TABLE).select('dataset,payload');
+  if (error) throw new Error(`Supabase read failed: ${error.message}`);
+
+  const result = { ...DEFAULT_META() };
+  for (const f of ARRAY_FIELDS) result[f] = [];
+  result.categoryThresholds = {};
+
+  for (const row of data || []) {
+    if (row.dataset === META_KEY) {
+      Object.assign(result, row.payload || {});
+    } else if (ARRAY_FIELDS.includes(row.dataset)) {
+      result[row.dataset] = Array.isArray(row.payload) ? row.payload : [];
+    } else if (OBJECT_FIELDS.includes(row.dataset)) {
+      result[row.dataset] = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    }
+  }
+  result.counts = { ...EMPTY_COUNTS, ...(result.counts || {}) };
+  return result;
 }
 
 /**
- * Returns lightweight status for rapid cross-browser polling.
+ * Lightweight status (version + counts) for cross-browser change detection.
  */
-export function getMasterDataStatus() {
-  const current = getMasterData();
+export async function getMasterDataStatus() {
+  const meta = await readMeta();
   return {
-    version: current.version || 0,
-    lastUpdated: current.lastUpdated || new Date().toISOString(),
-    lastUpdatedBy: current.lastUpdatedBy || 'Inventory Administrator',
-    updateKind: current.updateKind || 'Master Inventory',
+    version: meta.version || 0,
+    lastUpdated: meta.lastUpdated,
+    lastUpdatedBy: meta.lastUpdatedBy || 'Inventory Administrator',
+    updateKind: meta.updateKind || 'Master Inventory',
     serverTime: new Date().toISOString(),
-    counts: computeCounts(current)
+    counts: meta.counts
+  };
+}
+
+// Saves are serialised so two simultaneous uploads can not produce the same version number.
+let saveQueue = Promise.resolve();
+
+/**
+ * Saves updates to Supabase. Only datasets present in `updates` are written.
+ * Unless the update is an explicit "clear", an empty array never overwrites existing data.
+ */
+export function saveMasterData(updates = {}) {
+  const run = saveQueue.then(() => doSave(updates));
+  saveQueue = run.catch(() => {});
+  return run;
+}
+
+async function doSave(updates) {
+  const client = requireClient();
+  const meta = await readMeta();
+  const now = new Date().toISOString();
+  const isExplicitClear = Boolean(updates.updateKind && /clear/i.test(updates.updateKind));
+
+  const rows = [];
+  const counts = { ...meta.counts };
+
+  for (const field of ARRAY_FIELDS) {
+    const incoming = updates[field];
+    if (!Array.isArray(incoming)) continue;
+    if (incoming.length === 0 && !isExplicitClear) continue; // protect existing data
+    rows.push({ dataset: field, payload: incoming, updated_at: now });
+    counts[COUNT_KEY[field]] = incoming.length;
+  }
+  for (const field of OBJECT_FIELDS) {
+    const incoming = updates[field];
+    if (incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
+      rows.push({ dataset: field, payload: incoming, updated_at: now });
+    }
+  }
+
+  if (rows.length) {
+    const { error } = await client.from(TABLE).upsert(rows, { onConflict: 'dataset' });
+    if (error) throw new Error(`Supabase write failed: ${error.message}`);
+  }
+
+  const newMeta = {
+    version: (meta.version || 0) + 1,
+    lastUpdated: now,
+    lastUpdatedBy: updates.updatedBy || meta.lastUpdatedBy || 'Inventory Administrator',
+    updateKind: updates.updateKind || 'Master Data Update',
+    counts
+  };
+  // Meta row is written LAST: browsers react to it via Realtime, so by the time
+  // they hear about the new version the datasets are already in place.
+  const { error: metaError } = await client
+    .from(TABLE)
+    .upsert({ dataset: META_KEY, payload: newMeta, updated_at: now }, { onConflict: 'dataset' });
+  if (metaError) throw new Error(`Supabase write (_meta) failed: ${metaError.message}`);
+
+  console.log(`[Supabase Store] master data v${newMeta.version} (${newMeta.updateKind}) by ${newMeta.lastUpdatedBy}`);
+  return {
+    success: true,
+    version: newMeta.version,
+    lastUpdated: newMeta.lastUpdated,
+    lastUpdatedBy: newMeta.lastUpdatedBy,
+    updateKind: newMeta.updateKind,
+    counts
   };
 }
 
 /**
- * Saves updates to the centralized store file.
+ * One-time import: if Supabase has no data yet but an old server_data/epss_master_store.json
+ * exists, copy it into Supabase so nothing is lost when switching over.
  */
-export function saveMasterData(updates) {
+export async function importLegacyDiskStoreIfNeeded() {
   try {
-    const current = getMasterData();
-    const newVersion = (current.version || 0) + 1;
-    const now = new Date().toISOString();
-
-    const isExplicitClear = updates && updates.updateKind && /clear/i.test(updates.updateKind);
-
-    const merged = {
-      ...current,
-      ...updates,
-      version: newVersion,
-      lastUpdated: now,
-      lastUpdatedBy: updates.updatedBy || current.lastUpdatedBy || 'Inventory Administrator',
-      updateKind: updates.updateKind || current.updateKind || 'Master Data Update'
-    };
-
-    // If this is NOT an explicit clear command, protect all existing datasets from being overwritten by empty arrays
-    if (!isExplicitClear) {
-      const arrayFields = [
-        'items',
-        'multipleStockItems',
-        'receivingDataRecords',
-        'distributionDataRecords',
-        'materialMasterItems',
-        'hfListItems',
-        'programMdRecords',
-        'noBkdItems',
-        'confirmedBatches'
-      ];
-
-      for (const field of arrayFields) {
-        if (
-          Array.isArray(current[field]) &&
-          current[field].length > 0 &&
-          (!updates[field] || (Array.isArray(updates[field]) && updates[field].length === 0))
-        ) {
-          merged[field] = current[field];
-        }
-      }
-    }
-
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    console.log('[Server Store] Saving to:', STORE_FILE);
-    const tempFile = `${STORE_FILE}.tmp.${Date.now()}`;
-    fs.writeFileSync(tempFile, JSON.stringify(merged, null, 2), 'utf-8');
-    fs.renameSync(tempFile, STORE_FILE);
-    console.log(`[Server Store] Successfully synchronized master data v${newVersion} (${merged.updateKind}) by ${merged.lastUpdatedBy}`);
-
-    return {
-      success: true,
-      version: newVersion,
-      lastUpdated: now,
-      lastUpdatedBy: merged.lastUpdatedBy,
-      updateKind: merged.updateKind,
-      counts: computeCounts(merged)
-    };
+    if (!supabaseAdmin || !fs.existsSync(LEGACY_STORE_FILE)) return;
+    const meta = await readMeta();
+    if (meta.version > 0) return; // Supabase already has data
+    const raw = fs.readFileSync(LEGACY_STORE_FILE, 'utf-8');
+    if (!raw || !raw.trim()) return;
+    const legacy = JSON.parse(raw);
+    const { users, version, lastUpdated, ...datasets } = legacy; // never import legacy plaintext users
+    await saveMasterData({
+      ...datasets,
+      updatedBy: legacy.lastUpdatedBy || 'Legacy import',
+      updateKind: 'Imported from previous server disk store'
+    });
+    console.log('[Supabase Store] Imported legacy disk store into Supabase.');
   } catch (err) {
-    console.error('[Server Store] Failed to save master data:', err);
-    throw err;
+    console.warn('[Supabase Store] Legacy import skipped:', err.message);
   }
 }
