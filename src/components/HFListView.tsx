@@ -47,8 +47,6 @@ import { HFListUploadModal, parseHealthFacilityRows, parseHealthFacilityWorkbook
 import { ALL_ETHIOPIAN_REGIONS } from './RegionBreakdownMatrixTable';
 import { uploadAndRecordFile } from '../utils/fileUploadService';
 import { ETHIOPIAN_HEALTH_FACILITIES_7500 } from '../data/ethiopianHealthFacilities7500';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
 
 const REGION_BAR_COLORS = [
   '#059669', // Emerald
@@ -229,18 +227,8 @@ export const HFListView: React.FC<HFListViewProps> = ({
     if (autoRecordImmediate) {
       // MODE 1: IMMEDIATELY RECORD AND SAVE DATA TO MEMORY & STORAGE
       if (onUploadHFData) {
-        // Upload to storage (non-blocking)
+        // Files were already stored in Supabase Storage above (uploadAndRecordFile)
         const uploadedFiles: { name: string, url: string }[] = [];
-        for (const file of files) {
-          try {
-            const storageRef = ref(storage, `hf_uploads/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            uploadedFiles.push({ name: file.name, url: downloadURL });
-          } catch (err) {
-            console.warn('Storage upload bypassed (offline or rules restricted):', err);
-          }
-        }
         onUploadHFData(allItems, 'append', uploadedFiles);
       }
       setUploadToast({
@@ -1679,7 +1667,7 @@ export const HFListView: React.FC<HFListViewProps> = ({
                 <th className="py-3 px-3 whitespace-nowrap">Zone Description</th>
                 <th className="py-3 px-3 whitespace-nowrap text-center">Woreda</th>
                 <th className="py-3 px-3 whitespace-nowrap">Woreda Description</th>
-                <th className="py-3 px-3 text-center whitespace-nowrap">Firebase Sync</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">Cloud Sync</th>
                 <th className="py-3 px-3 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -1793,10 +1781,10 @@ export const HFListView: React.FC<HFListViewProps> = ({
                             }`}
                             title={
                               syncStatus === 'pending'
-                                ? 'Pending sync with Firebase'
+                                ? 'Pending sync with Supabase'
                                 : syncStatus === 'offline'
                                 ? 'Stored locally / offline'
-                                : 'Successfully synced with Firebase backend'
+                                : 'Successfully synced with Supabase backend'
                             }
                           />
                           <Hospital className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -1850,7 +1838,7 @@ export const HFListView: React.FC<HFListViewProps> = ({
                         {facility.woredaDescription || '-'}
                       </td>
 
-                      {/* Firebase Sync */}
+                      {/* Cloud Sync */}
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -1862,10 +1850,10 @@ export const HFListView: React.FC<HFListViewProps> = ({
                           }`}
                           title={
                             syncStatus === 'pending'
-                              ? 'Health facility record pending write to Firebase'
+                              ? 'Health facility record pending write to Supabase'
                               : syncStatus === 'offline'
                               ? 'Offline health facility record saved locally'
-                              : 'Health facility record verified and active on Firebase Firestore'
+                              : 'Health facility record verified and active on Supabase'
                           }
                         >
                           <span
@@ -2186,4 +2174,3 @@ export const HFListView: React.FC<HFListViewProps> = ({
     </div>
   );
 };
-
