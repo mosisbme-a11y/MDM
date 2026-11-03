@@ -33,9 +33,6 @@ export default defineConfig({
             if (id.includes('xlsx') || id.includes('jspdf') || id.includes('html2canvas')) {
               return 'vendor-export';
             }
-            if (id.includes('firebase')) {
-              return 'vendor-firebase';
-            }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
             }
