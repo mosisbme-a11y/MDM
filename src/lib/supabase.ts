@@ -34,6 +34,19 @@ if (isSupabaseConfigured) {
 export const supabase = client;
 
 /**
+ * Returns the current signed-in user's access token (JWT), or null.
+ */
+export async function getAccessToken(): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Helper to test connection with Supabase.
  */
 export async function testSupabaseConnection(): Promise<{ success: boolean; message: string }> {
@@ -45,8 +58,8 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
   }
 
   try {
-    // Attempt lightweight query on users or health check
-    const { data, error } = await supabase.from('users').select('count', { count: 'exact', head: true });
+    // Lightweight check: a signed-in user can always read their own profile row
+    const { error } = await supabase.from('users').select('uid', { count: 'exact', head: true });
     if (error) {
       return { success: false, message: error.message };
     }
