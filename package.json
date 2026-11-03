@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "start": "node server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "dev:api": "PORT=3001 node server.js",
+    "create-admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
