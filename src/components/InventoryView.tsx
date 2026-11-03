@@ -2264,7 +2264,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     )}
                   </div>
                 </th>
-                <th className="py-3 px-3 text-center whitespace-nowrap">Firebase Sync</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">Cloud Sync</th>
                 <th className="py-3 px-3 text-center print:hidden">
                   <div className="flex items-center justify-center gap-1.5">
                     <span>Actions</span>
