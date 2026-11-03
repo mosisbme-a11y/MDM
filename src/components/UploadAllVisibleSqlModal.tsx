@@ -18,7 +18,9 @@ import {
   Hospital,
   Package,
   Truck,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  ExternalLink
 } from 'lucide-react';
 import {
   MedicalDeviceItem,
@@ -32,6 +34,7 @@ import {
 } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatNumber, formatCurrency } from '../utils/formatters';
+import { isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 
 interface UploadAllVisibleSqlModalProps {
   isOpen: boolean;
@@ -72,6 +75,15 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
     message: ''
   });
   const [copiedSql, setCopiedSql] = useState(false);
+  const [testingSupabase, setTestingSupabase] = useState(false);
+  const [supabaseTestResult, setSupabaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTestSupabase = async () => {
+    setTestingSupabase(true);
+    const res = await testSupabaseConnection();
+    setSupabaseTestResult(res);
+    setTestingSupabase(false);
+  };
 
   // Statistics calculation
   const totalVisibleCount = useMemo(() => {
@@ -661,6 +673,74 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
                   </div>
                 </div>
               )}
+
+              {/* Supabase Environment Keys Status Card */}
+              <div className="border border-slate-200 rounded-xl p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-indigo-600" />
+                    Supabase Environment Keys Configuration (.env.example)
+                  </h4>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      isSupabaseConfigured
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                    }`}
+                  >
+                    {isSupabaseConfigured ? '✓ Keys Detected' : 'Pending Keys in .env'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Keys are configured in <code className="font-mono text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">.env.example</code> (or your environment variables):
+                </p>
+
+                <div className="space-y-1.5 font-mono text-[11px] bg-slate-900 text-slate-200 p-3.5 rounded-lg border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-cyan-400">VITE_SUPABASE_URL</span>
+                    <span className="text-slate-400 text-[10px]">
+                      {isSupabaseConfigured ? 'Configured' : 'https://your-project-id.supabase.co'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-400">VITE_SUPABASE_ANON_KEY</span>
+                    <span className="text-slate-400 text-[10px]">
+                      {isSupabaseConfigured ? 'Configured' : 'your-anon-public-key-here'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <span>Find keys in:</span>
+                    <span className="font-semibold text-slate-700">Supabase Dashboard &rarr; Project Settings &rarr; API</span>
+                  </div>
+
+                  {isSupabaseConfigured && (
+                    <button
+                      onClick={handleTestSupabase}
+                      disabled={testingSupabase}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${testingSupabase ? 'animate-spin' : ''}`} />
+                      <span>{testingSupabase ? 'Testing Connection...' : 'Test Connection'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {supabaseTestResult && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs border ${
+                      supabaseTestResult.success
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-rose-50 border-rose-200 text-rose-800'
+                    }`}
+                  >
+                    {supabaseTestResult.message}
+                  </div>
+                )}
+              </div>
 
               {/* Step Guide for Supabase */}
               <div className="border border-slate-200 rounded-xl p-5 bg-white space-y-3">
