@@ -358,7 +358,7 @@ export const MaterialMasterView: React.FC<MaterialMasterViewProps> = ({
                 <th className="py-3 px-4">Plant</th>
                 <th className="py-3 px-4">Product Type</th>
                 <th className="py-3 px-4">Product Group</th>
-                <th className="py-3 px-4 text-center">Firebase Sync</th>
+                <th className="py-3 px-4 text-center">Cloud Sync</th>
                 <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -384,10 +384,10 @@ export const MaterialMasterView: React.FC<MaterialMasterViewProps> = ({
                             }`}
                             title={
                               status === 'pending'
-                                ? 'Pending sync with Firebase'
+                                ? 'Pending sync with Supabase'
                                 : status === 'offline'
                                 ? 'Stored locally / offline'
-                                : 'Successfully synced with Firebase backend'
+                                : 'Successfully synced with Supabase backend'
                             }
                           />
                           <span>{item.product}</span>
@@ -408,10 +408,10 @@ export const MaterialMasterView: React.FC<MaterialMasterViewProps> = ({
                           }`}
                           title={
                             status === 'pending'
-                              ? 'Record pending upload to Firestore'
+                              ? 'Record pending upload to Supabase'
                               : status === 'offline'
                               ? 'Offline record saved locally'
-                              : 'Record verified and active on Firebase Firestore'
+                              : 'Record verified and active on Supabase'
                           }
                         >
                           <span

@@ -19,8 +19,7 @@ import * as XLSX from 'xlsx';
 import { MultipleStockRecord } from '../types';
 import { downloadCSV, formatCurrency, formatNumber } from '../utils/formatters';
 import { uploadAndRecordFile } from '../utils/fileUploadService';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 
 export interface MultipleStockUploadModalProps {
   isOpen: boolean;
@@ -490,13 +489,14 @@ export const MultipleStockUploadModal: React.FC<MultipleStockUploadModalProps> =
     setIsProcessing(true);
 
     try {
-      const storageRef = ref(storage, `stock_uploads/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setUploadedFiles([{ name: file.name, url: downloadURL }]);
+      const fileRecord = await uploadAndRecordFile(file, 'Inventory', 0);
+      if (fileRecord) {
+        setUploadedFiles([{ name: file.name, url: fileRecord.downloadUrl }]);
+      }
     } catch (err) {
       console.warn('File upload to storage failed:', err);
     }
+
 
     const reader = new FileReader();
 

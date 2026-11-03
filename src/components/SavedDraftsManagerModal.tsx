@@ -213,7 +213,7 @@ export const SavedDraftsManagerModal: React.FC<SavedDraftsManagerModalProps> = (
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-amber-600" />
-            <span>Stored drafts are persisted securely in local browser cache & Firestore</span>
+            <span>Stored drafts are persisted securely in local browser cache & Supabase</span>
           </div>
           <button
             onClick={onClose}

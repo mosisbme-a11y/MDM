@@ -5,22 +5,45 @@ import { createClient } from '@supabase/supabase-js';
 // This key bypasses Row Level Security: it must only ever live in the server's
 // environment (.env on the server / hosting dashboard), never in the browser
 // bundle and never in a committed file.
-const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+const isValidUrl = (u) => {
+  if (!u) return false;
+  try {
+    const parsed = new URL(u);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.host !== '';
+  } catch (e) {
+    return false;
+  }
+};
 
 export const isSupabaseAdminConfigured = Boolean(
-  url && serviceKey && !url.includes('your-project-id') && !serviceKey.includes('your-service')
+  url && 
+  serviceKey && 
+  isValidUrl(url) &&
+  !url.includes('your-project-id') && 
+  !serviceKey.includes('your-service')
 );
 
-export const supabaseAdmin = isSupabaseAdminConfigured
-  ? createClient(url, serviceKey, {
+let adminClient = null;
+if (isSupabaseAdminConfigured) {
+  try {
+    adminClient = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false }
-    })
-  : null;
+    });
+  } catch (err) {
+    console.error('[Supabase] CRITICAL: Failed to initialize Admin Client:', err.message);
+  }
+}
+
+export const supabaseAdmin = adminClient;
 
 if (!isSupabaseAdminConfigured) {
-  console.error(
-    '[Supabase] SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY are not set. ' +
-    'Login and data sync will not work until they are configured in .env.'
+  console.warn(
+    '[Supabase] SERVICE ROLE configuration is missing or invalid. ' +
+    'Backend data sync and admin auth features will be disabled. ' +
+    'Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set correctly in your environment.'
   );
 }
+

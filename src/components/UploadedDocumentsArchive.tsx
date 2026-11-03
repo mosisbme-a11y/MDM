@@ -27,8 +27,8 @@ import {
 } from 'lucide-react';
 import { DeviceDocument } from '../types';
 import { uploadAndRecordFile, fetchUploadedFilesFromDisk, UploadedFileRecord } from '../utils/fileUploadService';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
+
 
 interface UploadedDocumentsArchiveProps {
   documents: DeviceDocument[];
@@ -187,12 +187,6 @@ export const UploadedDocumentsArchive: React.FC<UploadedDocumentsArchiveProps> =
       const diskRec = await uploadAndRecordFile(uploadFileObj, uploadCategory);
       if (diskRec) {
         fileUrl = diskRec.downloadUrl;
-      } else {
-        try {
-          const storageRef = ref(storage, `documents/${Date.now()}_${uploadFileObj.name}`);
-          const snapshot = await uploadBytes(storageRef, uploadFileObj);
-          fileUrl = await getDownloadURL(snapshot.ref);
-        } catch (e) {}
       }
     }
 

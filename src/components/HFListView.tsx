@@ -233,7 +233,7 @@ export const HFListView: React.FC<HFListViewProps> = ({
       }
       setUploadToast({
         type: 'success',
-        message: `✓ Immediately recorded & saved ${allItems.length} facilities from ${files.length} file(s)! All 10 columns verified.`
+        message: `✓ Immediately recorded & saved ${allItems.length} facilities from ${files.length} file(s)! Synced to Supabase.`
       });
     } else {
       // MODE 2: DISPLAY MULTIPLE UPLOAD CONFIRMATION CARD FOR 1-CLICK SAVE
@@ -778,23 +778,6 @@ export const HFListView: React.FC<HFListViewProps> = ({
                 <span>Import Options</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (onUploadHFData) {
-                    onUploadHFData(ETHIOPIAN_HEALTH_FACILITIES_7500, 'replace');
-                    setUploadToast({
-                      type: 'success',
-                      message: `✓ Hydrated all 7,500 Master Health Facilities across all 13 Ethiopian Regions & 12 Hubs!`
-                    });
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="Hydrate / restore all 7,500 Master Health Facilities across Ethiopia"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Hydrate 7,500 Facilities</span>
-              </button>
             </>
           )}
 

@@ -934,7 +934,7 @@ export function App() {
 
     // 4. Notify user
     triggerCloudSyncToast(
-      `✓ Successfully saved ${processedRecords.length} Program MD records to the cloud (Total: ${updated.length}).`,
+      `✓ Successfully saved ${processedRecords.length} Program MD records to Supabase (Total: ${updated.length}).`,
       {
         type: 'CREATE',
         title: `Upload ${processedRecords.length} Program MD Records`,
@@ -1265,7 +1265,7 @@ export function App() {
     broadcastAdminUpdate('HF Master List', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
 
     triggerCloudSyncToast(
-      `✓ Data Safety Verified: Successfully merged ${newItems.length} records. Total: ${updated.length} Facilities preserved.`,
+      `✓ Data Safety Verified: Successfully merged ${newItems.length} records. Total: ${updated.length} Facilities preserved (Synced to Supabase).`,
       {
         type: 'CREATE',
         title: `Upload ${newItems.length} Health Facilities`,
@@ -1394,7 +1394,7 @@ export function App() {
     });
     broadcastAdminUpdate('Material Master', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
     triggerCloudSyncToast(
-      `✓ Successfully saved ${newItems.length} records into Material Master (${mode === 'append' ? 'Appended & Merged' : 'Fresh Master'}, Total: ${updated.length} Materials).`,
+      `✓ Successfully saved ${newItems.length} records into Material Master (${mode === 'append' ? 'Appended & Merged' : 'Fresh Master'}, Total: ${updated.length} Materials). Synced to Supabase.`,
       {
         type: 'CREATE',
         title: `Upload ${newItems.length} Material Master Records`,
@@ -1588,7 +1588,7 @@ export function App() {
       updateKind: `Multiple Stock (${mode === 'append' ? 'Appended' : 'Fresh Ledger'}, Total ${updated.length})`
     });
     triggerCloudSyncToast(
-      `✓ Auto-Saved: ${newItems.length} records safely stored across all plants (${mode === 'append' ? 'Appended & Merged' : 'Fresh Ledger'}, Total: ${updated.length} Records). Auto-Save Active.`,
+      `✓ Auto-Saved: ${newItems.length} records safely stored across all plants (${mode === 'append' ? 'Appended & Merged' : 'Fresh Ledger'}, Total: ${updated.length} Records). Synced to Supabase.`,
       {
         type: 'CREATE',
         title: `Upload ${newItems.length} Multiple Stock Records`,

@@ -34,7 +34,14 @@ import {
 } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatNumber, formatCurrency } from '../utils/formatters';
-import { isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
+import {
+  isSupabaseConfigured,
+  testSupabaseConnection,
+  verifySupabaseSync,
+  pushAllTablesToSupabase,
+  fetchFromSupabase,
+  SupabaseSyncVerification
+} from '../lib/supabase';
 
 interface UploadAllVisibleSqlModalProps {
   isOpen: boolean;
@@ -63,7 +70,7 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
   currentUser,
   onUploadAllSuccess
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'sql'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'sql' | 'verify'>('upload');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{
     status: 'idle' | 'uploading' | 'success' | 'error';
@@ -77,12 +84,53 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
   const [copiedSql, setCopiedSql] = useState(false);
   const [testingSupabase, setTestingSupabase] = useState(false);
   const [supabaseTestResult, setSupabaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [verifyingSync, setVerifyingSync] = useState(false);
+  const [syncReport, setSyncReport] = useState<SupabaseSyncVerification | null>(null);
+  const [isPushingSupabase, setIsPushingSupabase] = useState(false);
+  const [previewTable, setPreviewTable] = useState<string | null>(null);
+  const [previewRows, setPreviewRows] = useState<any[] | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const handleTestSupabase = async () => {
     setTestingSupabase(true);
     const res = await testSupabaseConnection();
     setSupabaseTestResult(res);
     setTestingSupabase(false);
+  };
+
+  const handleVerifySupabaseSync = async () => {
+    setVerifyingSync(true);
+    const rep = await verifySupabaseSync();
+    setSyncReport(rep);
+    setVerifyingSync(false);
+  };
+
+  const handlePushDirectlyToSupabase = async () => {
+    setIsPushingSupabase(true);
+    const res = await pushAllTablesToSupabase({
+      items,
+      healthFacilities,
+      materialMasterItems,
+      multipleStockItems,
+      receivingDataRecords,
+      distributionDataRecords
+    });
+    setUploadStatus({
+      status: res.success ? 'success' : 'error',
+      message: res.success ? `Synced to Supabase successfully: ${res.message}` : res.message,
+      timestamp: new Date().toLocaleTimeString()
+    });
+    const rep = await verifySupabaseSync();
+    setSyncReport(rep);
+    setIsPushingSupabase(false);
+  };
+
+  const handleFetchPreview = async (tableName: string) => {
+    setPreviewTable(tableName);
+    setLoadingPreview(true);
+    const { data } = await fetchFromSupabase(tableName, 10);
+    setPreviewRows(data || []);
+    setLoadingPreview(false);
   };
 
   // Statistics calculation
@@ -388,7 +436,7 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
     distributionDataRecords
   ]);
 
-  // Handle Upload All Visible Data (Cloud + Server Store + Firestore)
+  // Handle Upload All Visible Data (Cloud + Server Store + Supabase)
   const handleUploadAllVisible = async () => {
     setIsUploading(true);
     setUploadStatus({
@@ -509,6 +557,22 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
             <FileCode className="w-4 h-4" />
             2. View & Download Supabase SQL Code
           </button>
+          <button
+            onClick={() => {
+              setActiveTab('verify');
+              if (!syncReport && isSupabaseConfigured) {
+                handleVerifySupabaseSync();
+              }
+            }}
+            className={`flex items-center gap-2 pb-3 px-4 font-semibold text-sm border-b-2 transition-colors ${
+              activeTab === 'verify'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            3. Verify Supabase Sync & Live Data
+          </button>
         </div>
 
         {/* Content Body */}
@@ -596,7 +660,7 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
             </div>
           </div>
 
-          {activeTab === 'upload' ? (
+          {activeTab === 'upload' && (
             <div className="space-y-5">
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
                 <div className="flex items-start gap-4">
@@ -609,10 +673,11 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
                     </h4>
                     <p className="text-xs text-blue-800 mt-1 leading-relaxed">
                       This action bundles every table currently loaded in your browser and transmits
-                      it to the persistent system repository and Google Cloud Firestore. Once saved,
+                      it to the persistent system repository and Supabase PostgreSQL. Once saved,
                       all data remains visible across all computers, users, and future sessions
                       automatically.
                     </p>
+
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       <button
@@ -774,7 +839,9 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
                 </div>
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'sql' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -819,6 +886,176 @@ export const UploadAllVisibleSqlModal: React.FC<UploadAllVisibleSqlModalProps> =
                 <pre className="p-4 bg-slate-950 text-slate-200 text-xs font-mono rounded-xl max-h-[380px] overflow-auto border border-slate-800 leading-relaxed select-all">
                   {generatedSqlCode}
                 </pre>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'verify' && (
+            <div className="space-y-5">
+              {/* Verification Header & Action Controls */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl p-5 border border-slate-800 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-bold flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                      Live Supabase Synchronization & Remote Fetch Verifier
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Check exact row counts in your Supabase PostgreSQL database and inspect live fetched records.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleVerifySupabaseSync}
+                      disabled={verifyingSync || !isSupabaseConfigured}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${verifyingSync ? 'animate-spin' : ''}`} />
+                      <span>{verifyingSync ? 'Querying Supabase...' : 'Fetch & Verify Counts'}</span>
+                    </button>
+
+                    <button
+                      onClick={handlePushDirectlyToSupabase}
+                      disabled={isPushingSupabase || !isSupabaseConfigured || totalVisibleCount === 0}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    >
+                      <CloudUpload className={`w-3.5 h-3.5 ${isPushingSupabase ? 'animate-spin' : ''}`} />
+                      <span>{isPushingSupabase ? 'Pushing to Supabase...' : 'Push All Visible via API'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Message */}
+              {!isSupabaseConfigured ? (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-sm block">Supabase Credentials Not Yet Configured in .env</span>
+                    <p className="mt-1 leading-relaxed text-amber-800">
+                      To query Supabase directly, add your <code className="font-mono bg-white px-1 py-0.5 rounded border border-amber-300">VITE_SUPABASE_URL</code> and <code className="font-mono bg-white px-1 py-0.5 rounded border border-amber-300">VITE_SUPABASE_ANON_KEY</code> to your project's <code className="font-mono bg-white px-1 py-0.5 rounded border border-amber-300">.env.example</code> or hosting environment.
+                    </p>
+                    <p className="mt-1.5 text-amber-900 font-medium">
+                      Alternatively, use <strong>Tab 2 (Download .sql File)</strong> &rarr; run it in your <strong>Supabase SQL Editor</strong> to populate all tables without needing environment keys!
+                    </p>
+                  </div>
+                </div>
+              ) : syncReport ? (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="font-semibold text-slate-800">{syncReport.message}</span>
+                    </div>
+                    <span className="text-slate-500 font-mono text-[11px]">Checked at {syncReport.timestamp}</span>
+                  </div>
+
+                  {/* Table Counts Matrix */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="px-4 py-3">Supabase Table</th>
+                          <th className="px-4 py-3">Remote Rows in DB</th>
+                          <th className="px-4 py-3">Sync Status</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.entries(syncReport.tables as Record<string, any>).map(([tblName, tbl]: [string, any]) => (
+                          <tr key={tblName} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                              {tblName}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-900">
+                              {tbl.count.toLocaleString()} rows
+                            </td>
+                            <td className="px-4 py-3">
+                              {tbl.status === 'ok' && tbl.count > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  Synced & Active
+                                </span>
+                              ) : tbl.status === 'ok' && tbl.count === 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                                  Table Ready (0 Rows)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold" title={tbl.error}>
+                                  {tbl.status === 'not_created' ? 'Table Not Created' : 'Query Error'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {tbl.count > 0 ? (
+                                <button
+                                  onClick={() => handleFetchPreview(tblName)}
+                                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                >
+                                  Preview Rows &rarr;
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">No data yet</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Live Fetched Rows Preview Modal / Box */}
+                  {previewTable && (
+                    <div className="p-4 rounded-xl bg-slate-900 text-slate-100 text-xs border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="font-bold text-cyan-400 font-mono">
+                          Live Data Fetched from Supabase &rarr; <code className="text-white">{previewTable}</code>
+                        </span>
+                        <button
+                          onClick={() => { setPreviewTable(null); setPreviewRows(null); }}
+                          className="text-slate-400 hover:text-white text-xs cursor-pointer"
+                        >
+                          ✕ Close Preview
+                        </button>
+                      </div>
+
+                      {loadingPreview ? (
+                        <div className="py-6 flex items-center justify-center gap-2 text-slate-400">
+                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                          <span>Fetching rows from Supabase...</span>
+                        </div>
+                      ) : previewRows && previewRows.length > 0 ? (
+                        <div className="max-h-60 overflow-auto">
+                          <pre className="font-mono text-[11px] text-emerald-300 leading-relaxed">
+                            {JSON.stringify(previewRows, null, 2)}
+                          </pre>
+                        </div>
+                      ) : (
+                        <p className="text-slate-400 py-3">No records found in this table yet.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center border border-dashed border-slate-300 rounded-xl bg-white space-y-3">
+                  <Database className="w-10 h-10 text-slate-400 mx-auto" />
+                  <h5 className="font-bold text-slate-800 text-sm">Supabase Sync Verification Ready</h5>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Click the <strong>"Fetch & Verify Counts"</strong> button above to connect to your live Supabase database and retrieve exact row counts across all tables.
+                  </p>
+                </div>
+              )}
+
+              {/* Console Verification Tips */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                <span className="font-bold text-slate-800 block">How to verify in Supabase Dashboard directly:</span>
+                <ul className="list-disc list-inside space-y-1 pl-1 text-[11px]">
+                  <li>Log into <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-semibold">supabase.com/dashboard</a></li>
+                  <li>Click <strong>Table Editor</strong> (grid icon in left menu)</li>
+                  <li>Click any table: <code className="font-mono bg-white px-1 py-0.5 rounded border">medical_devices</code>, <code className="font-mono bg-white px-1 py-0.5 rounded border">health_facilities</code>, etc.</li>
+                  <li>You will see all inserted records in real-time with row counts, columns, and search filters.</li>
+                </ul>
               </div>
             </div>
           )}

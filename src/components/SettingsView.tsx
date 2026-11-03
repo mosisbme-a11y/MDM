@@ -42,8 +42,8 @@ import {
 } from 'lucide-react';
 import { Language } from '../utils/localization';
 import { HeaderNavThemeId, MasterDataLog, DspWorkflowRecord } from '../types';
-import { db } from '../lib/firebase';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
+
 import { HEADER_NAV_THEMES } from '../utils/headerNavThemes';
 import { ThemeCreatorSection } from './ThemeCreatorSection';
 import {
@@ -134,17 +134,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [uploadLogs, setUploadLogs] = useState<MasterDataLog[]>([]);
 
   useEffect(() => {
-    if (!userId) return;
-    const q = query(
-      collection(db, 'users', userId, 'masterDataLogs'),
-      orderBy('uploadedAt', 'desc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const logs = snapshot.docs.map(doc => doc.data() as MasterDataLog);
-      setUploadLogs(logs);
-    });
-    return () => unsubscribe();
-  }, [userId]);
+    fetch('/api/master-data-logs')
+      .then(res => res.json())
+      .then(data => {
+        if (data.logs) setUploadLogs(data.logs);
+      })
+      .catch(err => console.warn('Failed to fetch logs from Supabase:', err));
+  }, []);
 
   useEffect(() => {
     setSettings(prev => ({

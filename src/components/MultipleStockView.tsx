@@ -1311,8 +1311,8 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
                     </button>
                   </th>
 
-                  {/* Firebase Sync */}
-                  <th className="p-3 text-center min-w-[110px]">Firebase Sync</th>
+                  {/* Cloud Sync */}
+                  <th className="p-3 text-center min-w-[110px]">Cloud Sync</th>
 
                   {onDeleteMultipleStockItem && <th className="p-3 text-center w-16">Actions</th>}
                 </tr>
@@ -1376,10 +1376,10 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
                             }`}
                             title={
                               (item.syncStatus || 'synced') === 'pending'
-                                ? 'Pending sync with Firebase'
+                                ? 'Pending sync with Supabase'
                                 : (item.syncStatus || 'synced') === 'offline'
                                 ? 'Stored locally / offline'
-                                : 'Successfully synced with Firebase backend'
+                                : 'Successfully synced with Supabase backend'
                             }
                           />
                           <span>{item.materialDescription}</span>
@@ -1460,7 +1460,7 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
                           {item.wbsElement}
                         </span>
                       </td>
-                      {/* Firebase Sync */}
+                      {/* Cloud Sync */}
                       <td className="p-3 text-center whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -1472,10 +1472,10 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
                           }`}
                           title={
                             (item.syncStatus || 'synced') === 'pending'
-                              ? 'Stock record pending write to Firebase'
+                              ? 'Stock record pending write to Supabase'
                               : (item.syncStatus || 'synced') === 'offline'
                               ? 'Offline stock record saved locally'
-                              : 'Stock record verified and active on Firebase Firestore'
+                              : 'Stock record verified and active on Supabase'
                           }
                         >
                           <span
