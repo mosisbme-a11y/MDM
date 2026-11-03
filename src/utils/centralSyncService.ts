@@ -10,8 +10,7 @@ import {
   ConfirmedUploadBatch,
   CategoryThreshold
 } from '../types';
-import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 
 export interface CentralMasterDataCounts {
   items: number;
@@ -101,8 +100,7 @@ export function saveLastSyncMetadata(meta: CentralSyncStatus): void {
 }
 
 /**
- * Fetches the complete centralized dataset from the server API,
- * with Firestore fallback.
+ * Fetches the complete centralized dataset from the server API (stored in Supabase).
  */
 export async function fetchCentralMasterData(): Promise<CentralMasterData | null> {
   try {
@@ -129,26 +127,7 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
       }
     }
   } catch (err) {
-    console.warn('[CentralSyncService] Primary API fetch failed, trying Firestore fallback:', err);
-  }
-
-  // Cloud Firestore fallback with fast timeout to handle offline/latency gracefully
-  try {
-    const docRef = doc(db, 'system_master_data', 'global_state');
-    const fetchDocWithTimeout = Promise.race([
-      getDoc(docRef),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-    ]);
-    const snap = await fetchDocWithTimeout;
-    if (snap && snap.exists && snap.exists()) {
-      const cloudData = snap.data() as CentralMasterData;
-      if (cloudData && typeof cloudData.version === 'number') {
-        setLocalKnownVersion(cloudData.version);
-        return cloudData;
-      }
-    }
-  } catch (fErr) {
-    console.warn('[CentralSyncService] Firestore fallback query error:', fErr);
+    console.warn('[CentralSyncService] Could not fetch central data:', err);
   }
 
   return null;
@@ -195,25 +174,6 @@ export async function pushCentralMasterData(
   } catch (err) {
     console.error('[CentralSyncService] Failed to POST to central server API:', err);
   }
-
-  // Dual-sync to Firestore for redundant cloud backup
-  try {
-    const docRef = doc(db, 'system_master_data', 'global_state');
-    const cleanPayload: any = {
-      version: resultStatus?.version || localKnownVersion + 1,
-      lastUpdated: new Date().toISOString(),
-      lastUpdatedBy: updates.updatedBy || 'Inventory Administrator',
-      updateKind: updates.updateKind || 'Master Data Update'
-    };
-    if (updates.items) cleanPayload.items = updates.items;
-    if (updates.multipleStockItems) cleanPayload.multipleStockItems = updates.multipleStockItems;
-    if (updates.receivingDataRecords) cleanPayload.receivingDataRecords = updates.receivingDataRecords;
-    if (updates.distributionDataRecords) cleanPayload.distributionDataRecords = updates.distributionDataRecords;
-    if (updates.materialMasterItems) cleanPayload.materialMasterItems = updates.materialMasterItems;
-    if (updates.hfListItems) cleanPayload.hfListItems = updates.hfListItems;
-
-    setDoc(docRef, cleanPayload, { merge: true }).catch(() => {});
-  } catch {}
 
   return resultStatus;
 }
@@ -269,6 +229,23 @@ export function subscribeCentralSync(
   // 1. Initial check
   performCheck('mount');
 
+  // 1b. Instant push from Supabase Realtime: the server bumps the '_meta' row after every save
+  let realtimeChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+  if (supabase) {
+    try {
+      realtimeChannel = supabase
+        .channel('system-master-data-meta')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'system_master_data', filter: 'dataset=eq._meta' },
+          () => performCheck('realtime')
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[CentralSyncService] Realtime subscription unavailable, using polling only:', err);
+    }
+  }
+
   // 2. Periodic interval
   const intervalId = setInterval(() => performCheck('heartbeat'), pollIntervalMs);
 
@@ -278,6 +255,7 @@ export function subscribeCentralSync(
   document.addEventListener('visibilitychange', handleFocus);
 
   return () => {
+    if (realtimeChannel && supabase) supabase.removeChannel(realtimeChannel);
     clearInterval(intervalId);
     window.removeEventListener('focus', handleFocus);
     document.removeEventListener('visibilitychange', handleFocus);
@@ -328,4 +306,3 @@ export async function fetchHFMasterListFromServer(): Promise<HealthFacilityRecor
   }
   return null;
 }
-
