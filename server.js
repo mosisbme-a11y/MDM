@@ -2,13 +2,12 @@ import fs from 'fs';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getMasterData, saveMasterData, getMasterDataStatus } from './server_store.js';
+import { getMasterData, saveMasterData, getMasterDataStatus, importLegacyDiskStoreIfNeeded } from './server_store.js';
+import { supabaseAdmin, isSupabaseAdminConfigured } from './server_supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, 'server_data');
-const HF_STORE_FILE = path.join(DATA_DIR, 'epss_hf_master_list.json');
-const USERS_STORE_FILE = path.join(DATA_DIR, 'epss_authorized_users.json');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,156 +15,223 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Dedicated Authorized Users Database endpoints
-app.get('/api/users', (req, res) => {
-  try {
-    if (fs.existsSync(USERS_STORE_FILE)) {
-      const raw = fs.readFileSync(USERS_STORE_FILE, 'utf-8');
-      if (raw && raw.trim()) {
-        const parsed = JSON.parse(raw);
-        return res.json({ users: parsed, count: parsed.length });
-      }
-    }
-    const master = getMasterData();
-    const users = Array.isArray(master.users) ? master.users : [];
-    res.json({ users, count: users.length });
-  } catch (err) {
-    console.error('Error serving users database:', err);
-    res.status(500).json({ error: 'Failed to retrieve users database' });
+// ------------------------------------------------------------------------------
+// AUTHENTICATION (Supabase Auth)
+// Every /api route requires "Authorization: Bearer <supabase access token>".
+// The token is verified with Supabase, then the caller's profile row in
+// public.users must exist and be active.
+// ------------------------------------------------------------------------------
+async function requireAuth(req, res, next) {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Server is not connected to Supabase (check SUPABASE_SERVICE_ROLE_KEY).' });
   }
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: missing token' });
+  }
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data || !data.user) {
+      return res.status(401).json({ error: 'Unauthorized: invalid or expired session' });
+    }
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('uid,email,full_name,username,role,hub,is_admin,is_active')
+      .eq('uid', data.user.id)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    if (!profile || profile.is_active === false) {
+      return res.status(403).json({ error: 'Forbidden: this account is not active' });
+    }
+    req.user = { id: data.user.id, email: data.user.email, profile };
+    next();
+  } catch (err) {
+    console.error('Auth check failed:', err);
+    res.status(500).json({ error: 'Authentication check failed' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user || !req.user.profile || !req.user.profile.is_admin) {
+    return res.status(403).json({ error: 'Forbidden: administrator access required' });
+  }
+  next();
+}
+
+// Everything under /api needs a signed-in, active user.
+app.use('/api', requireAuth);
+
+const asyncRoute = (fn) => (req, res) =>
+  Promise.resolve(fn(req, res)).catch((err) => {
+    console.error(`Error in ${req.method} ${req.originalUrl}:`, err);
+    res.status(500).json({ error: err && err.message ? err.message : 'Server error' });
+  });
+
+const toClientUser = (row) => ({
+  id: row.uid,
+  username: row.username || (row.email || '').split('@')[0],
+  email: row.email,
+  name: row.full_name || row.email,
+  role: row.role,
+  hub: row.hub || '',
+  isAdmin: Boolean(row.is_admin),
+  isActive: row.is_active !== false,
+  createdAt: row.created_at
 });
 
-app.post('/api/users', (req, res) => {
-  try {
-    const { users } = req.body;
-    if (!Array.isArray(users)) {
-      return res.status(400).json({ error: 'users must be an array' });
-    }
+const MIN_PASSWORD_LENGTH = 8;
 
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(USERS_STORE_FILE, JSON.stringify(users, null, 2), 'utf-8');
+// ------------------------------------------------------------------------------
+// USER MANAGEMENT (admin only). Passwords are handled by Supabase Auth and are
+// never stored or returned by this app.
+// ------------------------------------------------------------------------------
+app.get('/api/admin/users', requireAdmin, asyncRoute(async (req, res) => {
+  const { data, error } = await supabaseAdmin.from('users').select('*').order('created_at', { ascending: true });
+  if (error) throw error;
+  res.json({ users: (data || []).map(toClientUser) });
+}));
 
-    saveMasterData({
-      users,
-      updateKind: `Users Database Update (${users.length} Users)`
-    });
-
-    console.log(`[Server Store] Successfully stored ${users.length} user records on system disk`);
-    res.json({ success: true, count: users.length, users });
-  } catch (err) {
-    console.error('Error saving users database:', err);
-    res.status(500).json({ error: 'Failed to save users database' });
+app.post('/api/admin/users', requireAdmin, asyncRoute(async (req, res) => {
+  const { email, password, name, role, hub, isAdmin } = req.body || {};
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return res.status(400).json({ error: 'A valid email address is required.' });
   }
-});
-
-// Dedicated Health Facility Master List persistence endpoints
-app.get('/api/hf-master-list', (req, res) => {
-  try {
-    if (fs.existsSync(HF_STORE_FILE)) {
-      const raw = fs.readFileSync(HF_STORE_FILE, 'utf-8');
-      if (raw && raw.trim()) {
-        const parsed = JSON.parse(raw);
-        return res.json({ items: parsed, count: parsed.length });
-      }
-    }
-    const master = getMasterData();
-    const items = Array.isArray(master.hfListItems) ? master.hfListItems : [];
-    res.json({ items, count: items.length });
-  } catch (err) {
-    console.error('Error serving hf-master-list:', err);
-    res.status(500).json({ error: 'Failed to retrieve HF master list' });
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
   }
-});
+  const fullName = String(name || '').trim() || cleanEmail.split('@')[0];
 
-app.post('/api/hf-master-list', (req, res) => {
-  try {
-    const { items, mode = 'append' } = req.body;
-    if (!Array.isArray(items)) {
-      return res.status(400).json({ error: 'items must be an array' });
-    }
-
-    let existingItems = [];
-    if (fs.existsSync(HF_STORE_FILE)) {
-      try {
-        const raw = fs.readFileSync(HF_STORE_FILE, 'utf-8');
-        if (raw && raw.trim()) existingItems = JSON.parse(raw);
-      } catch (e) {}
-    }
-    if (!existingItems.length) {
-      const master = getMasterData();
-      if (Array.isArray(master.hfListItems)) existingItems = master.hfListItems;
-    }
-
-    // Smart Merge / Upsert: preserve all existing facilities on system disk so no data is ever lost or removed
-    const map = new Map();
-    existingItems.forEach((it) => {
-      if (!it) return;
-      const key = it.customer ? String(it.customer).trim().toLowerCase() : String(it.customerDescription || it.id).trim().toLowerCase();
-      map.set(key, it);
-    });
-    items.forEach((it) => {
-      if (!it) return;
-      const key = it.customer ? String(it.customer).trim().toLowerCase() : String(it.customerDescription || it.id).trim().toLowerCase();
-      if (map.has(key)) {
-        // Merge fields, keeping existing non-empty properties
-        map.set(key, { ...map.get(key), ...it });
-      } else {
-        map.set(key, it);
-      }
-    });
-    const finalItems = Array.from(map.values());
-
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(HF_STORE_FILE, JSON.stringify(finalItems, null, 2), 'utf-8');
-
-    // Also update master store
-    saveMasterData({
-      hfListItems: finalItems,
-      updateKind: `HF Master List Update (${finalItems.length} Facilities)`
-    });
-
-    console.log(`[Server Store] Successfully stored ${finalItems.length} HF Master List records on system disk`);
-    res.json({ success: true, count: finalItems.length, items: finalItems });
-  } catch (err) {
-    console.error('Error saving hf-master-list:', err);
-    res.status(500).json({ error: 'Failed to save HF master list' });
+  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email: cleanEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName }
+  });
+  if (createError) {
+    return res.status(400).json({ error: createError.message });
   }
-});
 
-// Centralized Master Data synchronization endpoints for cross-browser consistency
-app.get('/api/system-master-data', (req, res) => {
-  try {
-    const data = getMasterData();
-    res.json(data);
-  } catch (err) {
-    console.error('Error serving system-master-data:', err);
-    res.status(500).json({ error: 'Failed to retrieve master data' });
-  }
-});
+  // The DB trigger already inserted a basic profile; fill in the real details.
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('users')
+    .upsert(
+      {
+        uid: created.user.id,
+        email: cleanEmail,
+        full_name: fullName,
+        username: cleanEmail.split('@')[0],
+        role: String(role || 'viewer').trim(),
+        hub: String(hub || '').trim(),
+        is_admin: Boolean(isAdmin),
+        is_active: true
+      },
+      { onConflict: 'uid' }
+    )
+    .select('*')
+    .single();
+  if (profileError) throw profileError;
+  res.json({ user: toClientUser(profile) });
+}));
 
-app.post('/api/system-master-data', (req, res) => {
-  try {
-    const result = saveMasterData(req.body || {});
-    res.json(result);
-  } catch (err) {
-    console.error('Error saving system-master-data:', err);
-    res.status(500).json({ error: 'Failed to save master data' });
+app.patch('/api/admin/users/:uid', requireAdmin, asyncRoute(async (req, res) => {
+  const { uid } = req.params;
+  const { name, role, hub, isAdmin, isActive } = req.body || {};
+  if (uid === req.user.id && (isAdmin === false || isActive === false)) {
+    return res.status(400).json({ error: 'You cannot remove your own admin access or deactivate yourself.' });
   }
-});
+  const patch = {};
+  if (name !== undefined) patch.full_name = String(name).trim();
+  if (role !== undefined) patch.role = String(role).trim();
+  if (hub !== undefined) patch.hub = String(hub).trim();
+  if (isAdmin !== undefined) patch.is_admin = Boolean(isAdmin);
+  if (isActive !== undefined) patch.is_active = Boolean(isActive);
+  const { data, error } = await supabaseAdmin.from('users').update(patch).eq('uid', uid).select('*').single();
+  if (error) throw error;
+  res.json({ user: toClientUser(data) });
+}));
 
-app.get('/api/system-master-data/status', (req, res) => {
-  try {
-    const status = getMasterDataStatus();
-    res.json(status);
-  } catch (err) {
-    console.error('Error checking system-master-data status:', err);
-    res.status(500).json({ error: 'Failed to get master data status' });
+app.post('/api/admin/users/:uid/password', requireAdmin, asyncRoute(async (req, res) => {
+  const { password } = req.body || {};
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
   }
-});
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.uid, { password });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+}));
+
+app.delete('/api/admin/users/:uid', requireAdmin, asyncRoute(async (req, res) => {
+  const { uid } = req.params;
+  if (uid === req.user.id) {
+    return res.status(400).json({ error: 'You cannot delete your own account.' });
+  }
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(uid);
+  if (error) return res.status(400).json({ error: error.message });
+  await supabaseAdmin.from('users').delete().eq('uid', uid);
+  res.json({ success: true });
+}));
+
+// ------------------------------------------------------------------------------
+// HEALTH FACILITY MASTER LIST (stored in Supabase with the other central datasets)
+// ------------------------------------------------------------------------------
+const hfKey = (it) =>
+  it.customer
+    ? String(it.customer).trim().toLowerCase()
+    : String(it.customerDescription || it.id).trim().toLowerCase();
+
+app.get('/api/hf-master-list', asyncRoute(async (req, res) => {
+  const master = await getMasterData();
+  const items = Array.isArray(master.hfListItems) ? master.hfListItems : [];
+  res.json({ items, count: items.length });
+}));
+
+app.post('/api/hf-master-list', asyncRoute(async (req, res) => {
+  const { items } = req.body || {};
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: 'items must be an array' });
+  }
+  const master = await getMasterData();
+  const existing = Array.isArray(master.hfListItems) ? master.hfListItems : [];
+
+  // Smart merge / upsert: never drop existing facilities
+  const map = new Map();
+  existing.forEach((it) => { if (it) map.set(hfKey(it), it); });
+  items.forEach((it) => {
+    if (!it) return;
+    const k = hfKey(it);
+    map.set(k, map.has(k) ? { ...map.get(k), ...it } : it);
+  });
+  const finalItems = Array.from(map.values());
+
+  await saveMasterData({
+    hfListItems: finalItems,
+    updatedBy: req.user.profile.full_name || req.user.email,
+    updateKind: `HF Master List Update (${finalItems.length} Facilities)`
+  });
+  res.json({ success: true, count: finalItems.length, items: finalItems });
+}));
+
+// ------------------------------------------------------------------------------
+// CENTRAL MASTER DATA SYNC (Supabase-backed)
+// ------------------------------------------------------------------------------
+app.get('/api/system-master-data', asyncRoute(async (req, res) => {
+  res.json(await getMasterData());
+}));
+
+app.post('/api/system-master-data', asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const result = await saveMasterData({
+    ...body,
+    updatedBy: body.updatedBy || req.user.profile.full_name || req.user.email
+  });
+  res.json(result);
+}));
+
+app.get('/api/system-master-data/status', asyncRoute(async (req, res) => {
+  res.json(await getMasterDataStatus());
+}));
 
 // Dedicated API endpoint for DSP Email transmission with exact binary attachments
 app.post('/api/send-dsp-email', (req, res) => {
@@ -373,6 +439,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running and listening on port ${PORT}`);
+importLegacyDiskStoreIfNeeded().finally(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running and listening on port ${PORT}`);
+    if (!isSupabaseAdminConfigured) {
+      console.error('WARNING: Supabase is not configured - all /api routes will return 503.');
+    }
+  });
 });
