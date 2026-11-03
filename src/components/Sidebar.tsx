@@ -704,12 +704,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                           isActive && (
                             epssSubTab === 'dsp-mgmt' ||
-                            epssSubTab === 'dsp-request-moh-epss' ||
-                            epssSubTab === 'dsp-breakdown-moh-rhb' ||
-                            epssSubTab === 'dsp-submitted-rhb-moh' ||
-                            epssSubTab === 'dsp-submitted-moh-epss-ho' ||
-                            epssSubTab === 'dsp-aggregation-epss-ho' ||
-                            epssSubTab === 'dsp-submitted-epss-branch'
+                            epssSubTab === 'head-office-dsp' ||
+                            epssSubTab === 'moh-osp-management' ||
+                            epssSubTab === 'rhb-breakdown-management' ||
+                            epssSubTab === 'branches-dsp-management' ||
+                            epssSubTab?.startsWith('dsp-ho-') ||
+                            epssSubTab?.startsWith('dsp-moh-') ||
+                            epssSubTab?.startsWith('dsp-rhb-') ||
+                            epssSubTab?.startsWith('dsp-branches-')
                           )
                             ? 'bg-slate-900 text-white font-bold shadow-xs'
                             : (navTheme.category === 'light' ? 'text-black hover:bg-slate-300' : `text-slate-400 hover:text-white ${navTheme.navInactiveHover}`)
@@ -727,94 +729,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       {/* Visible only when expanded / clicked */}
                       {isDspMgmtOpen && (
                         <div className="ml-3 pl-2.5 border-l-2 border-amber-500/30 space-y-1 py-0.5">
+                          {/* 1. Head office DSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-request-moh-epss');
+                              onSelectEpssSubTab?.('head-office-dsp');
                             }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'dsp-request-moh-epss' || epssSubTab === 'dsp-mgmt')
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                              isActive && (epssSubTab === 'head-office-dsp' || epssSubTab?.startsWith('dsp-ho-'))
                                 ? 'bg-amber-600/30 text-amber-300 font-bold border border-amber-500/40 shadow-xs'
                                 : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
                             }`}
                           >
-                            <Send className="w-3 h-3 text-cyan-400 shrink-0" />
-                            <span className="truncate">DSP Request EPSS to MOH</span>
+                            <Send className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span className="truncate">1. Head Office DSP Mgmt</span>
                           </button>
 
+                          {/* 2. MOH OSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-breakdown-moh-rhb');
+                              onSelectEpssSubTab?.('moh-osp-management');
                             }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'dsp-breakdown-moh-rhb'
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                              isActive && (epssSubTab === 'moh-osp-management' || epssSubTab?.startsWith('dsp-moh-'))
                                 ? 'bg-cyan-600/30 text-cyan-300 font-bold border border-cyan-500/40 shadow-xs'
                                 : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
                             }`}
                           >
-                            <FileText className="w-3 h-3 text-teal-400 shrink-0" />
-                            <span className="truncate">Breakdown Request MOH to Region</span>
+                            <FileText className="w-3 h-3 text-cyan-400 shrink-0" />
+                            <span className="truncate">2. MOH OSP Management</span>
                           </button>
 
+                          {/* 3. RHB Break down management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-submitted-rhb-moh');
+                              onSelectEpssSubTab?.('rhb-breakdown-management');
                             }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'dsp-submitted-rhb-moh'
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                              isActive && (epssSubTab === 'rhb-breakdown-management' || epssSubTab?.startsWith('dsp-rhb-'))
                                 ? 'bg-orange-600/30 text-orange-300 font-bold border border-orange-500/40 shadow-xs'
                                 : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
                             }`}
                           >
                             <Building2 className="w-3 h-3 text-orange-400 shrink-0" />
-                            <span className="truncate">DSP Submitted Region to MOH</span>
+                            <span className="truncate">3. RHB Breakdown Mgmt</span>
                           </button>
 
+                          {/* 4. Branches DSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-submitted-moh-epss-ho');
+                              onSelectEpssSubTab?.('branches-dsp-management');
                             }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'dsp-submitted-moh-epss-ho'
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                              isActive && (epssSubTab === 'branches-dsp-management' || epssSubTab?.startsWith('dsp-branches-'))
                                 ? 'bg-purple-600/30 text-purple-300 font-bold border border-purple-500/40 shadow-xs'
                                 : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
                             }`}
                           >
-                            <FileCheck className="w-3 h-3 text-purple-400 shrink-0" />
-                            <span className="truncate">DSP Submitted MOH to EPSS</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-aggregation-epss-ho');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'dsp-aggregation-epss-ho'
-                                ? 'bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/40 shadow-xs'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Layers className="w-3 h-3 text-emerald-400 shrink-0" />
-                            <span className="truncate">DSP Aggregation</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('dsp-submitted-epss-branch');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'dsp-submitted-epss-branch'
-                                ? 'bg-rose-600/30 text-rose-300 font-bold border border-rose-500/40 shadow-xs'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Truck className="w-3 h-3 text-rose-400 shrink-0" />
-                            <span className="truncate">DSP Submitted EPSS.HO to Plant</span>
+                            <Warehouse className="w-3 h-3 text-purple-400 shrink-0" />
+                            <span className="truncate">4. Branches DSP Mgmt</span>
                           </button>
                         </div>
                       )}

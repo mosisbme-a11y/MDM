@@ -210,12 +210,32 @@ export type EpssSubTab =
   | 'distribution-data'
   | 'inventory-analysis'
   | 'dsp-mgmt'
+  | 'head-office-dsp'
+  | 'moh-osp-management'
+  | 'rhb-breakdown-management'
+  | 'branches-dsp-management'
   | 'dsp-request-moh-epss'
   | 'dsp-breakdown-moh-rhb'
   | 'dsp-submitted-rhb-moh'
   | 'dsp-submitted-moh-epss-ho'
   | 'dsp-aggregation-epss-ho'
   | 'dsp-submitted-epss-branch'
+  | 'dsp-ho-1-1'
+  | 'dsp-ho-1-2'
+  | 'dsp-ho-1-3'
+  | 'dsp-ho-1-3-1'
+  | 'dsp-ho-1-3-2'
+  | 'dsp-ho-1-3-3'
+  | 'dsp-ho-1-3-4'
+  | 'dsp-moh-2-1'
+  | 'dsp-moh-2-2'
+  | 'dsp-moh-2-3'
+  | 'dsp-moh-2-4'
+  | 'dsp-moh-2-5'
+  | 'dsp-rhb-3-1'
+  | 'dsp-rhb-3-2'
+  | 'dsp-branches-4-1'
+  | 'dsp-branches-4-2'
   | 'plant-dsp'
   | 'plant-receiving-dsp'
   | 'plant-distribution-status'
@@ -636,7 +656,18 @@ export interface RegionBreakdownMatrixData {
 export interface DspWorkflowRecord {
   id: string;
   dspRefNumber: string;
-  stage: 'moh-to-epss' | 'moh-to-rhb' | 'rhb-to-moh' | 'moh-to-epss-ho' | 'epss-ho-aggregation' | 'epss-to-branch';
+  stage: 
+    | 'head-office-dsp' 
+    | 'moh-osp-management' 
+    | 'rhb-breakdown-management' 
+    | 'branches-dsp-management'
+    | 'moh-to-epss' 
+    | 'moh-to-rhb' 
+    | 'rhb-to-moh' 
+    | 'moh-to-epss-ho' 
+    | 'epss-ho-aggregation' 
+    | 'epss-to-branch';
+  subStage?: string;
   stageTitle: string;
   senderOrg: string;
   recipientOrg: string;
@@ -646,7 +677,7 @@ export interface DspWorkflowRecord {
   approvedDate?: string;
   actionTakenDate?: string;
   actionTakenBy?: string;
-  actionType?: 'Endorsed & Approved' | 'Proceed to Stage 2 Breakdown' | 'Under MOH Technical Review' | 'Revision Requested';
+  actionType?: string;
   actionLetterRef?: string;
   actionNotes?: string;
   turnaroundDays?: number;

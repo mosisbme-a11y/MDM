@@ -339,11 +339,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
   const handleOpenActionModal = (rec: DspWorkflowRecord) => {
     setActionTargetRecord(rec);
-    setActionDecision(rec.actionType || 'Endorsed & Approved');
+    setActionDecision((rec.actionType as any) || 'Endorsed & Approved');
     setActionFormDate(rec.actionTakenDate || new Date().toISOString().split('T')[0]);
-    setActionFormOfficer(rec.actionTakenBy || 'Dr. Bethlehem (MOH PMD Directorate)');
-    setActionFormLetterRef(rec.actionLetterRef || `MOH/PMD/ACT/2026/${Math.floor(100 + Math.random() * 900)}`);
-    setActionFormNotes(rec.actionNotes || 'DSP allocation quota endorsed and validated as per national priority distribution guidelines.');
+    setActionFormOfficer(rec.actionTakenBy || 'Officer');
+    setActionFormLetterRef(rec.actionLetterRef || '');
+    setActionFormNotes(rec.actionNotes || '');
     setActionFormRegions(rec.targetedRegions || []);
     setIsActionModalOpen(true);
   };
@@ -426,31 +426,149 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
   const handleClearAllRegions = () => setSelectedRegionsFilter([ALL_ETHIOPIAN_REGIONS[0]]);
 
 
-  // Map subTab to stage
-  const currentStage = useMemo(() => {
+  // Map subTab to stage and subStep
+  const { currentStage, currentSubStep } = useMemo(() => {
     switch (currentSubTab) {
-      case 'dsp-request-moh-epss': return 'moh-to-epss';
-      case 'dsp-breakdown-moh-rhb': return 'moh-to-rhb';
-      case 'dsp-submitted-rhb-moh': return 'rhb-to-moh';
-      case 'dsp-submitted-moh-epss-ho': return 'moh-to-epss-ho';
-      case 'dsp-aggregation-epss-ho': return 'epss-ho-aggregation';
-      case 'dsp-submitted-epss-branch': return 'epss-to-branch';
-      default: return 'all';
+      // 1. Head office DSP management
+      case 'head-office-dsp':
+        return { currentStage: 'head-office-dsp', currentSubStep: 'all' };
+      case 'dsp-ho-1-1':
+      case 'dsp-request-moh-epss':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.1' };
+      case 'dsp-ho-1-2':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.2' };
+      case 'dsp-ho-1-3':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.3' };
+      case 'dsp-ho-1-3-1':
+      case 'mapping-breakdown':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.3.1' };
+      case 'dsp-ho-1-3-2':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.3.2' };
+      case 'dsp-ho-1-3-3':
+      case 'dsp-aggregation-epss-ho':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.3.3' };
+      case 'dsp-ho-1-3-4':
+        return { currentStage: 'head-office-dsp', currentSubStep: '1.3.4' };
+
+      // 2. MOH OSP management
+      case 'moh-osp-management':
+        return { currentStage: 'moh-osp-management', currentSubStep: 'all' };
+      case 'dsp-moh-2-1':
+        return { currentStage: 'moh-osp-management', currentSubStep: '2.1' };
+      case 'dsp-moh-2-2':
+      case 'dsp-breakdown-moh-rhb':
+        return { currentStage: 'moh-osp-management', currentSubStep: '2.2' };
+      case 'dsp-moh-2-3':
+        return { currentStage: 'moh-osp-management', currentSubStep: '2.3' };
+      case 'dsp-moh-2-4':
+      case 'regional-aggregator':
+        return { currentStage: 'moh-osp-management', currentSubStep: '2.4' };
+      case 'dsp-moh-2-5':
+      case 'dsp-submitted-moh-epss-ho':
+        return { currentStage: 'moh-osp-management', currentSubStep: '2.5' };
+
+      // 3. RHB Break down management
+      case 'rhb-breakdown-management':
+        return { currentStage: 'rhb-breakdown-management', currentSubStep: 'all' };
+      case 'dsp-rhb-3-1':
+        return { currentStage: 'rhb-breakdown-management', currentSubStep: '3.1' };
+      case 'dsp-rhb-3-2':
+      case 'dsp-submitted-rhb-moh':
+        return { currentStage: 'rhb-breakdown-management', currentSubStep: '3.2' };
+
+      // 4. Branches DSP management
+      case 'branches-dsp-management':
+        return { currentStage: 'branches-dsp-management', currentSubStep: 'all' };
+      case 'dsp-branches-4-1':
+      case 'dsp-submitted-epss-branch':
+      case 'plant-dsp':
+        return { currentStage: 'branches-dsp-management', currentSubStep: '4.1' };
+      case 'dsp-branches-4-2':
+        return { currentStage: 'branches-dsp-management', currentSubStep: '4.2' };
+
+      default:
+        return { currentStage: 'all', currentSubStep: 'all' };
     }
   }, [currentSubTab]);
 
   const stagesList = [
-    { id: 'dsp-request-moh-epss', stageKey: 'moh-to-epss', label: '1. DSP Request EPSS to MOH', color: 'from-blue-600 to-cyan-600', count: records.filter(r => r.stage === 'moh-to-epss').length },
-    { id: 'dsp-breakdown-moh-rhb', stageKey: 'moh-to-rhb', label: '2. Breakdown Request MOH to RHB', color: 'from-cyan-600 to-teal-600', count: records.filter(r => r.stage === 'moh-to-rhb').length },
-    { id: 'dsp-submitted-rhb-moh', stageKey: 'rhb-to-moh', label: '3. DSP Submitted RHB to MOH', color: 'from-amber-600 to-orange-600', count: records.filter(r => r.stage === 'rhb-to-moh').length },
-    { id: 'dsp-submitted-moh-epss-ho', stageKey: 'moh-to-epss-ho', label: '4. DSP Submitted MOH to EPSS HO', color: 'from-purple-600 to-indigo-600', count: records.filter(r => r.stage === 'moh-to-epss-ho').length },
-    { id: 'dsp-aggregation-epss-ho', stageKey: 'epss-ho-aggregation', label: '5. DSP Aggregation (EPSS HO)', color: 'from-emerald-600 to-teal-600', count: records.filter(r => r.stage === 'epss-ho-aggregation').length },
-    { id: 'dsp-submitted-epss-branch', stageKey: 'epss-to-branch', label: '6. DSP Submitted EPSS.HO to Plant', color: 'from-rose-600 to-pink-600', count: records.filter(r => r.stage === 'epss-to-branch').length },
+    { 
+      id: 'head-office-dsp', 
+      stageKey: 'head-office-dsp', 
+      label: '1. Head Office DSP Management', 
+      color: 'from-blue-600 to-cyan-600', 
+      count: records.filter(r => r.stage === 'head-office-dsp' || r.stage === 'moh-to-epss' || r.stage === 'epss-ho-aggregation').length,
+      subSteps: [
+        { id: '1.1', label: '1.1 DSP request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
+        { id: '1.2', label: '1.2 DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
+        { id: '1.3.1', label: '1.3.1 Map HF to Hubs', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
+        { id: '1.3.2', label: '1.3.2 Send DSP to Hubs / Submit', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
+        { id: '1.3.3', label: '1.3.3 Item Aggregation', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
+        { id: '1.3.4', label: '1.3.4 Order Process', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
+      ]
+    },
+    { 
+      id: 'moh-osp-management', 
+      stageKey: 'moh-osp-management', 
+      label: '2. MOH OSP Management', 
+      color: 'from-cyan-600 to-teal-600', 
+      count: records.filter(r => r.stage === 'moh-osp-management' || r.stage === 'moh-to-rhb' || r.stage === 'moh-to-epss-ho').length,
+      subSteps: [
+        { id: '2.1', label: '2.1 DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
+        { id: '2.2', label: '2.2 DSP Break down request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
+        { id: '2.3', label: '2.3 Break down Received from RHB', subTab: 'dsp-moh-2-3' as EpssSubTab },
+        { id: '2.4', label: '2.4 Break down Aggregation by RHB', subTab: 'dsp-moh-2-4' as EpssSubTab },
+        { id: '2.5', label: '2.5 DSP Agr. DSP Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
+      ]
+    },
+    { 
+      id: 'rhb-breakdown-management', 
+      stageKey: 'rhb-breakdown-management', 
+      label: '3. RHB Breakdown Management', 
+      color: 'from-amber-600 to-orange-600', 
+      count: records.filter(r => r.stage === 'rhb-breakdown-management' || r.stage === 'rhb-to-moh').length,
+      subSteps: [
+        { id: '3.1', label: '3.1 Break down Received from MOH', subTab: 'dsp-rhb-3-1' as EpssSubTab },
+        { id: '3.2', label: '3.2 Submit Break down to MOH', subTab: 'dsp-rhb-3-2' as EpssSubTab },
+      ]
+    },
+    { 
+      id: 'branches-dsp-management', 
+      stageKey: 'branches-dsp-management', 
+      label: '4. Branches DSP Management', 
+      color: 'from-purple-600 to-indigo-600', 
+      count: records.filter(r => r.stage === 'branches-dsp-management' || r.stage === 'epss-to-branch').length,
+      subSteps: [
+        { id: '4.1', label: '4.1 Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
+        { id: '4.2', label: '4.2 Analysis and Comparing with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
+      ]
+    },
   ];
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      const matchStage = currentStage === 'all' || r.stage === currentStage;
+      let matchStage = true;
+      if (currentStage !== 'all') {
+        if (currentStage === 'head-office-dsp') {
+          matchStage = r.stage === 'head-office-dsp' || r.stage === 'moh-to-epss' || r.stage === 'epss-ho-aggregation';
+        } else if (currentStage === 'moh-osp-management') {
+          matchStage = r.stage === 'moh-osp-management' || r.stage === 'moh-to-rhb' || r.stage === 'moh-to-epss-ho';
+        } else if (currentStage === 'rhb-breakdown-management') {
+          matchStage = r.stage === 'rhb-breakdown-management' || r.stage === 'rhb-to-moh';
+        } else if (currentStage === 'branches-dsp-management') {
+          matchStage = r.stage === 'branches-dsp-management' || r.stage === 'epss-to-branch';
+        } else {
+          matchStage = r.stage === currentStage;
+        }
+      }
+
+      let matchSubStep = true;
+      if (currentSubStep && currentSubStep !== 'all') {
+        if (r.subStage) {
+          matchSubStep = r.subStage === currentSubStep || r.subStage.startsWith(currentSubStep);
+        }
+      }
+
       const matchSearch =
         r.dspRefNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -478,9 +596,9 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
       const matchStageFilter = stageFilter === 'all' || r.stage === stageFilter;
 
-      return matchStage && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
+      return matchStage && matchSubStep && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
     });
-  }, [records, currentStage, searchQuery, statusFilter, agingFilter, selectedRegionsFilter, stageFilter]);
+  }, [records, currentStage, currentSubStep, searchQuery, statusFilter, agingFilter, selectedRegionsFilter, stageFilter]);
 
   const totalValuation = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalValuationETB, 0), [filteredRecords]);
   const totalUnits = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalQuantity, 0), [filteredRecords]);
@@ -660,8 +778,9 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           const newRecord: DspWorkflowRecord = {
             id: `dsp-${Date.now().toString().slice(-6)}`,
             dspRefNumber: refNum,
-            stage: 'moh-to-epss',
-            stageTitle: '1. DSP Request EPSS to MOH',
+            stage: 'head-office-dsp',
+            subStage: '1.1',
+            stageTitle: '1.1 DSP Request to MOH',
             senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
             recipientOrg: metadata.recipient,
             subject: metadata.subject,
@@ -904,41 +1023,70 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         }}
       />
 
-      {/* 6-Stage Interactive Visual Pipeline Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm overflow-x-auto">
-        <div className="text-[11px] font-bold text-slate-500 mb-2 px-1 flex items-center justify-between">
-          <span>DSP INTER-INSTITUTIONAL WORKFLOW STAGES</span>
-          <span className="text-[10px] text-amber-600 font-normal italic">Click to filter • Double-click any stage card to inspect source dossiers</span>
+      {/* 4-Section DSP Management Interactive Pipeline Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="text-[11px] font-bold text-slate-500 px-1 flex items-center justify-between">
+          <span className="uppercase tracking-wider">DSP MANAGEMENT INSTITUTIONAL HIERARCHY</span>
+          <span className="text-[10px] text-amber-600 font-medium italic">Click main section or sub-step to view and collect data</span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 min-w-[720px]">
+        {/* 4 Major Category Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
           {stagesList.map((stg) => {
-            const isSelected = currentSubTab === stg.id || (currentSubTab === 'dsp-mgmt' && stg.stageKey === 'moh-to-epss');
+            const isSelected = currentStage === stg.stageKey;
             return (
-              <button
+              <div
                 key={stg.id}
                 onClick={() => onSelectSubTab?.(stg.id as any)}
-                onDoubleClick={() => setInspectStageInfo({ stageKey: stg.stageKey, stageTitle: stg.label })}
-                title="Double-click to view stage source data"
-                className={`p-2.5 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                className={`p-3 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-slate-50 border-amber-500/60 shadow-sm ring-1 ring-amber-500/30'
-                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50'
+                    ? 'bg-slate-50 border-amber-500/80 shadow-md ring-2 ring-amber-500/20'
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
                 }`}
               >
                 <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${stg.color}`} />
-                  <span className="text-[10px] font-mono font-bold text-slate-400">{stg.count} Dossiers</span>
+                  <span className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${stg.color}`} />
+                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                    {stg.count} Dossiers
+                  </span>
                 </div>
-                <div className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                <div className={`text-xs font-black leading-snug ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
                   {stg.label}
                 </div>
+                <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                  {stg.subSteps.length} Sub-Steps
+                </div>
                 {isSelected && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
                 )}
-              </button>
+              </div>
             );
           })}
+        </div>
+
+        {/* Sub-Steps Selector Pills Bar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 overflow-x-auto">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mr-1">Sub-Steps:</span>
+          {stagesList
+            .filter(stg => currentStage === 'all' || currentStage === stg.stageKey)
+            .flatMap(stg => stg.subSteps)
+            .map((sub) => {
+              const isSubSelected = currentSubStep === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  onClick={() => onSelectSubTab?.(sub.subTab)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                    isSubSelected
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSubSelected ? 'bg-amber-400' : 'bg-slate-400'}`} />
+                  <span>{sub.label}</span>
+                </button>
+              );
+            })}
         </div>
       </div>
 
