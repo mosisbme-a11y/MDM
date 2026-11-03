@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, User, Eye, EyeOff, ShieldCheck, CheckCircle2, ArrowRight, KeyRound, Database, RefreshCw, Radio } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ArrowRight, KeyRound } from 'lucide-react';
 import { AuthUser } from '../types';
 import { EPSSLogo } from './EPSSLogo';
 import { ThemeSelector } from './ThemeSelector';
-import { getAuthorizedUsers, authenticateUser, AuthorizedUser } from '../utils/userManager';
-import { checkCentralSyncStatus, CentralSyncStatus } from '../utils/centralSyncService';
+import { signInWithPassword } from '../utils/authService';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { CentralSyncStatus } from '../utils/centralSyncService';
 
 interface LoginViewProps {
   onLogin: (user: AuthUser, remember: boolean) => void;
@@ -14,76 +15,39 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onThemeChange, syncStatus: propSyncStatus }) => {
-  const authorizedUsers = getAuthorizedUsers();
-  const [username, setUsername] = useState('admin@epss.gov.et');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isVideoBgEnabled, setIsVideoBgEnabled] = useState(true);
-  const [liveSyncStatus, setLiveSyncStatus] = useState<CentralSyncStatus | null>(propSyncStatus || null);
 
-  useEffect(() => {
-    let isMounted = true;
-    checkCentralSyncStatus().then((st) => {
-      if (isMounted && st) setLiveSyncStatus(st);
-    });
-    const interval = setInterval(() => {
-      checkCentralSyncStatus().then((st) => {
-        if (isMounted && st) setLiveSyncStatus(st);
-      });
-    }, 8000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    const trimmedUser = username.trim();
-    const trimmedPass = password.trim();
-
-    if (!trimmedUser) {
-      setErrorMessage('Please enter your individual email address or username.');
+    const email = username.trim();
+    if (!email || !email.includes('@')) {
+      setErrorMessage('Please enter the email address of your account.');
       return;
     }
-
-    if (!trimmedPass) {
+    if (!password) {
       setErrorMessage('Please enter your password.');
       return;
     }
 
     setIsLoading(true);
-
-    setTimeout(() => {
-      const matched = authenticateUser(trimmedUser, trimmedPass);
-
-      if (matched) {
-        const authUser: AuthUser = {
-          id: matched.id,
-          username: matched.username,
-          name: matched.name,
-          email: matched.email,
-          role: matched.role,
-          hub: matched.hub,
-          isAdmin: matched.isAdmin
-        };
-        onLogin(authUser, rememberMe);
+    try {
+      const result = await signInWithPassword(email, password, rememberMe);
+      if (result.user) {
+        onLogin(result.user, rememberMe);
       } else {
-        setErrorMessage('Invalid email or password. Passwords are created and assigned by the Inventory Administrator only.');
+        setErrorMessage(result.error || 'Sign in failed.');
       }
+    } finally {
       setIsLoading(false);
-    }, 350);
-  };
-
-  const handleSelectPreset = (user: AuthorizedUser) => {
-    setUsername(user.email);
-    setPassword(user.password);
-    setErrorMessage('');
+    }
   };
 
   return (
@@ -151,32 +115,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
             </div>
             <h3 className="text-base font-bold text-slate-900">Portal Access</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Log in with your individual email username and the password created and assigned by the Inventory Administrator.
+              Sign in with your email address and the password issued by the Inventory Administrator.
             </p>
 
-            {/* Central Master Cross-Browser Synchronization Indicator */}
-            <div className="mt-3 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900">
-              <div className="flex items-center justify-between font-semibold">
-                <span className="flex items-center gap-1.5 text-blue-700">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span>EPSS Master Central Server</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold bg-blue-200/60 px-1.5 py-0.5 rounded text-blue-800">
-                  v{liveSyncStatus?.version || 1}.0 Active
-                </span>
+            {!isSupabaseConfigured && (
+              <div className="mt-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                Supabase is not configured. Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in <code>.env</code> and rebuild.
               </div>
-              <div className="mt-1 text-slate-600 text-[11px] flex items-center justify-between">
-                <span>Multi-browser sync: <strong>Zero Variance</strong></span>
-                {liveSyncStatus?.counts && (
-                  <span className="text-blue-700 font-medium">
-                    {liveSyncStatus.counts.items || 0} Devices • {liveSyncStatus.counts.multipleStock || 0} Stock
-                  </span>
-                )}
-              </div>
-            </div>
+            )}
           </div>
 
           {errorMessage && (
@@ -190,7 +136,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
             {/* Username / Email Input */}
             <div>
               <label htmlFor="username" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Individual Email Username
+                Email Address
               </label>
               <div className="relative rounded-lg shadow-xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -199,12 +145,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
                 <input
                   id="username"
                   name="username"
-                  type="text"
+                  type="email"
                   autoComplete="username"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. admin@epss.gov.et or mosisa"
+                  placeholder="you@example.com"
                   className="block w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
                 />
               </div>
@@ -214,10 +160,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
-                  Password (Admin Assigned)
+                  Password
                 </label>
                 <span className="text-[11px] text-slate-400 font-medium">
-                  Created by Admin only
+                  Issued by the administrator
                 </span>
               </div>
               <div className="relative rounded-lg shadow-xs">
@@ -232,7 +178,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter assigned password"
+                  placeholder="Enter your password"
                   className="block w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
                 />
                 <button
@@ -276,53 +222,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
             </button>
           </form>
 
-          {/* Quick Select Authorized Accounts (for testing/convenience) */}
-          <div className="mt-6 pt-5 border-t border-slate-200">
-            <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
-              Authorized Accounts Quick Sign-In:
-            </span>
-            <div className="space-y-2">
-              {authorizedUsers.map((user) => {
-                const isSelected = username.toLowerCase() === user.email.toLowerCase() || username.toLowerCase() === user.username.toLowerCase();
-                return (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => handleSelectPreset(user)}
-                    className={`w-full text-left p-2.5 rounded-lg border transition flex items-center justify-between cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${user.isAdmin ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                        {user.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-slate-900 leading-tight">
-                          {user.name} {user.isAdmin && <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded ml-1">Admin</span>}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          {user.email} • {user.role}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected ? (
-                      <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    ) : (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
-                        Select
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-slate-400 mt-3 text-center">
-              Note: Self-registration is disabled. Only the Inventory Administrator can create accounts and assign passwords.
-            </p>
-          </div>
+          <p className="text-[10px] text-slate-400 mt-5 pt-4 border-t border-slate-200 text-center">
+            Self-registration is disabled. Only the Inventory Administrator can create accounts.
+          </p>
         </div>
 
         {/* Footer Credit */}
