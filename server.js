@@ -76,9 +76,17 @@ function requireAdmin(req, res, next) {
 }
 
 // Public health check: open https://YOUR-SITE/api/health in a browser to confirm the API is deployed and configured.
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, runtime: IS_VERCEL ? 'vercel' : 'node', supabaseConfigured: isSupabaseAdminConfigured, deltaSync: true });
-});
+// Add ?deep=1 to also test the database table and storage.
+app.get('/api/health', asyncRoute(async (req, res) => {
+  const out = { ok: true, runtime: IS_VERCEL ? 'vercel' : 'node', supabaseConfigured: isSupabaseAdminConfigured, deltaSync: true };
+  if (req.query.deep && supabaseAdmin) {
+    const { error } = await supabaseAdmin.from('system_master_data').select('dataset').limit(1);
+    out.syncTable = error ? `PROBLEM: ${error.message} (run supabase_sync_setup.sql in the Supabase SQL Editor)` : 'ok';
+    const { error: userErr } = await supabaseAdmin.from('users').select('uid').limit(1);
+    out.usersTable = userErr ? `PROBLEM: ${userErr.message}` : 'ok';
+  }
+  res.json(out);
+}));
 
 // Everything under /api needs a signed-in, active user.
 app.use('/api', requireAuth);
