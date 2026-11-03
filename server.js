@@ -1,17 +1,22 @@
-import fs from 'fs';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getMasterData, saveMasterData, getMasterDataStatus, importLegacyDiskStoreIfNeeded } from './server_store.js';
+import {
+  getMasterData, saveMasterData, getMasterDataStatus, importLegacyDiskStoreIfNeeded,
+  getManifest, getDatasetRow, putChunk, commitMasterData, getUploadRegistry, addUploadRecord,
+  getMasterDataLogs, addMasterDataLog
+} from './server_store.js';
 import { supabaseAdmin, isSupabaseAdminConfigured } from './server_supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, 'server_data');
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const UPLOAD_BUCKET = process.env.SUPABASE_UPLOAD_BUCKET || 'epss-uploads';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// express.json() also transparently inflates gzip request bodies (the browser compresses sync uploads).
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -21,6 +26,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // The token is verified with Supabase, then the caller's profile row in
 // public.users must exist and be active.
 // ------------------------------------------------------------------------------
+// Verified sessions are cached briefly so the 5-second sync polling does not cost two Supabase round-trips each time.
+const AUTH_CACHE_MS = 30_000;
+const authCache = new Map(); // token -> { user, expires }
+
 async function requireAuth(req, res, next) {
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'Server is not connected to Supabase (check SUPABASE_SERVICE_ROLE_KEY).' });
@@ -29,6 +38,11 @@ async function requireAuth(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized: missing token' });
+  }
+  const cached = authCache.get(token);
+  if (cached && cached.expires > Date.now()) {
+    req.user = cached.user;
+    return next();
   }
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
@@ -45,6 +59,8 @@ async function requireAuth(req, res, next) {
       return res.status(403).json({ error: 'Forbidden: this account is not active' });
     }
     req.user = { id: data.user.id, email: data.user.email, profile };
+    if (authCache.size > 500) authCache.clear();
+    authCache.set(token, { user: req.user, expires: Date.now() + AUTH_CACHE_MS });
     next();
   } catch (err) {
     console.error('Auth check failed:', err);
@@ -65,7 +81,7 @@ app.use('/api', requireAuth);
 const asyncRoute = (fn) => (req, res) =>
   Promise.resolve(fn(req, res)).catch((err) => {
     console.error(`Error in ${req.method} ${req.originalUrl}:`, err);
-    res.status(500).json({ error: err && err.message ? err.message : 'Server error' });
+    res.status(err && err.status ? err.status : 500).json({ error: err && err.message ? err.message : 'Server error' });
   });
 
 const toClientUser = (row) => ({
@@ -233,6 +249,41 @@ app.get('/api/system-master-data/status', asyncRoute(async (req, res) => {
   res.json(await getMasterDataStatus());
 }));
 
+app.get('/api/master-data-logs', asyncRoute(async (req, res) => {
+  res.json({ logs: await getMasterDataLogs() });
+}));
+
+app.post('/api/master-data-logs', asyncRoute(async (req, res) => {
+  const log = req.body && req.body.log;
+  if (!log || typeof log !== 'object') return res.status(400).json({ error: 'log is required' });
+  res.json({ success: true, log: await addMasterDataLog({ ...log, userId: req.user.id }) });
+}));
+
+// --- Delta sync: manifest + single-chunk read/write + commit (small requests, serverless-safe) ---
+app.get('/api/system-master-data/manifest', asyncRoute(async (req, res) => {
+  res.json(await getManifest());
+}));
+
+app.get('/api/system-master-data/chunk', asyncRoute(async (req, res) => {
+  res.json({ payload: await getDatasetRow(req.query.key) });
+}));
+
+app.put('/api/system-master-data/chunk', asyncRoute(async (req, res) => {
+  const { field, index, payload } = req.body || {};
+  await putChunk(String(field || ''), Number(index), payload);
+  res.json({ success: true });
+}));
+
+app.post('/api/system-master-data/commit', asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  res.json(await commitMasterData({
+    fields: body.fields || {},
+    categoryThresholds: body.categoryThresholds,
+    updateKind: body.updateKind,
+    updatedBy: body.updatedBy || req.user.profile.full_name || req.user.email
+  }));
+}));
+
 // Dedicated API endpoint for DSP Email transmission with exact binary attachments
 app.post('/api/send-dsp-email', (req, res) => {
   const {
@@ -336,114 +387,133 @@ app.post('/api/send-dsp-email', (req, res) => {
   });
 });
 
-// System Disk File Storage & Registry endpoints for uploaded spreadsheets and documents
-const UPLOAD_DIR = path.join(DATA_DIR, 'uploaded_files');
-const UPLOAD_REGISTRY_FILE = path.join(DATA_DIR, 'uploaded_files_registry.json');
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  try {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  } catch (err) {
-    console.warn('[Server Store] Failed to create uploaded_files directory:', err);
+// ------------------------------------------------------------------------------
+// UPLOADED FILES - stored in Supabase Storage (private bucket), listed from a registry row in the DB.
+// (Serverless hosts such as Vercel have no persistent disk, so nothing is written locally.)
+// Browsers upload straight to Storage through a signed URL, so large spreadsheets
+// never pass through this server (Vercel limits request bodies to 4.5 MB).
+// ------------------------------------------------------------------------------
+let bucketReady = null;
+function ensureBucket() {
+  if (!bucketReady) {
+    bucketReady = (async () => {
+      const { error } = await supabaseAdmin.storage.createBucket(UPLOAD_BUCKET, { public: false });
+      if (error && !/already exists|duplicate/i.test(error.message || '')) throw error;
+    })().catch((err) => {
+      bucketReady = null;
+      throw err;
+    });
   }
+  return bucketReady;
 }
 
-app.post('/api/upload-file', (req, res) => {
-  try {
-    const { fileName, fileDataBase64, fileType, module, rowCount, uploadedBy } = req.body;
-    if (!fileName || !fileDataBase64) {
-      return res.status(400).json({ error: 'fileName and fileDataBase64 are required' });
-    }
+const makeStoredName = (fileName) => {
+  const safe = path.basename(String(fileName || 'file')).replace(/[^\w.\- ]+/g, '_').slice(0, 150) || 'file';
+  return { safe, stored: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${safe}` };
+};
 
-    const safeName = path.basename(fileName);
-    const timePrefix = Date.now();
-    const storedFileName = `${timePrefix}_${safeName}`;
-    const filePath = path.join(UPLOAD_DIR, storedFileName);
-    const cleanBase64 = fileDataBase64.replace(/^data:.*?;base64,/, '');
-    const buffer = Buffer.from(cleanBase64, 'base64');
-    fs.writeFileSync(filePath, buffer);
+const formatSize = (bytes) =>
+  bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
-    let registry = [];
-    if (fs.existsSync(UPLOAD_REGISTRY_FILE)) {
-      try {
-        const raw = fs.readFileSync(UPLOAD_REGISTRY_FILE, 'utf-8');
-        if (raw && raw.trim()) registry = JSON.parse(raw);
-      } catch (e) {}
-    }
+function buildFileRecord({ safe, stored, sizeBytes, fileType, module: moduleName, rowCount, uploadedBy }) {
+  return {
+    id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    fileName: safe,
+    storedFileName: stored,
+    sizeBytes,
+    sizeStr: formatSize(sizeBytes),
+    fileType: fileType || path.extname(safe).replace('.', '').toUpperCase() || 'FILE',
+    module: moduleName || 'General Master Data',
+    rowCount: rowCount || 0,
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: uploadedBy || 'Inventory Administrator',
+    downloadUrl: `/api/download-file/${encodeURIComponent(stored)}`
+  };
+}
 
-    const sizeStr = buffer.length < 1024 * 1024 
-      ? `${(buffer.length / 1024).toFixed(1)} KB` 
-      : `${(buffer.length / (1024 * 1024)).toFixed(1)} MB`;
+// Step 1: browser asks for a one-time signed upload URL
+app.post('/api/upload-file/sign', asyncRoute(async (req, res) => {
+  const { fileName } = req.body || {};
+  if (!fileName) return res.status(400).json({ error: 'fileName is required' });
+  await ensureBucket();
+  const { safe, stored } = makeStoredName(fileName);
+  const { data, error } = await supabaseAdmin.storage.from(UPLOAD_BUCKET).createSignedUploadUrl(stored);
+  if (error) throw error;
+  res.json({ bucket: UPLOAD_BUCKET, path: data.path, token: data.token, safeName: safe, storedFileName: stored });
+}));
 
-    const fileRecord = {
-      id: `file-${timePrefix}-${Math.random().toString(36).substr(2, 5)}`,
-      fileName: safeName,
-      storedFileName,
-      sizeBytes: buffer.length,
-      sizeStr,
-      fileType: fileType || path.extname(safeName).replace('.', '').toUpperCase() || 'FILE',
-      module: module || 'General Master Data',
-      rowCount: rowCount || 0,
-      uploadedAt: new Date().toISOString(),
-      uploadedBy: uploadedBy || 'Inventory Administrator',
-      downloadUrl: `/api/download-file/${encodeURIComponent(storedFileName)}`
-    };
-
-    registry.unshift(fileRecord);
-    fs.writeFileSync(UPLOAD_REGISTRY_FILE, JSON.stringify(registry, null, 2), 'utf-8');
-
-    console.log(`[Server Store] Recorded uploaded file ${safeName} (${sizeStr}) permanently on system disk.`);
-    res.json({ success: true, fileRecord });
-  } catch (err) {
-    console.error('Error saving uploaded file to system disk:', err);
-    res.status(500).json({ error: 'Failed to record uploaded file on system disk' });
+// Step 2: after the browser finished uploading, register the file
+app.post('/api/upload-file/complete', asyncRoute(async (req, res) => {
+  const { storedFileName, fileName, sizeBytes, fileType, module: moduleName, rowCount, uploadedBy } = req.body || {};
+  if (!storedFileName || path.basename(storedFileName) !== storedFileName) {
+    return res.status(400).json({ error: 'storedFileName is required' });
   }
-});
-
-app.get('/api/uploaded-files', (req, res) => {
-  try {
-    let registry = [];
-    if (fs.existsSync(UPLOAD_REGISTRY_FILE)) {
-      const raw = fs.readFileSync(UPLOAD_REGISTRY_FILE, 'utf-8');
-      if (raw && raw.trim()) registry = JSON.parse(raw);
-    }
-    res.json({ files: registry, count: registry.length });
-  } catch (err) {
-    console.error('Error serving uploaded files registry:', err);
-    res.status(500).json({ error: 'Failed to fetch uploaded files registry' });
-  }
-});
-
-app.get('/api/download-file/:storedFileName', (req, res) => {
-  try {
-    const { storedFileName } = req.params;
-    const safePath = path.join(UPLOAD_DIR, path.basename(storedFileName));
-    if (fs.existsSync(safePath)) {
-      return res.download(safePath);
-    }
-    res.status(404).json({ error: 'File not found on system disk' });
-  } catch (err) {
-    console.error('Error serving file download:', err);
-    res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
-// Serve static files from the 'dist' directory
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Handle client-side routing fallback without invoking path-to-regexp (Express 5 safe)
-app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api')) {
-    return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-  }
-  next();
-});
-
-importLegacyDiskStoreIfNeeded().finally(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running and listening on port ${PORT}`);
-    if (!isSupabaseAdminConfigured) {
-      console.error('WARNING: Supabase is not configured - all /api routes will return 503.');
-    }
+  const fileRecord = buildFileRecord({
+    safe: path.basename(String(fileName || storedFileName)),
+    stored: storedFileName,
+    sizeBytes: Number(sizeBytes) || 0,
+    fileType, module: moduleName, rowCount, uploadedBy
   });
-});
+  await addUploadRecord(fileRecord);
+  res.json({ success: true, fileRecord });
+}));
+
+// Legacy single-request upload (small files only; kept for older clients)
+app.post('/api/upload-file', asyncRoute(async (req, res) => {
+  const { fileName, fileDataBase64, fileType, module: moduleName, rowCount, uploadedBy } = req.body || {};
+  if (!fileName || !fileDataBase64) {
+    return res.status(400).json({ error: 'fileName and fileDataBase64 are required' });
+  }
+  await ensureBucket();
+  const { safe, stored } = makeStoredName(fileName);
+  const buffer = Buffer.from(String(fileDataBase64).replace(/^data:.*?;base64,/, ''), 'base64');
+  const { error } = await supabaseAdmin.storage.from(UPLOAD_BUCKET).upload(stored, buffer, {
+    contentType: 'application/octet-stream'
+  });
+  if (error) throw error;
+  const fileRecord = buildFileRecord({ safe, stored, sizeBytes: buffer.length, fileType, module: moduleName, rowCount, uploadedBy });
+  await addUploadRecord(fileRecord);
+  res.json({ success: true, fileRecord });
+}));
+
+app.get('/api/uploaded-files', asyncRoute(async (req, res) => {
+  const files = await getUploadRegistry();
+  res.json({ files, count: files.length });
+}));
+
+app.get('/api/download-file/:storedFileName', asyncRoute(async (req, res) => {
+  const stored = path.basename(req.params.storedFileName);
+  const registry = await getUploadRegistry();
+  const rec = registry.find((r) => r.storedFileName === stored);
+  const { data, error } = await supabaseAdmin.storage
+    .from(UPLOAD_BUCKET)
+    .createSignedUrl(stored, 120, { download: rec ? rec.fileName : true });
+  if (error || !data) return res.status(404).json({ error: 'File not found in storage' });
+  res.redirect(302, data.signedUrl);
+}));
+
+// On Vercel the static site (dist/) and SPA fallback are served by Vercel itself (see vercel.json);
+// this Express app only answers /api/*. For `npm start` / other hosts it also serves the built site.
+if (!IS_VERCEL) {
+  app.use(express.static(path.join(__dirname, 'dist')));
+
+  // Handle client-side routing fallback without invoking path-to-regexp (Express 5 safe)
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    }
+    next();
+  });
+
+  importLegacyDiskStoreIfNeeded().finally(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server is running and listening on port ${PORT}`);
+      if (!isSupabaseAdminConfigured) {
+        console.error('WARNING: Supabase is not configured - all /api routes will return 503.');
+      }
+    });
+  });
+}
+
+// Exported for the Vercel serverless entry point (api/index.js).
+export default app;
