@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { createHash } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { supabaseAdmin } from './server_supabase.js';
@@ -11,6 +12,10 @@ const LEGACY_STORE_FILE = path.join(__dirname, 'server_data', 'epss_master_store
 
 const TABLE = 'system_master_data';
 const META_KEY = '_meta';
+// Large datasets (e.g. 7,500+ health facilities) are split into chunks of this many records,
+// one database row each, so no single request/row is too big or times out.
+const CHUNK_SIZE = 500;
+const chunkKey = (field, i) => `${field}:${String(i).padStart(5, '0')}`;
 
 // Array datasets stored one row each in public.system_master_data
 const ARRAY_FIELDS = [
@@ -76,14 +81,30 @@ export async function getMasterData() {
   for (const f of ARRAY_FIELDS) result[f] = [];
   result.categoryThresholds = {};
 
+  const chunks = {}; // field -> [{ index, payload }]
   for (const row of data || []) {
     if (row.dataset === META_KEY) {
       Object.assign(result, row.payload || {});
-    } else if (ARRAY_FIELDS.includes(row.dataset)) {
-      result[row.dataset] = Array.isArray(row.payload) ? row.payload : [];
+      continue;
+    }
+    const [field, idx] = String(row.dataset).split(':');
+    if (ARRAY_FIELDS.includes(field)) {
+      (chunks[field] = chunks[field] || []).push({
+        index: idx === undefined ? -1 : parseInt(idx, 10), // -1 = old single-row format
+        payload: Array.isArray(row.payload) ? row.payload : []
+      });
     } else if (OBJECT_FIELDS.includes(row.dataset)) {
       result[row.dataset] = row.payload && typeof row.payload === 'object' ? row.payload : {};
     }
+  }
+  for (const field of Object.keys(chunks)) {
+    const list = chunks[field];
+    // If new-format chunks exist, ignore any old single row
+    const hasChunks = list.some((c) => c.index >= 0);
+    result[field] = list
+      .filter((c) => (hasChunks ? c.index >= 0 : true))
+      .sort((x, y) => x.index - y.index)
+      .flatMap((c) => c.payload);
   }
   result.counts = { ...EMPTY_COUNTS, ...(result.counts || {}) };
   return result;
@@ -117,6 +138,58 @@ export function saveMasterData(updates = {}) {
   return run;
 }
 
+// Remember what is already stored so repeat saves only send the chunks that changed.
+const chunkHashes = new Map();   // chunk key -> content hash
+const chunkCounts = new Map();   // field -> number of chunks last written
+
+const hashOf = (value) => createHash('md5').update(JSON.stringify(value)).digest('hex');
+
+async function runLimited(tasks, limit) {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      const task = tasks[next++];
+      await task();
+    }
+  });
+  await Promise.all(workers);
+}
+
+async function writeChunked(client, field, records, now) {
+  const chunkRows = [];
+  for (let i = 0, n = 0; i < records.length; i += CHUNK_SIZE, n++) {
+    const payload = records.slice(i, i + CHUNK_SIZE);
+    chunkRows.push({ dataset: chunkKey(field, n), payload, updated_at: now, _hash: hashOf(payload) });
+  }
+
+  // Only upload chunks whose content changed since the last save
+  const changed = chunkRows.filter((r) => chunkHashes.get(r.dataset) !== r._hash);
+  const tasks = changed.map((row) => async () => {
+    const { _hash, ...dbRow } = row;
+    const { error } = await client.from(TABLE).upsert(dbRow, { onConflict: 'dataset' });
+    if (error) throw new Error(`Supabase write failed (${field}, ${row.dataset}): ${error.message}`);
+    chunkHashes.set(row.dataset, _hash);
+  });
+  await runLimited(tasks, 8); // 8 uploads in parallel
+
+  // Clean up stale rows only when needed (first save after a restart, or the list got shorter)
+  const previousCount = chunkCounts.get(field);
+  if (previousCount === undefined || previousCount > chunkRows.length) {
+    const keep = new Set(chunkRows.map((r) => r.dataset));
+    const { data: chunkList, error: listError } = await client
+      .from(TABLE)
+      .select('dataset')
+      .like('dataset', `${field}:%`);
+    if (listError) throw new Error(`Supabase cleanup failed (${field}): ${listError.message}`);
+    const stale = (chunkList || []).map((r) => r.dataset).filter((k) => !keep.has(k));
+    stale.push(field); // old single-row format (deleting a missing row is harmless)
+    const { error: delError } = await client.from(TABLE).delete().in('dataset', stale);
+    if (delError) throw new Error(`Supabase cleanup failed (${field}): ${delError.message}`);
+    stale.forEach((k) => chunkHashes.delete(k));
+  }
+  chunkCounts.set(field, chunkRows.length);
+}
+
 async function doSave(updates) {
   const client = requireClient();
   const meta = await readMeta();
@@ -124,13 +197,14 @@ async function doSave(updates) {
   const isExplicitClear = Boolean(updates.updateKind && /clear/i.test(updates.updateKind));
 
   const rows = [];
+  const arrayWrites = [];
   const counts = { ...meta.counts };
 
   for (const field of ARRAY_FIELDS) {
     const incoming = updates[field];
     if (!Array.isArray(incoming)) continue;
     if (incoming.length === 0 && !isExplicitClear) continue; // protect existing data
-    rows.push({ dataset: field, payload: incoming, updated_at: now });
+    arrayWrites.push({ field, incoming });
     counts[COUNT_KEY[field]] = incoming.length;
   }
   for (const field of OBJECT_FIELDS) {
@@ -143,6 +217,10 @@ async function doSave(updates) {
   if (rows.length) {
     const { error } = await client.from(TABLE).upsert(rows, { onConflict: 'dataset' });
     if (error) throw new Error(`Supabase write failed: ${error.message}`);
+  }
+
+  for (const { field, incoming } of arrayWrites) {
+    await writeChunked(client, field, incoming, now);
   }
 
   const newMeta = {
