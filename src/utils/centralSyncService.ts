@@ -8,7 +8,8 @@ import {
   ProgramMdRecord,
   NoBkdItem,
   ConfirmedUploadBatch,
-  CategoryThreshold
+  CategoryThreshold,
+  DspWorkflowRecord
 } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -22,6 +23,7 @@ export interface CentralMasterDataCounts {
   programMd?: number;
   noBkd?: number;
   confirmedBatches?: number;
+  dspWorkflows?: number;
 }
 
 export interface CentralMasterData {
@@ -39,6 +41,7 @@ export interface CentralMasterData {
   programMdRecords?: ProgramMdRecord[];
   noBkdItems?: NoBkdItem[];
   confirmedBatches?: ConfirmedUploadBatch[];
+  dspWorkflowRecords?: DspWorkflowRecord[];
   categoryThresholds?: Record<string, CategoryThreshold>;
   counts?: CentralMasterDataCounts;
 }
@@ -99,38 +102,178 @@ export function saveLastSyncMetadata(meta: CentralSyncStatus): void {
   } catch {}
 }
 
+// ------------------------------------------------------------------------------
+// DELTA SYNC
+// The dataset is stored on the server as chunks of ~500 records, each with a content hash.
+// Downloads/uploads only move the chunks that differ from what this browser already has,
+// in parallel, as small requests (also keeps every request under Vercel's 4.5 MB limit).
+// ------------------------------------------------------------------------------
+const ARRAY_FIELDS = [
+  'items',
+  'multipleStockItems',
+  'receivingDataRecords',
+  'distributionDataRecords',
+  'materialMasterItems',
+  'hfListItems',
+  'programMdRecords',
+  'noBkdItems',
+  'confirmedBatches',
+  'dspWorkflowRecords'
+] as const;
+type ArrayField = typeof ARRAY_FIELDS[number];
+
+interface ManifestField { keys: string[]; hashes: (string | null)[] }
+interface Manifest extends CentralSyncStatus {
+  chunkSize: number;
+  fields: Record<string, ManifestField>;
+}
+
+// What this browser already holds: chunk key -> { hash, payload }
+const chunkCache = new Map<string, { hash: string; payload: any[] }>();
+
+/** Fast, non-cryptographic 53-bit string hash (cyrb53) used to compare chunk contents. */
+function hashString(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}-${str.length.toString(36)}`;
+}
+
+const chunkKeyOf = (field: string, i: number) => `${field}:${String(i).padStart(5, '0')}`;
+
+/** Runs async jobs with a fixed number in flight at once. */
+async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      await worker(item);
+    }
+  });
+  await Promise.all(runners);
+}
+
+/** JSON body, gzip-compressed when the browser supports it (spreadsheet rows compress ~10x). */
+async function jsonBody(value: unknown): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+  const text = JSON.stringify(value);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    if (text.length > 20_000 && typeof CompressionStream !== 'undefined') {
+      const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+      const compressed = await new Response(stream).arrayBuffer();
+      headers['Content-Encoding'] = 'gzip';
+      return { body: compressed, headers };
+    }
+  } catch {
+    // fall through to plain JSON
+  }
+  return { body: text, headers };
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-cache' });
+  if (!res.ok) {
+    const err: any = new Error(`${url} -> HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+// Older servers (deployed before delta sync) answer 404/405 on the new endpoints -> use the original full-dataset API.
+let legacyServer = false;
+const isMissingEndpoint = (err: any) => err && (err.status === 404 || err.status === 405);
+
+async function legacyFetch(): Promise<CentralMasterData> {
+  return getJson<CentralMasterData>('/api/system-master-data');
+}
+
+async function fetchManifest(): Promise<Manifest> {
+  return getJson<Manifest>('/api/system-master-data/manifest');
+}
+
 /**
- * Fetches the complete centralized dataset from the server API (stored in Supabase).
+ * Fetches the complete centralized dataset from the server API (stored in Supabase),
+ * downloading only the chunks that changed since this browser last looked.
  */
 export async function fetchCentralMasterData(): Promise<CentralMasterData | null> {
   try {
-    const res = await fetch('/api/system-master-data', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-cache'
+    if (legacyServer) return await finishFetch(await legacyFetch());
+    let manifest: Manifest;
+    try {
+      manifest = await fetchManifest();
+    } catch (err) {
+      if (!isMissingEndpoint(err)) throw err;
+      legacyServer = true;
+      console.warn('[CentralSyncService] Server has no delta-sync endpoints (404) - using full-dataset API. Redeploy the server to enable fast sync.');
+      return await finishFetch(await legacyFetch());
+    }
+    const result: any = {
+      version: manifest.version,
+      lastUpdated: manifest.lastUpdated,
+      lastUpdatedBy: manifest.lastUpdatedBy,
+      updateKind: manifest.updateKind,
+      serverTime: manifest.serverTime,
+      counts: manifest.counts
+    };
+
+    const jobs: { field: string; index: number; key: string; hash: string | null }[] = [];
+    const parts: Record<string, any[][]> = {};
+    for (const field of ARRAY_FIELDS) {
+      const f = manifest.fields?.[field] || { keys: [], hashes: [] };
+      parts[field] = new Array(f.keys.length);
+      f.keys.forEach((key, index) => {
+        const hash = f.hashes[index] ?? null;
+        const cached = chunkCache.get(key);
+        if (hash && cached && cached.hash === hash) parts[field][index] = cached.payload;
+        else jobs.push({ field, index, key, hash });
+      });
+    }
+
+    await runPool(jobs, 6, async (job) => {
+      const { payload } = await getJson<{ payload: any[] }>(`/api/system-master-data/chunk?key=${encodeURIComponent(job.key)}`);
+      const rows = Array.isArray(payload) ? payload : [];
+      parts[job.field][job.index] = rows;
+      if (job.hash) chunkCache.set(job.key, { hash: job.hash, payload: rows });
+      else chunkCache.delete(job.key);
     });
 
-    if (res.ok) {
-      const data: CentralMasterData = await res.json();
-      if (data && typeof data.version === 'number') {
-        setLocalKnownVersion(data.version);
-        if (data.counts) {
-          saveLastSyncMetadata({
-            version: data.version,
-            lastUpdated: data.lastUpdated,
-            lastUpdatedBy: data.lastUpdatedBy,
-            updateKind: data.updateKind,
-            serverTime: data.serverTime || new Date().toISOString(),
-            counts: data.counts
-          });
-        }
-        return data;
-      }
+    for (const field of ARRAY_FIELDS) result[field] = parts[field].flat();
+    try {
+      const { payload } = await getJson<{ payload: any }>('/api/system-master-data/chunk?key=categoryThresholds');
+      result.categoryThresholds = payload && typeof payload === 'object' ? payload : {};
+    } catch {
+      result.categoryThresholds = {};
     }
+
+    return await finishFetch(result as CentralMasterData);
   } catch (err) {
     console.warn('[CentralSyncService] Could not fetch central data:', err);
   }
 
   return null;
+}
+
+async function finishFetch(data: CentralMasterData): Promise<CentralMasterData> {
+  {
+    setLocalKnownVersion(data.version);
+    if (data.counts) {
+      saveLastSyncMetadata({
+        version: data.version,
+        lastUpdated: data.lastUpdated,
+        lastUpdatedBy: data.lastUpdatedBy,
+        updateKind: data.updateKind,
+        serverTime: data.serverTime || new Date().toISOString(),
+        counts: data.counts
+      });
+    }
+    return data;
+  }
 }
 
 export type SupabaseSyncState = 'syncing' | 'synced' | 'error';
@@ -160,7 +303,6 @@ export async function pushCentralMasterData(
     updateKind?: string;
   }
 ): Promise<CentralSyncStatus | null> {
-  console.log('[CentralSyncService] Pushing updates:', updates);
   let resultStatus: CentralSyncStatus | null = null;
   let errorMessage = '';
 
@@ -168,15 +310,103 @@ export async function pushCentralMasterData(
   emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind });
 
   try {
-    const res = await fetch('/api/system-master-data', {
+    let manifest: Manifest | null = null;
+    if (!legacyServer) {
+      try {
+        manifest = await fetchManifest();
+      } catch (err) {
+        if (!isMissingEndpoint(err)) throw err;
+        legacyServer = true;
+        console.warn('[CentralSyncService] Server has no delta-sync endpoints (404) - using full-dataset API.');
+      }
+    }
+    if (!manifest) {
+      const res = await fetch('/api/system-master-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (!res.ok) {
+        let msg = `Server returned ${res.status}`;
+        try { msg = (await res.json())?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      const respData = await res.json();
+      if (respData && respData.version) {
+        setLocalKnownVersion(respData.version);
+        resultStatus = {
+          version: respData.version, lastUpdated: respData.lastUpdated, lastUpdatedBy: respData.lastUpdatedBy,
+          updateKind: respData.updateKind, serverTime: new Date().toISOString(), counts: respData.counts
+        };
+        saveLastSyncMetadata(resultStatus);
+      }
+      pendingPushes = Math.max(0, pendingPushes - 1);
+      emitSyncEvent(pendingPushes > 0 ? { state: 'syncing', pending: pendingPushes } : { state: 'synced', pending: 0, kind: resultStatus?.updateKind, version: resultStatus?.version });
+      return resultStatus;
+    }
+    const chunkSize = manifest.chunkSize || 500;
+    const commitFields: Record<string, { hashes: string[]; total: number }> = {};
+    const uploads: { field: string; index: number; key: string; hash: string; payload: any[] }[] = [];
+
+    for (const field of ARRAY_FIELDS) {
+      const records = (updates as any)[field];
+      if (!Array.isArray(records)) continue;
+      const serverHashes = manifest.fields?.[field]?.hashes || [];
+      const hashes: string[] = [];
+      for (let i = 0, n = 0; i < records.length; i += chunkSize, n++) {
+        const payload = records.slice(i, i + chunkSize);
+        const hash = hashString(JSON.stringify(payload));
+        hashes.push(hash);
+        if (serverHashes[n] !== hash) uploads.push({ field, index: n, key: chunkKeyOf(field, n), hash, payload });
+      }
+      commitFields[field] = { hashes, total: records.length };
+    }
+
+    // Upload only the chunks that differ from what the server already has
+    await runPool(uploads, 4, async (u) => {
+      const { body, headers } = await jsonBody({ field: u.field, index: u.index, payload: u.payload });
+      const res = await fetch('/api/system-master-data/chunk', { method: 'PUT', headers, body });
+      if (!res.ok) {
+        let msg = `Server returned ${res.status}`;
+        try { msg = (await res.json())?.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      chunkCache.set(u.key, { hash: u.hash, payload: u.payload });
+    });
+
+    // Nothing differs from the server -> nothing to commit (also stops echo loops between browsers)
+    const unchanged =
+      uploads.length === 0 &&
+      updates.categoryThresholds === undefined &&
+      Object.entries(commitFields).every(([f, c]) => {
+        const sh = manifest.fields?.[f]?.hashes || [];
+        return sh.length === c.hashes.length && sh.every((h, i) => h === c.hashes[i]);
+      });
+    if (unchanged) {
+      resultStatus = {
+        version: manifest.version, lastUpdated: manifest.lastUpdated, lastUpdatedBy: manifest.lastUpdatedBy,
+        updateKind: manifest.updateKind, serverTime: manifest.serverTime, counts: manifest.counts
+      };
+      pendingPushes = Math.max(0, pendingPushes - 1);
+      emitSyncEvent(pendingPushes > 0 ? { state: 'syncing', pending: pendingPushes } : { state: 'synced', pending: 0, kind: manifest.updateKind, version: manifest.version });
+      return resultStatus;
+    }
+
+    // One tiny request bumps the version; other browsers then pull just the changed chunks
+    const res = await fetch('/api/system-master-data/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
+      body: JSON.stringify({
+        fields: commitFields,
+        categoryThresholds: updates.categoryThresholds,
+        updatedBy: updates.updatedBy,
+        updateKind: updates.updateKind
+      })
     });
 
     if (res.ok) {
       const respData = await res.json();
-      console.log('[CentralSyncService] Push successful, response:', respData);
+      console.log('[CentralSyncService] Push successful:', { version: respData?.version, chunksUploaded: uploads.length });
       if (respData && respData.version) {
         setLocalKnownVersion(respData.version);
         resultStatus = {
@@ -190,7 +420,7 @@ export async function pushCentralMasterData(
         saveLastSyncMetadata(resultStatus);
       }
     } else {
-      console.error('[CentralSyncService] Push failed, res:', res.status, res.statusText);
+      console.error('[CentralSyncService] Commit failed, res:', res.status, res.statusText);
       try {
         const body = await res.json();
         errorMessage = body?.error || `Server returned ${res.status}`;
@@ -199,7 +429,7 @@ export async function pushCentralMasterData(
       }
     }
   } catch (err: any) {
-    console.error('[CentralSyncService] Failed to POST to central server API:', err);
+    console.error('[CentralSyncService] Failed to sync with central server API:', err);
     errorMessage = err?.message || 'Network error';
   }
 
