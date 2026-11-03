@@ -75,6 +75,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// Public health check: open https://YOUR-SITE/api/health in a browser to confirm the API is deployed and configured.
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, runtime: IS_VERCEL ? 'vercel' : 'node', supabaseConfigured: isSupabaseAdminConfigured, deltaSync: true });
+});
+
 // Everything under /api needs a signed-in, active user.
 app.use('/api', requireAuth);
 
