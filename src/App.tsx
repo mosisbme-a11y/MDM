@@ -88,6 +88,7 @@ import {
   applyFontScaleToDOM,
 } from './utils/systemSettings';
 import { LoginView } from './components/LoginView';
+import { restoreSession, signOut as supabaseSignOut, onSignedOut } from './utils/authService';
 import { inventoryData } from './data/inventoryData';
 import { DEFAULT_MASTER_STOCK_RECORDS, DEFAULT_MASTER_MEDICAL_DEVICES } from './data/defaultInventoryItems';
 import {
@@ -212,25 +213,23 @@ const BackgroundRenderer: React.FC<{ themeId: string }> = ({ themeId }) => {
 };
 
 export function App() {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    try {
-      const savedLocal = localStorage.getItem('epss_auth_user');
-      if (savedLocal) {
-        const u = JSON.parse(savedLocal);
-        if (u && !u.uid && u.id) u.uid = u.id;
-        return u;
-      }
-      const savedSession = sessionStorage.getItem('epss_auth_user');
-      if (savedSession) {
-        const u = JSON.parse(savedSession);
-        if (u && !u.uid && u.id) u.uid = u.id;
-        return u;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  // The signed-in user comes from the Supabase Auth session (never from localStorage).
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    restoreSession().then((user) => {
+      if (cancelled) return;
+      setCurrentUser(user);
+      setAuthReady(true);
+    });
+    const stopListening = onSignedOut(() => setCurrentUser(null));
+    return () => {
+      cancelled = true;
+      stopListening();
+    };
+  }, []);
 
   const isAdmin = Boolean(currentUser !== null);
 
@@ -478,6 +477,7 @@ export function App() {
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
   useEffect(() => {
+    if (!currentUser) return;
     let isMounted = true;
 
     // 1. Initial hydration from Central Server
@@ -663,7 +663,7 @@ export function App() {
       unsubscribePolling();
       cleanupBroadcast();
     };
-  }, []);
+  }, [currentUser?.id]);
   const [selectedDevice, setSelectedDevice] = useState<MedicalDeviceItem | null>(null);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isPrintConfirmModalOpen, setIsPrintConfirmModalOpen] = useState(false);
@@ -2222,13 +2222,9 @@ export function App() {
   const [actionDevice, setActionDevice] = useState<MedicalDeviceItem | null>(null);
 
   // Auth Handlers
-  const handleLogin = (user: AuthUser, remember: boolean) => {
+  const handleLogin = (user: AuthUser, _remember: boolean) => {
+    // Session persistence is handled by Supabase Auth (see utils/authService.ts)
     setCurrentUser(user);
-    if (remember) {
-      localStorage.setItem('epss_auth_user', JSON.stringify(user));
-    } else {
-      sessionStorage.setItem('epss_auth_user', JSON.stringify(user));
-    }
 
     // Check latest central sync status
     checkCentralSyncStatus().then((status) => {
@@ -2239,14 +2235,9 @@ export function App() {
     });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabaseSignOut();
     setCurrentUser(null);
-    try {
-      localStorage.removeItem('epss_auth_user');
-      sessionStorage.removeItem('epss_auth_user');
-    } catch {
-      // ignore
-    }
   };
 
   const handleInitiatePrint = () => {
@@ -3242,6 +3233,14 @@ export function App() {
       setTimeout(() => setToastMessage(null), 5000);
     }
   };
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 text-sm">
+        Checking your session...
+      </div>
+    );
+  }
 
   if (!currentUser) {
     const activeTheme = THEMES.find(t => t.id === theme) || THEMES[0];
