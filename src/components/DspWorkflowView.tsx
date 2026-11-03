@@ -87,8 +87,6 @@ import {
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
 import { DEFAULT_MASTER_STOCK_RECORDS } from '../data/defaultInventoryItems';
-import { db } from '../lib/firebase';
-import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 export interface DateCountInfo {
   days: number;
@@ -380,7 +378,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     setRecords(prev => {
       const updated = prev.map(r => r.id === actionTargetRecord.id ? updatedRecord : r);
       saveDspRecordsToIndexedDB(updated);
-      syncDspRecordToFirestore(updatedRecord);
       return updated;
     });
 
@@ -412,25 +409,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     }
     setActionTargetRecord(null);
   };
-
-  const sanitizeDspRecordForFirestore = (rec: DspWorkflowRecord) => {
-    const clean: any = { ...rec };
-    if (clean.excelFile) clean.excelFile = { name: clean.excelFile.name };
-    if (clean.pdfFile) clean.pdfFile = { name: clean.pdfFile.name };
-    if (clean.zipFile) clean.zipFile = { name: clean.zipFile.name };
-    return clean;
-  };
-
-  const syncDspRecordToFirestore = async (record: DspWorkflowRecord) => {
-    if (!userId || !record.id) return;
-    try {
-      const docRef = doc(db, 'users', userId, 'dspWorkflows', String(record.id));
-      await setDoc(docRef, sanitizeDspRecordForFirestore(record), { merge: true });
-    } catch (err) {
-      console.warn('Failed to sync DSP record to Firestore:', err);
-    }
-  };
-
 
   const handleToggleRegion = (reg: string) => {
     setSelectedRegionsFilter(prev => {
@@ -712,7 +690,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords(prev => {
             const updated = [newRecord, ...prev];
             saveDspRecordsToIndexedDB(updated); // Persist to IndexedDB
-            syncDspRecordToFirestore(newRecord);
             return updated;
           });
 
@@ -832,7 +809,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             setRecords(prev => {
               const updated = [newRecord, ...prev];
               saveDspRecordsToIndexedDB(updated);
-              syncDspRecordToFirestore(newRecord);
               return updated;
             });
 
@@ -888,7 +864,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             setRecords(prev => {
               const updated = [newRecord, ...prev];
               saveDspRecordsToIndexedDB(updated);
-              syncDspRecordToFirestore(newRecord);
               return updated;
             });
 
@@ -913,7 +888,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords(prev => {
             const updated = [newRecord, ...prev];
             saveDspRecordsToIndexedDB(updated);
-            syncDspRecordToFirestore(newRecord);
             return updated;
           });
 
@@ -1418,7 +1392,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
                 saveDspRecordsToIndexedDB(copy);
-                syncDspRecordToFirestore(updatedRec);
                 return copy;
               }
               return prev;
@@ -1466,7 +1439,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
                 saveDspRecordsToIndexedDB(copy);
-                syncDspRecordToFirestore(updatedRec);
                 return copy;
               }
               return prev;
