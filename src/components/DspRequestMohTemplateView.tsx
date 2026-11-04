@@ -700,39 +700,32 @@ Authorized Directorate Desk`;
       notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.`
     };
 
-    // 2. Incoming Received DSP record (Sub-step 1.2: DSP Received from MOH)
-    const receivedRecord12: DspWorkflowRecord = {
-      id: `dsp-moh-received-${Date.now()}`,
+    // 2. Incoming Received DSP record (Sub-step 2.1: DSP Received from EPSS in Stage 2 MOH OSP Management)
+    const receivedRecord21: DspWorkflowRecord = {
+      id: `dsp-moh-received-epss-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
-      stage: 'head-office-dsp',
-      subStage: '1.2',
-      stageTitle: 'Head Office DSP Management',
-      senderOrg: 'Ministry of Health (PMD Directorate)',
-      recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      subject: `DSP Received from MOH: Official Allocation Endorsement for ${refNum} (${itemsToSend.length} Program HP Items)`,
-      status: 'Endorsed & Approved',
+      stage: 'moh-osp-management',
+      subStage: '2.1',
+      stageTitle: 'MOH OSP Management',
+      senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      recipientOrg: 'Ministry of Health (PMD Directorate)',
+      subject: `DSP Received from EPSS: Official Equipment Quota Transmission for ${refNum} (${itemsToSend.length} Program HP Items)`,
+      status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
-      approvedDate: TODAY_ISO_DATE,
-      actionTakenDate: TODAY_ISO_DATE,
-      actionTakenBy: 'Dr. Bethlehem (MOH PMD Directorate)',
-      actionType: 'Endorsed & Approved',
-      actionLetterRef: mohLetterRef,
-      actionNotes: `Official national priority allocation approved for all ${itemsToSend.length} Program (HP) equipment lines.`,
-      turnaroundDays: 0,
       totalDevices: itemsToSend.length,
       totalQuantity: sentTotals.totalQty,
       totalValuationETB: sentTotals.totalValuation,
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
-      officialLetterRef: `MOH/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`,
-      signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
-      signatoryRole: 'PMD Directorate Director',
+      officialLetterRef: officialLetterRef,
+      signatory: 'Mosisa (Authorized User)',
+      signatoryRole: 'Directorate Technical Lead',
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
         description: r.materialDescription,
         quantity: r.qty,
         plant: 'AA01 Central',
-        allocatedFacility: 'MOH Approved Allocation Quota',
+        allocatedFacility: 'MOH Allocation Quota',
         valuationTypeDesc: r.valuationTypeDesc,
         wbsElement: r.wbsElement,
         budgetSource: r.budgetSource,
@@ -740,25 +733,25 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Official DSP Response from MOH. Exact copy of ${itemsToSend.length} transmitted items (Ref: ${refNum}).`
+      notes: `Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).`
     };
 
-    // 3. Clear previous default for 1.2 and store exact transmitted records
+    // 3. Clear previous default for 2.1 and store exact transmitted records
     setRecords(prev => {
       const filtered = prev.filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        if (sub === '1.2') return false;
+        if (sub === '2.1') return false;
         return true;
       });
-      const updated = [newRecord11, receivedRecord12, ...filtered];
+      const updated = [newRecord11, receivedRecord21, ...filtered];
       saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
-    // 4. Save exact rows to localStorage for sub-step 1.2 view rendering
+    // 4. Save exact rows to localStorage for sub-step 2.1 view rendering
     try {
-      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(itemsToSend));
-      localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(receivedRecord12));
+      localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
+      localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(receivedRecord21));
     } catch (e) {
       console.warn('Failed to save to localStorage:', e);
     }
@@ -771,15 +764,15 @@ Authorized Directorate Desk`;
     setSelectedRowIds([]);
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from MOH (1.2)`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from EPSS (2.1)`, {
         type: 'CREATE',
         title: `DSP Transmittal ${refNum}`,
-        payload: { request: newRecord11, received: receivedRecord12 }
+        payload: { request: newRecord11, received: receivedRecord21 }
       });
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Removed from imported table & stored in Sub-step 1.2.`);
+    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Removed from imported table & stored in Sub-step 2.1 (DSP Received from EPSS).`);
   };
 
   return (
