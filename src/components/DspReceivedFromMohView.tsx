@@ -312,6 +312,45 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
     showToast('✓ Received DSP data cleared');
   };
 
+  // Remove specific row from stored DSP data & update
+  const handleRemoveRow = (rowId: string) => {
+    const updated = receivedRows.filter(r => r.id !== rowId);
+    setReceivedRows(updated);
+    try {
+      localStorage.setItem(storageRowsKey, JSON.stringify(updated));
+      if (receivedRecord) {
+        const updatedRecord = {
+          ...receivedRecord,
+          totalDevices: updated.length,
+          totalQuantity: updated.reduce((sum, r) => sum + (r.qty || 0), 0),
+          totalValuationETB: updated.reduce((sum, r) => sum + (r.totalAmount || 0), 0),
+          itemsIncluded: updated.map(r => ({
+            material: r.material,
+            description: r.materialDescription,
+            quantity: r.qty,
+            plant: 'AA01 Central',
+            allocatedFacility: 'Allocation Quota',
+            valuationTypeDesc: r.valuationTypeDesc,
+            wbsElement: r.wbsElement,
+            budgetSource: r.budgetSource,
+            requestDate: r.requestDate,
+            dspRequestTo: r.dspRequestTo,
+            totalAmount: r.totalAmount
+          }))
+        };
+        setRecords(prev => {
+          const filtered = prev.filter(r => r.id !== receivedRecord.id);
+          const nextRecs = [updatedRecord, ...filtered];
+          saveDspRecordsToIndexedDB(nextRecs);
+          return nextRecs;
+        });
+      }
+    } catch (e) {
+      console.warn('Error updating storage after row removal:', e);
+    }
+    showToast('✓ Item removed from stored DSP data & updated successfully');
+  };
+
   // Excel Export
   const handleDownloadExcel = () => {
     const exportData = receivedRows.map((r, idx) => ({
@@ -668,7 +707,8 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Budget Source</th>
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Request Date</th>
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Received From</th>
-                    <th className="py-3 px-3 text-center">MOH Endorsement</th>
+                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">MOH Endorsement</th>
+                    <th className="py-3 px-3 text-center w-16">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-amber-100/60 font-medium text-slate-800">
@@ -736,11 +776,23 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                         </td>
 
                         {/* 11. MOH Endorsement Status */}
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <td className="py-2.5 px-3 text-center border-r border-amber-200/50 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             Approved
                           </span>
+                        </td>
+
+                        {/* 12. Action Remove Button */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(row.id)}
+                            className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                            title="Remove this item from stored DSP Received data"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     );
