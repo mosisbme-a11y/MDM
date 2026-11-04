@@ -605,14 +605,16 @@ _Protocol: Immutable Binary Stream Transmission (Zero Text Transcoding)_`;
       : 'Ministry of Health (MOH)';
 
     const formattedRows = selectedItems.map((item, idx) => ({
-      'Sr. No': idx + 1,
+      'S/N': idx + 1,
       'Material Code': item.material,
-      'Material Description': item.materialDescription,
-      'Quantity': formatNumber(item.unrestrictedStock),
-      'Valuation (ETB)': formatCurrency(item.currentValueOfUnrestrictedStock),
+      'Item Description': item.materialDescription,
+      'Qty Requested': formatNumber(item.unrestrictedStock),
+      'Total Amount (ETB)': formatCurrency(item.currentValueOfUnrestrictedStock),
+      'Valuation Type': item.inventoryValuationType || 'Standard',
       'WBS Element': item.wbsElement || 'N/A',
       'Budget Source': budgetSources[item.id] || 'N/A',
-      'Target Channel': targetLabel
+      'Request Date': currentDate,
+      'DSP Target': targetLabel
     }));
     setConfirmationData(formattedRows);
     setShowConfirmation(true);
@@ -780,7 +782,9 @@ _Protocol: Immutable Binary Stream Transmission (Zero Text Transcoding)_`;
     // 2. Add authentic official Letter PDF binary if present
     if (letterPayload && letterPayload.blob && letterPayload.file) {
       const letterBuffer = await letterPayload.blob.arrayBuffer();
-      zip.file(letterPayload.fileName, letterBuffer, { binary: true });
+      // Ensure PDF blob is treated as PDF for readability
+      const pdfBlob = new Blob([letterBuffer], { type: 'application/pdf' });
+      zip.file(letterPayload.fileName, await pdfBlob.arrayBuffer(), { binary: true });
     }
 
     const totalQtyNum = selectedItems.reduce((acc, i) => acc + i.unrestrictedStock, 0);
