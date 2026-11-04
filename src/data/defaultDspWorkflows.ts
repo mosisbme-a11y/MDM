@@ -2,14 +2,83 @@ import { DspWorkflowRecord } from '../types';
 import { DEFAULT_STAGE_3_COLUMNS, DEFAULT_STAGE_3_ROWS } from '../components/RegionBreakdownMatrixTable';
 import { DEFAULT_STAGE_4_COLUMNS, DEFAULT_STAGE_4_ROWS } from '../components/Stage4MohSubmittedMatrixTable';
 
+// Canonicalize subStage strings to standard hierarchy keys
+export const canonicalizeSubStage = (s?: string, stage?: string): string => {
+  if (!s && !stage) return '1.1';
+  const clean = (s || '').trim().toLowerCase();
+
+  if (clean === '1.1' || clean.includes('1.1') || clean.includes('dsp-ho-1-1') || clean.includes('dsp-request') || clean.includes('request to moh') || clean.includes('epss to moh')) return '1.1';
+  if (clean === '1.2' || clean.includes('1.2') || clean.includes('dsp-ho-1-2') || clean.includes('received from moh')) return '1.2';
+  if (clean === '1.3.1' || clean.includes('1.3.1') || clean.includes('dsp-ho-1-3-1') || clean.includes('mapping') || clean.includes('map hf')) return '1.3.1';
+  if (clean === '1.3.2' || clean.includes('1.3.2') || clean.includes('dsp-ho-1-3-2') || clean.includes('send dsp to hubs')) return '1.3.2';
+  if (clean === '1.3.3' || clean.includes('1.3.3') || clean.includes('dsp-ho-1-3-3') || clean.includes('item aggregation')) return '1.3.3';
+  if (clean === '1.3.4' || clean.includes('1.3.4') || clean.includes('dsp-ho-1-3-4') || clean.includes('order process')) return '1.3.4';
+
+  if (clean === '2.1' || clean.includes('2.1') || clean.includes('dsp-moh-2-1') || clean.includes('received from epss')) return '2.1';
+  if (clean === '2.2' || clean.includes('2.2') || clean.includes('dsp-moh-2-2') || clean.includes('breakdown request to rhb')) return '2.2';
+  if (clean === '2.3' || clean.includes('2.3') || clean.includes('dsp-moh-2-3') || clean.includes('breakdown received from rhb')) return '2.3';
+  if (clean === '2.4' || clean.includes('2.4') || clean.includes('dsp-moh-2-4') || clean.includes('aggregation by rhb')) return '2.4';
+  if (clean === '2.5' || clean.includes('2.5') || clean.includes('dsp-moh-2-5') || clean.includes('submitted to epss')) return '2.5';
+
+  if (clean === '3.1' || clean.includes('3.1') || clean.includes('dsp-rhb-3-1') || clean.includes('breakdown received from moh')) return '3.1';
+  if (clean === '3.2' || clean.includes('3.2') || clean.includes('dsp-rhb-3-2') || clean.includes('submit breakdown to moh')) return '3.2';
+
+  if (clean === '4.1' || clean.includes('4.1') || clean.includes('dsp-branches-4-1') || clean.includes('received dsp')) return '4.1';
+  if (clean === '4.2' || clean.includes('4.2') || clean.includes('dsp-branches-4-2') || clean.includes('analysis and comparing')) return '4.2';
+
+  if (stage === 'head-office-dsp' || stage === 'moh-to-epss') return '1.1';
+  if (stage === 'moh-osp-management' || stage === 'moh-to-rhb') return '2.2';
+  if (stage === 'rhb-breakdown-management' || stage === 'rhb-to-moh') return '3.2';
+  if (stage === 'branches-dsp-management' || stage === 'epss-to-branch') return '4.1';
+
+  return '1.1';
+};
+
+// Helper function to ensure all records follow the professional 4-tier DSP hierarchy structure
+export const normalizeDspRecord = (r: DspWorkflowRecord): DspWorkflowRecord => {
+  let stage = r.stage;
+  let stageTitle = r.stageTitle;
+
+  if (r.stage === 'moh-to-epss' || r.stage === 'head-office-dsp') {
+    stage = 'head-office-dsp';
+    stageTitle = 'Head Office DSP Management';
+  } else if (r.stage === 'moh-to-rhb' || r.stage === 'moh-osp-management') {
+    stage = 'moh-osp-management';
+    stageTitle = 'MOH OSP Management';
+  } else if (r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management') {
+    stage = 'rhb-breakdown-management';
+    stageTitle = 'RHB Breakdown Management';
+  } else if (r.stage === 'epss-to-branch' || r.stage === 'branches-dsp-management') {
+    stage = 'branches-dsp-management';
+    stageTitle = 'Branches DSP Management';
+  } else if (r.stage === 'moh-to-epss-ho') {
+    stage = 'moh-osp-management';
+    stageTitle = 'MOH OSP Management';
+  } else if (r.stage === 'epss-ho-aggregation') {
+    stage = 'head-office-dsp';
+    stageTitle = 'Head Office DSP Management';
+  }
+
+  const subStage = canonicalizeSubStage(r.subStage, stage);
+
+  return {
+    ...r,
+    stage,
+    subStage,
+    stageTitle
+  };
+};
+
+// 1. HEAD OFFICE DSP MANAGEMENT RECORDS
 export const DEFAULT_STAGE_1_DOSSIER_1: DspWorkflowRecord = {
   id: 'dsp-epss-sample-01',
   dspRefNumber: 'EPSS/MD-DSP/2026/042',
-  stage: 'moh-to-epss',
-  stageTitle: '1. DSP Request EPSS to MOH',
+  stage: 'head-office-dsp',
+  subStage: '1.1',
+  stageTitle: 'Head Office DSP Management',
   senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
   recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'National Priority Medical Equipment Allocation Request - Batch 01 (MCH & Critical Care Fleet)',
+  subject: 'DSP Request to MOH: Priority MCH & Critical Care Equipment Allocation Request',
   status: 'Endorsed & Approved',
   dateSubmitted: '2026-10-24',
   approvedDate: '2026-10-25',
@@ -41,11 +110,12 @@ export const DEFAULT_STAGE_1_DOSSIER_1: DspWorkflowRecord = {
 export const DEFAULT_STAGE_1_DOSSIER_2: DspWorkflowRecord = {
   id: 'dsp-epss-sample-02',
   dspRefNumber: 'EPSS/MD-DSP/2026/048',
-  stage: 'moh-to-epss',
-  stageTitle: '1. DSP Request EPSS to MOH',
-  senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-  recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'Special Stock Type Q Diagnostic Imaging & ICU Ventilator Allocation Request',
+  stage: 'head-office-dsp',
+  subStage: '1.2',
+  stageTitle: 'Head Office DSP Management',
+  senderOrg: 'Ministry of Health (PMD Directorate)',
+  recipientOrg: 'EPSS Head Office',
+  subject: 'DSP Received from MOH: Special Stock Diagnostic Imaging & ICU Ventilator Allocation Approval',
   status: 'Endorsed & Approved',
   dateSubmitted: '2026-10-25',
   approvedDate: '2026-10-26',
@@ -74,11 +144,12 @@ export const DEFAULT_STAGE_1_DOSSIER_2: DspWorkflowRecord = {
 export const DEFAULT_STAGE_1_DOSSIER_3: DspWorkflowRecord = {
   id: 'dsp-epss-sample-03',
   dspRefNumber: 'EPSS/MD-DSP/2026/055',
-  stage: 'moh-to-epss',
-  stageTitle: '1. DSP Request EPSS to MOH',
+  stage: 'head-office-dsp',
+  subStage: '1.3.1',
+  stageTitle: 'Head Office DSP Management',
   senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-  recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'Laboratory Clinical Chemistry & Vital Signs Monitor Fleet Allocation',
+  recipientOrg: 'EPSS Distribution Hubs',
+  subject: 'Map HF to Hubs: Laboratory Clinical Chemistry & Vital Signs Monitor Fleet Allocation',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-27',
   totalDevices: 2,
@@ -93,17 +164,102 @@ export const DEFAULT_STAGE_1_DOSSIER_3: DspWorkflowRecord = {
     { material: 'MAT-100237', description: 'Automated Clinical Chemistry Analyzer, 400 Tests/Hour', quantity: 30, plant: 'BD01 Bahir Dar' },
     { material: 'MAT-100238', description: 'Multiparameter Patient Monitor 12.1 Inch (ECG, SpO2, NIBP, Temp, Resp)', quantity: 50, plant: 'MK01 Mekelle' }
   ],
-  notes: 'Clinical chemistry analyzers and monitors for secondary regional laboratories.'
+  notes: 'Clinical chemistry analyzers and monitors mapped to regional health facilities and nearest hubs.'
 };
 
+export const DEFAULT_STAGE_1_DOSSIER_4: DspWorkflowRecord = {
+  id: 'dsp-epss-sample-04',
+  dspRefNumber: 'EPSS/MD-DSP/2026/061',
+  stage: 'head-office-dsp',
+  subStage: '1.3.2',
+  stageTitle: 'Head Office DSP Management',
+  senderOrg: 'EPSS Head Office',
+  recipientOrg: 'EPSS Branch Hubs',
+  subject: 'Send DSP to Hubs / Submit: Central Cold Chain & Surgical Fleet Dispatch Authorization',
+  status: 'Submitted & Pending',
+  dateSubmitted: '2026-10-28',
+  totalDevices: 4,
+  totalQuantity: 95,
+  totalValuationETB: 24500000,
+  targetedRegions: ['Amhara', 'Oromia', 'Harari'],
+  targetedFacilitiesCount: 14,
+  officialLetterRef: 'EPSS/LET/2026/889',
+  signatory: 'Mosisa (Authorized User)',
+  signatoryRole: 'Directorate Technical Lead',
+  itemsIncluded: [
+    { material: 'MAT-100240', description: 'Solar Direct Drive Vaccine Refrigerator 150L', quantity: 40, plant: 'AA01 Central' },
+    { material: 'MAT-100241', description: 'Major Operating Table Hydraulic Multi-Position', quantity: 20, plant: 'AD01 Adama' },
+    { material: 'MAT-100242', description: 'Surgical LED Shadowless Operating Light Twin Arm', quantity: 20, plant: 'BD01 Bahir Dar' },
+    { material: 'MAT-100243', description: 'Steam Sterilizer Autoclave 200L Horizontal', quantity: 15, plant: 'HW01 Hawassa' }
+  ],
+  notes: 'Dispatched to branch hubs for release order confirmation.'
+};
+
+export const DEFAULT_STAGE_1_DOSSIER_5: DspWorkflowRecord = {
+  id: 'dsp-epss-sample-05',
+  dspRefNumber: 'EPSS/MD-DSP/2026/068',
+  stage: 'head-office-dsp',
+  subStage: '1.3.3',
+  stageTitle: 'Head Office DSP Management',
+  senderOrg: 'EPSS Head Office',
+  recipientOrg: 'MOH PMD Directorate',
+  subject: 'Item Aggregation: Consolidated Regional Equipment Requisition Summary',
+  status: 'Endorsed & Approved',
+  dateSubmitted: '2026-10-29',
+  totalDevices: 5,
+  totalQuantity: 150,
+  totalValuationETB: 38000000,
+  targetedRegions: ['National Coverage'],
+  targetedFacilitiesCount: 25,
+  officialLetterRef: 'EPSS/LET/2026/912',
+  signatory: 'Mosisa (Authorized User)',
+  signatoryRole: 'Directorate Technical Lead',
+  itemsIncluded: [
+    { material: 'MAT-100250', description: 'Infant Incubator Intensive Care Unit with Humidity Control', quantity: 30, plant: 'AA01 Central' },
+    { material: 'MAT-100251', description: 'Phototherapy Unit LED Overhead Stand', quantity: 50, plant: 'AD01 Adama' },
+    { material: 'MAT-100252', description: 'Neonatal Resuscitation Warmer Table', quantity: 40, plant: 'HW01 Hawassa' },
+    { material: 'MAT-100253', description: 'Suction Machine Electric Dual Bottle 40L/Min', quantity: 30, plant: 'BD01 Bahir Dar' }
+  ],
+  notes: 'Item-level aggregation completed across all regional demand forecasts.'
+};
+
+export const DEFAULT_STAGE_1_DOSSIER_6: DspWorkflowRecord = {
+  id: 'dsp-epss-sample-06',
+  dspRefNumber: 'EPSS/MD-DSP/2026/072',
+  stage: 'head-office-dsp',
+  subStage: '1.3.4',
+  stageTitle: 'Head Office DSP Management',
+  senderOrg: 'EPSS Head Office',
+  recipientOrg: 'Procurement & Logistics Directorate',
+  subject: 'Order Process: Final Approved Equipment Allocation Purchase Order Processing',
+  status: 'Endorsed & Approved',
+  dateSubmitted: '2026-10-30',
+  totalDevices: 3,
+  totalQuantity: 110,
+  totalValuationETB: 29000000,
+  targetedRegions: ['National Coverage'],
+  targetedFacilitiesCount: 20,
+  officialLetterRef: 'EPSS/LET/2026/945',
+  signatory: 'Mosisa (Authorized User)',
+  signatoryRole: 'Directorate Technical Lead',
+  itemsIncluded: [
+    { material: 'MAT-100260', description: 'Haemodialysis Machine Triple Pump System', quantity: 20, plant: 'AA01 Central' },
+    { material: 'MAT-100261', description: 'Water Treatment Reverse Osmosis System for Dialysis', quantity: 10, plant: 'AA01 Central' },
+    { material: 'MAT-100262', description: 'Dialysate Re-use System Automated', quantity: 80, plant: 'AD01 Adama' }
+  ],
+  notes: 'Order processing initiated with supplier contract fulfillment logs.'
+};
+
+// 2. MOH OSP MANAGEMENT RECORDS
 export const DEFAULT_STAGE_2_DOSSIER_1: DspWorkflowRecord = {
   id: 'dsp-brk-sample-01',
   dspRefNumber: 'MOH/PMD-BRK/2026/101',
-  stage: 'moh-to-rhb',
-  stageTitle: '2. Breakdown Request MOH to Region',
-  senderOrg: 'Ministry of Health (PMD Directorate)',
-  recipientOrg: 'Oromia, Amhara, Sidama Regional Health Bureaus',
-  subject: 'Official Regional Medical Equipment Breakdown Request - Batch 01 (Based on EPSS/MD-DSP/2026/042)',
+  stage: 'moh-osp-management',
+  subStage: '2.1',
+  stageTitle: 'MOH OSP Management',
+  senderOrg: 'EPSS Head Office',
+  recipientOrg: 'Ministry of Health (PMD Directorate)',
+  subject: 'DSP Received from EPSS: Official Equipment Quota Transmission - Batch 01',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-26',
   totalDevices: 6,
@@ -122,7 +278,7 @@ export const DEFAULT_STAGE_2_DOSSIER_1: DspWorkflowRecord = {
     { material: '401-WICU-0101N', description: 'Couch - Delivery', quantity: 5, plant: 'MK01 Mekelle' },
     { material: '401-WICU-0101N', description: 'Couch - Examination', quantity: 5, plant: 'AA01 Central' }
   ],
-  notes: 'Regional breakdown allocation quota transmitted via Email & WhatsApp based on EPSS Medical Device Request EPSS/MD-DSP/2026/042.',
+  notes: 'Regional breakdown allocation quota received from EPSS.',
   facilityMatrixData: {
     date: '2026-10-26',
     region: 'Oromia',
@@ -134,11 +290,12 @@ export const DEFAULT_STAGE_2_DOSSIER_1: DspWorkflowRecord = {
 export const DEFAULT_STAGE_2_DOSSIER_2: DspWorkflowRecord = {
   id: 'dsp-brk-sample-02',
   dspRefNumber: 'MOH/PMD-BRK/2026/102',
-  stage: 'moh-to-rhb',
-  stageTitle: '2. Breakdown Request MOH to Region',
+  stage: 'moh-osp-management',
+  subStage: '2.2',
+  stageTitle: 'MOH OSP Management',
   senderOrg: 'Ministry of Health (PMD Directorate)',
   recipientOrg: 'Tigray, Somali, Afar Regional Health Bureaus',
-  subject: 'Regional Breakdown Allocation Request: Diagnostic Imaging & ICU Ventilators (Based on EPSS/MD-DSP/2026/048)',
+  subject: 'DSP Breakdown Request to RHB: Diagnostic Imaging & ICU Ventilators Allocation Quota',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-27',
   totalDevices: 3,
@@ -154,7 +311,7 @@ export const DEFAULT_STAGE_2_DOSSIER_2: DspWorkflowRecord = {
     { material: 'MAT-100235', description: 'ICU Mechanical Ventilator, Adult/Pediatric Invasive & Non-Invasive', quantity: 15, plant: 'HO01 Central' },
     { material: 'MAT-100236', description: 'Digital X-Ray System, Ceiling-Suspended High Frequency 50kW', quantity: 10, plant: 'HW01 Hawassa' }
   ],
-  notes: 'Regional breakdown allocation quota transmitted via Email & WhatsApp based on EPSS Medical Device Request EPSS/MD-DSP/2026/048.',
+  notes: 'Regional breakdown allocation quota transmitted via Email & WhatsApp.',
   facilityMatrixData: {
     date: '2026-10-27',
     region: 'Tigray',
@@ -166,11 +323,12 @@ export const DEFAULT_STAGE_2_DOSSIER_2: DspWorkflowRecord = {
 export const DEFAULT_STAGE_2_DOSSIER_3: DspWorkflowRecord = {
   id: 'dsp-brk-sample-03',
   dspRefNumber: 'MOH/PMD-BRK/2026/103',
-  stage: 'moh-to-rhb',
-  stageTitle: '2. Breakdown Request MOH to Region',
-  senderOrg: 'Ministry of Health (PMD Directorate)',
-  recipientOrg: 'South Ethiopia, Central Ethiopia, Benishangul-Gumuz',
-  subject: 'Primary Hospital MCH & Laboratory Fleet Breakdown Quota Request (Based on EPSS/MD-DSP/2026/055)',
+  stage: 'moh-osp-management',
+  subStage: '2.3',
+  stageTitle: 'MOH OSP Management',
+  senderOrg: 'South Ethiopia, Central Ethiopia Regional Health Bureaus',
+  recipientOrg: 'Ministry of Health (PMD Directorate)',
+  subject: 'Breakdown Received from RHB: Primary Hospital MCH & Laboratory Breakdown Matrix',
   status: 'Under Review',
   dateSubmitted: '2026-10-27',
   totalDevices: 2,
@@ -185,7 +343,7 @@ export const DEFAULT_STAGE_2_DOSSIER_3: DspWorkflowRecord = {
     { material: 'MAT-100237', description: 'Automated Clinical Chemistry Analyzer, 400 Tests/Hour', quantity: 15, plant: 'BD01 Bahir Dar' },
     { material: 'MAT-100238', description: 'Multiparameter Patient Monitor 12.1 Inch', quantity: 25, plant: 'MK01 Mekelle' }
   ],
-  notes: 'Regional breakdown allocation quota transmitted via Email & WhatsApp based on EPSS Medical Device Request EPSS/MD-DSP/2026/055.',
+  notes: 'Regional breakdown matrix received from RHB.',
   facilityMatrixData: {
     date: '2026-10-27',
     region: 'South Ethiopia',
@@ -194,14 +352,72 @@ export const DEFAULT_STAGE_2_DOSSIER_3: DspWorkflowRecord = {
   }
 };
 
-export const DEFAULT_STAGE_3_DOSSIER: DspWorkflowRecord = {
+export const DEFAULT_STAGE_2_DOSSIER_4: DspWorkflowRecord = {
+  id: 'dsp-brk-sample-04',
+  dspRefNumber: 'MOH/PMD-BRK/2026/108',
+  stage: 'moh-osp-management',
+  subStage: '2.4',
+  stageTitle: 'MOH OSP Management',
+  senderOrg: 'Regional Health Bureaus',
+  recipientOrg: 'Ministry of Health (PMD Directorate)',
+  subject: 'Breakdown Aggregation by RHB: Multi-Regional Consolidated Breakdown Summary',
+  status: 'Endorsed & Approved',
+  dateSubmitted: '2026-10-28',
+  totalDevices: 4,
+  totalQuantity: 85,
+  totalValuationETB: 21000000,
+  targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Tigray'],
+  targetedFacilitiesCount: 22,
+  officialLetterRef: 'MOH/LET/2026/928',
+  signatory: 'Dr. Bethlehem (MOH PMD Director)',
+  signatoryRole: 'Director, Pharmaceuticals & Medical Devices',
+  itemsIncluded: [
+    { material: 'MAT-100270', description: 'Electrocardiograph 12-Channel Color Screen Printer', quantity: 35, plant: 'AA01 Central' },
+    { material: 'MAT-100271', description: 'Defibrillator Monitor Bi-phasic with External Pacemaker', quantity: 25, plant: 'AD01 Adama' },
+    { material: 'MAT-100272', description: 'Pulse Oximeter Fingertip / Handheld Clinical', quantity: 25, plant: 'HW01 Hawassa' }
+  ],
+  notes: 'Breakdown aggregation validated across 4 major regions.'
+};
+
+export const DEFAULT_STAGE_2_DOSSIER_5: DspWorkflowRecord = {
+  id: 'dsp-brk-sample-05',
+  dspRefNumber: 'MOH/PMD-BRK/2026/115',
+  stage: 'moh-osp-management',
+  subStage: '2.5',
+  stageTitle: 'MOH OSP Management',
+  senderOrg: 'Ministry of Health (PMD Directorate)',
+  recipientOrg: 'EPSS Head Office',
+  subject: 'DSP Agr. DSP Submitted to EPSS: Final Approved National Distribution Matrix',
+  status: 'Endorsed & Approved',
+  dateSubmitted: '2026-10-29',
+  approvedDate: '2026-10-29',
+  totalDevices: DEFAULT_STAGE_4_COLUMNS.length,
+  totalQuantity: 110,
+  totalValuationETB: 28500000,
+  targetedRegions: ['National Coverage'],
+  targetedFacilitiesCount: 30,
+  officialLetterRef: 'MOH/PMD/LET/2026/1150',
+  signatory: 'Dr. Dereje (MOH State Minister)',
+  signatoryRole: 'State Minister of Health',
+  itemsIncluded: DEFAULT_STAGE_4_COLUMNS.map(c => ({
+    material: c.code,
+    description: c.name,
+    quantity: 18,
+    plant: 'Central Hub'
+  })),
+  notes: 'Final aggregated national distribution matrix submitted from MOH to EPSS Head Office.'
+};
+
+// 3. RHB BREAKDOWN MANAGEMENT RECORDS
+export const DEFAULT_STAGE_3_DOSSIER_1: DspWorkflowRecord = {
   id: 'dsp-reg-sample-01',
   dspRefNumber: 'RHB/OR-DSP/2026/088',
-  stage: 'rhb-to-moh',
-  stageTitle: '3. DSP Submitted Region to MOH',
-  senderOrg: 'Oromia Regional Health Bureau',
-  recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'Official Regional Health Facility Equipment Allocation Breakdown - Oromia Region',
+  stage: 'rhb-breakdown-management',
+  subStage: '3.1',
+  stageTitle: 'RHB Breakdown Management',
+  senderOrg: 'Ministry of Health (PMD Directorate)',
+  recipientOrg: 'Oromia Regional Health Bureau',
+  subject: 'Breakdown Received from MOH: Oromia Health Facility Quota Allocation Request',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-27',
   totalDevices: 6,
@@ -218,7 +434,7 @@ export const DEFAULT_STAGE_3_DOSSIER: DspWorkflowRecord = {
     quantity: DEFAULT_STAGE_3_ROWS.reduce((sum, r) => sum + (r.quantities[c.id] || 0), 0),
     plant: 'Oromia Hub'
   })),
-  notes: 'Regional facility breakdown matrix submitted as per MOH distribution quota.',
+  notes: 'Breakdown request received from MOH for Oromia health facilities.',
   facilityMatrixData: {
     date: '2026-10-27',
     region: 'Oromia',
@@ -227,14 +443,15 @@ export const DEFAULT_STAGE_3_DOSSIER: DspWorkflowRecord = {
   }
 };
 
-export const DEFAULT_STAGE_3_DOSSIER_AMHARA: DspWorkflowRecord = {
+export const DEFAULT_STAGE_3_DOSSIER_2: DspWorkflowRecord = {
   id: 'dsp-reg-sample-02',
   dspRefNumber: 'RHB/AM-DSP/2026/092',
-  stage: 'rhb-to-moh',
-  stageTitle: '3. DSP Submitted Region to MOH',
+  stage: 'rhb-breakdown-management',
+  subStage: '3.2',
+  stageTitle: 'RHB Breakdown Management',
   senderOrg: 'Amhara Regional Health Bureau',
   recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'Official Regional Health Facility Equipment Allocation Breakdown - Amhara Region',
+  subject: 'Submit Breakdown to MOH: Amhara Regional Health Facility Allocation Matrix',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-27',
   totalDevices: 6,
@@ -254,14 +471,15 @@ export const DEFAULT_STAGE_3_DOSSIER_AMHARA: DspWorkflowRecord = {
   notes: 'Amhara Regional Health Bureau facility breakdown submitted per MOH quota.'
 };
 
-export const DEFAULT_STAGE_3_DOSSIER_SIDAMA: DspWorkflowRecord = {
+export const DEFAULT_STAGE_3_DOSSIER_3: DspWorkflowRecord = {
   id: 'dsp-reg-sample-03',
   dspRefNumber: 'RHB/SD-DSP/2026/045',
-  stage: 'rhb-to-moh',
-  stageTitle: '3. DSP Submitted Region to MOH',
-  senderOrg: 'Sidama Regional Health Bureau',
-  recipientOrg: 'Ministry of Health (PMD Directorate)',
-  subject: 'Official Regional Health Facility Equipment Allocation Breakdown - Sidama Region',
+  stage: 'rhb-breakdown-management',
+  subStage: '3.1',
+  stageTitle: 'RHB Breakdown Management',
+  senderOrg: 'Ministry of Health (PMD Directorate)',
+  recipientOrg: 'Sidama Regional Health Bureau',
+  subject: 'Breakdown Received from MOH: Sidama Regional Hospital Equipment Quota',
   status: 'Under Review',
   dateSubmitted: '2026-10-27',
   totalDevices: 6,
@@ -278,35 +496,19 @@ export const DEFAULT_STAGE_3_DOSSIER_SIDAMA: DspWorkflowRecord = {
     quantity: 7,
     plant: 'Hawassa Hub'
   })),
-  notes: 'Sidama Regional Health Bureau facility breakdown submitted per MOH quota.'
+  notes: 'Sidama Regional Health Bureau facility breakdown received from MOH.'
 };
 
-export const DEFAULT_STAGE_1_DOSSIERS = [
-  DEFAULT_STAGE_1_DOSSIER_1,
-  DEFAULT_STAGE_1_DOSSIER_2,
-  DEFAULT_STAGE_1_DOSSIER_3
-];
-
-export const DEFAULT_STAGE_2_DOSSIERS = [
-  DEFAULT_STAGE_2_DOSSIER_1,
-  DEFAULT_STAGE_2_DOSSIER_2,
-  DEFAULT_STAGE_2_DOSSIER_3
-];
-
-export const DEFAULT_STAGE_3_DOSSIERS = [
-  DEFAULT_STAGE_3_DOSSIER,
-  DEFAULT_STAGE_3_DOSSIER_AMHARA,
-  DEFAULT_STAGE_3_DOSSIER_SIDAMA
-];
-
-export const DEFAULT_STAGE_4_DOSSIER: DspWorkflowRecord = {
+// 4. BRANCHES DSP MANAGEMENT RECORDS
+export const DEFAULT_STAGE_4_DOSSIER_1: DspWorkflowRecord = {
   id: 'dsp-moh-epss-sample-01',
   dspRefNumber: 'MOH/PMD-DSP/2026/099',
-  stage: 'moh-to-epss-ho',
-  stageTitle: '4. DSP Submitted MOH to EPSS',
+  stage: 'branches-dsp-management',
+  subStage: '4.1',
+  stageTitle: 'Branches DSP Management',
   senderOrg: 'Ministry of Health (PMD Directorate)',
-  recipientOrg: 'Ethiopian Pharmaceuticals Supply Service (EPSS)',
-  subject: 'Official Approved National Health Facility Equipment Allocation Breakdown (MOH to EPSS)',
+  recipientOrg: 'Ethiopian Pharmaceuticals Supply Service (EPSS Branch Hubs)',
+  subject: 'Received DSP: Official Approved National Health Facility Allocation Breakdown',
   status: 'Endorsed & Approved',
   dateSubmitted: '2026-10-28',
   approvedDate: '2026-10-28',
@@ -326,7 +528,7 @@ export const DEFAULT_STAGE_4_DOSSIER: DspWorkflowRecord = {
     quantity: DEFAULT_STAGE_4_ROWS.reduce((sum, r) => sum + (r.quantities[c.id] || 0), 0),
     plant: 'Central Hub'
   })),
-  notes: 'Official MOH approved health facility equipment breakdown matrix submitted to EPSS.',
+  notes: 'Official MOH approved health facility equipment breakdown matrix received by EPSS Branch Hubs.',
   stage4MatrixData: {
     date: '2026-10-28',
     region: 'Oromia',
@@ -335,18 +537,15 @@ export const DEFAULT_STAGE_4_DOSSIER: DspWorkflowRecord = {
   }
 };
 
-export const DEFAULT_STAGE_4_DOSSIERS = [
-  DEFAULT_STAGE_4_DOSSIER
-];
-
-export const DEFAULT_STAGE_5_DOSSIER_1: DspWorkflowRecord = {
+export const DEFAULT_STAGE_4_DOSSIER_2: DspWorkflowRecord = {
   id: 'dsp-epss-ho-sample-01',
   dspRefNumber: 'EPSS/HO-AGG/2026/012',
-  stage: 'epss-ho-aggregation',
-  stageTitle: '5. DSP Aggregation (EPSS HO)',
+  stage: 'branches-dsp-management',
+  subStage: '4.2',
+  stageTitle: 'Branches DSP Management',
   senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
   recipientOrg: 'EPSS Branch Hubs (Adama, Hawassa, Bahir Dar, Addis Ababa)',
-  subject: 'Consolidated National Health Facility Equipment Allocation & EPSS Hub Dispatch Mapping',
+  subject: 'Analysis and Comparing with DSP: Consolidated EPSS Branch Dispatch & Stock Verification',
   status: 'Endorsed & Approved',
   dateSubmitted: '2026-10-29',
   approvedDate: '2026-10-29',
@@ -370,7 +569,7 @@ export const DEFAULT_STAGE_5_DOSSIER_1: DspWorkflowRecord = {
     quantity: 10,
     plant: 'Central EPSS'
   })),
-  notes: 'Aggregated from MOH Approved Dossier MOH/PMD-DSP/2026/099. Facilities matched to EPSS distribution hubs based on HF Master data.',
+  notes: 'Aggregated and analyzed versus EPSS SOH stock ledgers.',
   stage4MatrixData: {
     date: '2026-10-29',
     region: 'Oromia & National',
@@ -415,163 +614,20 @@ export const DEFAULT_STAGE_5_DOSSIER_1: DspWorkflowRecord = {
         matchConfidence: 100,
         quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
         totalQty: 12
-      },
-      {
-        id: 's5-alloc-3',
-        healthFacility: 'Adama Health Center',
-        region: 'Oromia',
-        zone: 'Addis ketema',
-        woreda: '02',
-        packages: 'MCH',
-        hubCode: 'AD01',
-        hubName: 'Adama Hub',
-        masterCustomerCode: '1000845',
-        masterFacilityName: 'Adama General Hospital & Medical College',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-4',
-        healthFacility: 'Bole 17 Health Center',
-        region: 'Addis Ababa',
-        zone: 'kirkose',
-        woreda: '03',
-        packages: 'MCH',
-        hubCode: 'AA01',
-        hubName: 'Addis Ababa (Hub 1)',
-        masterCustomerCode: '1000214',
-        masterFacilityName: 'Bole 17 Health Center',
-        matchMethod: 'zone-region-fallback',
-        matchConfidence: 90,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-5',
-        healthFacility: 'Abala Primary Hospital',
-        region: 'Oromia',
-        zone: 'kirkose',
-        woreda: '03',
-        packages: 'MCH',
-        hubCode: 'AD01',
-        hubName: 'Adama Hub',
-        masterCustomerCode: '1000912',
-        masterFacilityName: 'Bishoftu / Adama Axis Clinic',
-        matchMethod: 'fuzzy-master',
-        matchConfidence: 82,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-6',
-        healthFacility: 'Felege Hiwot Comprehensive Specialized Hospital',
-        region: 'Amhara',
-        zone: 'West Gojjam',
-        woreda: 'Bahir Dar City',
-        packages: 'MCH',
-        hubCode: 'BD01',
-        hubName: 'Bahir Dar Hub',
-        masterCustomerCode: '1001120',
-        masterFacilityName: 'Felege Hiwot Comprehensive Specialized Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-7',
-        healthFacility: 'University of Gondar Comprehensive Hospital',
-        region: 'Amhara',
-        zone: 'Central Gondar',
-        woreda: 'Gondar City',
-        packages: 'MCH',
-        hubCode: 'GD01',
-        hubName: 'Gondar Hub',
-        masterCustomerCode: '1001340',
-        masterFacilityName: 'University of Gondar Comprehensive Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-8',
-        healthFacility: 'Hawassa University Comprehensive Hospital',
-        region: 'Sidama',
-        zone: 'Hawassa City',
-        woreda: 'Meneharia',
-        packages: 'MCH',
-        hubCode: 'HW01',
-        hubName: 'Hawassa Hub',
-        masterCustomerCode: '1001780',
-        masterFacilityName: 'Hawassa University Comprehensive Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-9',
-        healthFacility: 'Ayder Comprehensive Specialized Hospital',
-        region: 'Tigray',
-        zone: 'South Eastern',
-        woreda: 'Mekelle City',
-        packages: 'MCH',
-        hubCode: 'MK01',
-        hubName: 'Mekelle Hub',
-        masterCustomerCode: '1001560',
-        masterFacilityName: 'Ayder Comprehensive Specialized Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-10',
-        healthFacility: 'Tikur Anbessa Specialized Hospital',
-        region: 'Addis Ababa',
-        zone: 'Lideta',
-        woreda: 'W-08',
-        packages: 'MCH',
-        hubCode: 'AA01',
-        hubName: 'Addis Ababa (Hub 1)',
-        masterCustomerCode: '1000214',
-        masterFacilityName: 'Tikur Anbessa Specialized Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-11',
-        healthFacility: 'Karamara General Hospital',
-        region: 'Somali',
-        zone: 'Fafan',
-        woreda: 'Jijiga Woreda',
-        packages: 'MCH',
-        hubCode: 'JJ01',
-        hubName: 'Jijiga Hub',
-        masterCustomerCode: '1001920',
-        masterFacilityName: 'Karamara General Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 2, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
       }
     ]
   }
 };
 
-export const DEFAULT_STAGE_5_DOSSIER_2: DspWorkflowRecord = {
+export const DEFAULT_STAGE_4_DOSSIER_3: DspWorkflowRecord = {
   id: 'dsp-epss-ho-sample-02',
   dspRefNumber: 'EPSS/HO-AGG/2026/015',
-  stage: 'epss-ho-aggregation',
-  stageTitle: '5. DSP Aggregation (EPSS HO)',
-  senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+  stage: 'branches-dsp-management',
+  subStage: '4.1',
+  stageTitle: 'Branches DSP Management',
+  senderOrg: 'EPSS Head Office',
   recipientOrg: 'EPSS Branch Hubs (Hawassa, Bahir Dar, Mekelle)',
-  subject: 'Multi-Regional Secondary Referral Hospital Fleet Hub Mapping & Quota Aggregation',
+  subject: 'Received DSP: Multi-Regional Secondary Referral Hospital Fleet Hub Mapping',
   status: 'Submitted & Pending',
   dateSubmitted: '2026-10-30',
   totalDevices: 6,
@@ -588,92 +644,41 @@ export const DEFAULT_STAGE_5_DOSSIER_2: DspWorkflowRecord = {
     quantity: 8,
     plant: 'Central EPSS'
   })),
-  notes: 'Regional hospital allocations mapped to Hawassa, Bahir Dar, and Mekelle EPSS distribution branches.',
-  hubAggregationData: {
-    dossierId: 'dsp-epss-ho-sample-02',
-    dspRefNumber: 'EPSS/HO-AGG/2026/015',
-    generatedDate: '2026-10-30',
-    status: 'In Progress',
-    columns: DEFAULT_STAGE_4_COLUMNS,
-    allocations: [
-      {
-        id: 's5-alloc-6',
-        healthFacility: 'Hawassa University Comprehensive Hospital',
-        region: 'Sidama',
-        zone: 'Hawassa City',
-        woreda: 'Meneharia',
-        packages: 'Tertiary Fleet',
-        hubCode: 'HW01',
-        hubName: 'Hawassa Hub',
-        masterCustomerCode: '1001780',
-        masterFacilityName: 'Hawassa University Comprehensive Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 4, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 1, 'col-exam': 2 },
-        totalQty: 13
-      },
-      {
-        id: 's5-alloc-7',
-        healthFacility: 'Felege Hiwot Comprehensive Specialized Hospital',
-        region: 'Amhara',
-        zone: 'West Gojjam',
-        woreda: 'Bahir Dar City',
-        packages: 'Tertiary Fleet',
-        hubCode: 'BD01',
-        hubName: 'Bahir Dar Hub',
-        masterCustomerCode: '1001120',
-        masterFacilityName: 'Felege Hiwot Comprehensive Specialized Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 3, 'col-bowel': 2, 'col-coldbox': 1, 'col-delivery': 2, 'col-exam': 2 },
-        totalQty: 12
-      },
-      {
-        id: 's5-alloc-8',
-        healthFacility: 'Ayder Comprehensive Specialized Hospital',
-        region: 'Tigray',
-        zone: 'South Eastern',
-        woreda: 'Mekelle City',
-        packages: 'Tertiary Fleet',
-        hubCode: 'MK01',
-        hubName: 'Mekelle Hub',
-        masterCustomerCode: '1001560',
-        masterFacilityName: 'Ayder Comprehensive Specialized Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 2, 'col-bed': 4, 'col-bowel': 2, 'col-coldbox': 2, 'col-delivery': 1, 'col-exam': 2 },
-        totalQty: 13
-      },
-      {
-        id: 's5-alloc-9',
-        healthFacility: 'University of Gondar Comprehensive Hospital',
-        region: 'Amhara',
-        zone: 'Central Gondar',
-        woreda: 'Gondar City',
-        packages: 'Tertiary Fleet',
-        hubCode: 'GD01',
-        hubName: 'Gondar Hub',
-        masterCustomerCode: '1001340',
-        masterFacilityName: 'University of Gondar Comprehensive Hospital',
-        matchMethod: 'exact-master',
-        matchConfidence: 100,
-        quantities: { 'col-anesthesia': 1, 'col-bed': 3, 'col-bowel': 2, 'col-coldbox': 1, 'col-delivery': 1, 'col-exam': 2 },
-        totalQty: 10
-      }
-    ]
-  }
+  notes: 'Regional hospital allocations mapped to Hawassa, Bahir Dar, and Mekelle EPSS distribution branches.'
 };
 
-export const DEFAULT_STAGE_5_DOSSIERS = [
-  DEFAULT_STAGE_5_DOSSIER_1,
-  DEFAULT_STAGE_5_DOSSIER_2
+export const DEFAULT_STAGE_1_DOSSIERS = [
+  DEFAULT_STAGE_1_DOSSIER_1,
+  DEFAULT_STAGE_1_DOSSIER_2,
+  DEFAULT_STAGE_1_DOSSIER_3,
+  DEFAULT_STAGE_1_DOSSIER_4,
+  DEFAULT_STAGE_1_DOSSIER_5,
+  DEFAULT_STAGE_1_DOSSIER_6
+];
+
+export const DEFAULT_STAGE_2_DOSSIERS = [
+  DEFAULT_STAGE_2_DOSSIER_1,
+  DEFAULT_STAGE_2_DOSSIER_2,
+  DEFAULT_STAGE_2_DOSSIER_3,
+  DEFAULT_STAGE_2_DOSSIER_4,
+  DEFAULT_STAGE_2_DOSSIER_5
+];
+
+export const DEFAULT_STAGE_3_DOSSIERS = [
+  DEFAULT_STAGE_3_DOSSIER_1,
+  DEFAULT_STAGE_3_DOSSIER_2,
+  DEFAULT_STAGE_3_DOSSIER_3
+];
+
+export const DEFAULT_STAGE_4_DOSSIERS = [
+  DEFAULT_STAGE_4_DOSSIER_1,
+  DEFAULT_STAGE_4_DOSSIER_2,
+  DEFAULT_STAGE_4_DOSSIER_3
 ];
 
 export const INITIAL_DSP_RECORDS: DspWorkflowRecord[] = [
   ...DEFAULT_STAGE_1_DOSSIERS,
   ...DEFAULT_STAGE_2_DOSSIERS,
   ...DEFAULT_STAGE_3_DOSSIERS,
-  ...DEFAULT_STAGE_4_DOSSIERS,
-  ...DEFAULT_STAGE_5_DOSSIERS
-];
-
+  ...DEFAULT_STAGE_4_DOSSIERS
+].map(normalizeDspRecord);

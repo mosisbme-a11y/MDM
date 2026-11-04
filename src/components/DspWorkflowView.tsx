@@ -87,6 +87,7 @@ import {
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
 import { DEFAULT_MASTER_STOCK_RECORDS } from '../data/defaultInventoryItems';
+import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 
 export interface DateCountInfo {
   days: number;
@@ -204,6 +205,159 @@ export function computeDateCount(
   }
 }
 
+export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: string; recipient: string; criteria: string[] }> = {
+  '1.1': {
+    title: 'DSP Request to MOH',
+    sender: 'EPSS Head Office (Medical Equipment Directorate)',
+    recipient: 'Ministry of Health (PMD Directorate)',
+    criteria: [
+      'Official Request Covering Letter (Signed & Sealed)',
+      'Stock Verification List & Equipment Catalog Matching',
+      'Prioritized Health Facility Request Dossier (Excel + PDF)',
+      'Executive Quota Summary & Budgetary Valuation'
+    ]
+  },
+  '1.2': {
+    title: 'DSP Received from MOH',
+    sender: 'Ministry of Health (PMD Directorate)',
+    recipient: 'EPSS Head Office',
+    criteria: [
+      'Official MOH Endorsement Letter with Reference Number',
+      'Approved National Allocation Quota Summary',
+      'Technical Committee Review Sign-off & Guidelines'
+    ]
+  },
+  '1.3.1': {
+    title: 'Map HF to Hubs',
+    sender: 'EPSS Head Office Technical Operations',
+    recipient: 'EPSS Regional Distribution Hubs',
+    criteria: [
+      'Master Health Facility Registry Code Mapping',
+      'Geographic Hub Catchment Proximity Validation',
+      'Cold-Chain & Heavy Equipment Transport Feasibility Check'
+    ]
+  },
+  '1.3.2': {
+    title: 'Send DSP to Hubs / Submit',
+    sender: 'EPSS Head Office Logistics',
+    recipient: 'Regional Distribution Hubs / Plants',
+    criteria: [
+      'Individual Hub Allocation Breakdown Dispatch',
+      'Plant Manager Official Acknowledgment Receipt',
+      'Inventory Reserve Hold Authorization'
+    ]
+  },
+  '1.3.3': {
+    title: 'Item Aggregation',
+    sender: 'EPSS Technical Operations',
+    recipient: 'EPSS Executive Directorate & MOH',
+    criteria: [
+      'Multi-Region Material Requirement Roll-up',
+      'Stock Ledger Reconciliation vs Unrestricted Quota',
+      'Equipment Specification Normalization'
+    ]
+  },
+  '1.3.4': {
+    title: 'Order Process',
+    sender: 'Procurement & Logistics Directorate',
+    recipient: 'EPSS Central Dispatch & Warehouses',
+    criteria: [
+      'Official Release Order & Purchase Contract Linking',
+      'Quality Assurance & Pre-Shipment Clearance Certificate',
+      'Transport & Waybill Logistics Scheduling'
+    ]
+  },
+  '2.1': {
+    title: 'DSP Received from EPSS',
+    sender: 'EPSS Head Office',
+    recipient: 'Ministry of Health (PMD Directorate)',
+    criteria: [
+      'DSP Master Document Receipt Validation',
+      'National Priority Alignment Verification',
+      'Technical Equipment Specification Approval'
+    ]
+  },
+  '2.2': {
+    title: 'DSP Breakdown Request to RHB',
+    sender: 'Ministry of Health (PMD Directorate)',
+    recipient: 'Regional Health Bureaus (RHBs)',
+    criteria: [
+      'Official Ministerial Breakdown Letter',
+      'Regional Quota Matrix Spreadsheet',
+      'Submission SLA Timeline Notice (Standard 3 Days)'
+    ]
+  },
+  '2.3': {
+    title: 'Breakdown Received from RHB',
+    sender: 'Regional Health Bureaus (RHBs)',
+    recipient: 'Ministry of Health (PMD Directorate)',
+    criteria: [
+      'RHB Head Official Sign-off & Bureau Stamp',
+      'Facility-Level Distribution Matrix (Woreda/Zone/Facility)',
+      'Site Readiness & Infrastructure Clearance Checklist'
+    ]
+  },
+  '2.4': {
+    title: 'Breakdown Aggregation by RHB',
+    sender: 'MOH Technical Aggregation Team',
+    recipient: 'MOH Executive Council',
+    criteria: [
+      'Multi-Regional Consolidated Breakdown Validation',
+      'Zero-Discrepancy Quantity Cross-Check',
+      'Priority Health Facility Coverage Index'
+    ]
+  },
+  '2.5': {
+    title: 'DSP Agr. DSP Submitted to EPSS',
+    sender: 'Ministry of Health (PMD Directorate)',
+    recipient: 'EPSS Head Office',
+    criteria: [
+      'Minister / State Minister Final Approval Seal',
+      'Final Two-Tier National Breakdown Matrix',
+      'EPSS Release Order Authorization Memo'
+    ]
+  },
+  '3.1': {
+    title: 'Breakdown Received from MOH',
+    sender: 'Ministry of Health (PMD Directorate)',
+    recipient: 'Regional Health Bureau (RHB) Planning Team',
+    criteria: [
+      'Ministerial Allocation Guideline Review',
+      'Zonal & Woreda Need Assessment Integration',
+      'Target Hospital / Health Center Readiness Screening'
+    ]
+  },
+  '3.2': {
+    title: 'Submit Breakdown to MOH',
+    sender: 'Regional Health Bureau (RHB)',
+    recipient: 'Ministry of Health (PMD Directorate)',
+    criteria: [
+      'RHB Bureau Head Approval Signature',
+      'Completed Two-Tier Health Facility Matrix',
+      'Formal Submission Transmittal Letter'
+    ]
+  },
+  '4.1': {
+    title: 'Received DSP',
+    sender: 'Ministry of Health / EPSS HO',
+    recipient: 'EPSS Branch Hubs & Plants',
+    criteria: [
+      'Branch Inward Dispatch Notice Registration',
+      'Health Facility Destination Verification',
+      'Stock Physical Lot / Serial Allocation'
+    ]
+  },
+  '4.2': {
+    title: 'Analysis and Comparing with DSP',
+    sender: 'EPSS Branch Hub Operations',
+    recipient: 'EPSS Quality & Logistics Division',
+    criteria: [
+      'SOH Ledger vs Allocation Comparison',
+      'Discrepancy & Variance Audit Report',
+      'Waybill Generation & Final Gate Pass Approval'
+    ]
+  }
+};
 
 export interface DspWorkflowViewProps {
   currentSubTab?: EpssSubTab;
@@ -277,6 +431,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
+  const [requestMechanismView, setRequestMechanismView] = useState<'tables' | 'dossiers'>('tables');
 
   // Take Action modal state for EPSS to MOH requests
   const [actionTargetRecord, setActionTargetRecord] = useState<DspWorkflowRecord | null>(null);
@@ -564,13 +719,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
       let matchSubStep = true;
       if (currentSubStep && currentSubStep !== 'all') {
-        if (r.subStage) {
-          matchSubStep = r.subStage === currentSubStep || r.subStage.startsWith(currentSubStep) || currentSubStep.startsWith(r.subStage);
-        } else {
-          // Fallback if subStage is not explicitly tagged on older or mock records:
-          // Keep stage records visible so data is always displayed when clicking hierarchy
-          matchSubStep = matchStage;
-        }
+        const recordSubStage = canonicalizeSubStage(r.subStage, r.stage);
+        matchSubStep = recordSubStage === currentSubStep || recordSubStage.startsWith(currentSubStep) || currentSubStep.startsWith(recordSubStage);
       }
 
       const matchSearch =
@@ -603,6 +753,45 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       return matchStage && matchSubStep && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
     });
   }, [records, currentStage, currentSubStep, searchQuery, statusFilter, agingFilter, selectedRegionsFilter, stageFilter]);
+
+  const allRequestTableItems = useMemo(() => {
+    const result: Array<{
+      id: string;
+      parentRecord: DspWorkflowRecord;
+      itemIndex: number;
+      material: string;
+      description: string;
+      quantity: number;
+      plant: string;
+      allocatedFacility?: string;
+      unitPriceETB: number;
+      totalValuationETB: number;
+    }> = [];
+
+    filteredRecords.forEach((rec) => {
+      const totalQty = rec.itemsIncluded.reduce((acc, i) => acc + (i.quantity || 0), 0) || 1;
+      const avgValPerUnit = rec.totalValuationETB > 0 ? rec.totalValuationETB / totalQty : 350000;
+
+      rec.itemsIncluded.forEach((item, idx) => {
+        const itemQty = item.quantity || 1;
+        const val = itemQty * avgValPerUnit;
+        result.push({
+          id: `${rec.id}-item-${idx}`,
+          parentRecord: rec,
+          itemIndex: idx,
+          material: item.material,
+          description: item.description,
+          quantity: itemQty,
+          plant: item.plant || 'HO01',
+          allocatedFacility: item.allocatedFacility || rec.recipientOrg,
+          unitPriceETB: Math.round(avgValPerUnit),
+          totalValuationETB: Math.round(val)
+        });
+      });
+    });
+
+    return result;
+  }, [filteredRecords]);
 
   const totalValuation = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalValuationETB, 0), [filteredRecords]);
   const totalUnits = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalQuantity, 0), [filteredRecords]);
@@ -1076,6 +1265,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             .flatMap(stg => stg.subSteps)
             .map((sub) => {
               const isSubSelected = currentSubStep === sub.id;
+              const subCount = records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
               return (
                 <button
                   key={sub.id}
@@ -1088,6 +1278,13 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${isSubSelected ? 'bg-amber-400' : 'bg-slate-400'}`} />
                   <span>{sub.label}</span>
+                  {subCount > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                      isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {subCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1616,13 +1813,199 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         />
       ) : (
         <>
+          {/* Active Sub-Step Sent & Received Data & Submitting Criteria Panel */}
+          {(() => {
+            const activeCriteriaInfo = SUBMITTING_CRITERIA_MAP[currentSubStep] || (
+              currentSubStep === 'all' && SUBMITTING_CRITERIA_MAP['1.1'] ? SUBMITTING_CRITERIA_MAP['1.1'] : null
+            );
+            const latestRecord = filteredRecords[0] || records[0];
+            
+            if (!activeCriteriaInfo) return null;
+
+            return (
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+                {/* Header */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 font-mono text-xs font-bold">
+                      {currentSubStep === 'all' ? '1.1' : currentSubStep}
+                    </span>
+                    <div>
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                        {activeCriteriaInfo.title} — Sent & Received Data Panel
+                      </h3>
+                      <p className="text-[10px] text-slate-500">
+                        Official Institutional Route: <span className="font-semibold text-slate-800">{activeCriteriaInfo.sender}</span> ➔ <span className="font-semibold text-slate-800">{activeCriteriaInfo.recipient}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold font-mono">
+                      {filteredRecords.length} Active Dossiers
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                      Submitting Criteria Verified
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3 Grid Columns: Sent Data, Received Data, Submitting Criteria */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Sent Data (Outgoing) */}
+                  <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-1 border-b border-slate-200">
+                      <span className="flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-indigo-600">
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Data Sent (Outgoing Payload)</span>
+                      </span>
+                      <span className="text-[9px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-bold">
+                        SENT
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Issuing Sender</span>
+                        <span className="text-slate-900 font-bold truncate block">{latestRecord?.senderOrg || activeCriteriaInfo.sender}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Dossier Ref</span>
+                          <span className="font-mono font-bold text-indigo-600 text-[11px]">{latestRecord?.dspRefNumber || 'EPSS/MD-DSP/2026/042'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Date Transmitted</span>
+                          <span className="font-mono text-slate-700 font-semibold text-[11px]">{latestRecord?.dateSubmitted || '2026-10-24'}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Equipment Sent</span>
+                          <span className="font-mono font-black text-cyan-700 text-xs">{latestRecord?.totalQuantity?.toLocaleString() || '120'} Units</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Valuation (ETB)</span>
+                          <span className="font-mono font-black text-emerald-700 text-xs">{formatCurrency(latestRecord?.totalValuationETB || 42500000)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Received Data (Incoming) */}
+                  <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-1 border-b border-slate-200">
+                      <span className="flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-cyan-700">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Data Received (Incoming Action)</span>
+                      </span>
+                      <span className="text-[9px] font-mono bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded font-bold">
+                        RECEIVED
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Recipient Institution</span>
+                        <span className="text-slate-900 font-bold truncate block">{latestRecord?.recipientOrg || activeCriteriaInfo.recipient}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Official Letter Ref</span>
+                          <span className="font-mono text-cyan-800 font-bold text-[11px]">{latestRecord?.officialLetterRef || 'EPSS/LET/2026/782'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Approval Status</span>
+                          <span className="text-emerald-700 font-black text-[11px]">{latestRecord?.status || 'Submitted & Pending'}</span>
+                        </div>
+                      </div>
+                      <div className="pt-1 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Signatory & Role</span>
+                        <span className="text-slate-800 font-semibold text-[11px]">{latestRecord?.signatory || 'Authorized User'} ({latestRecord?.signatoryRole || 'Technical Lead'})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submitting Criteria Checklist */}
+                  <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-1 border-b border-amber-200/80">
+                      <span className="flex items-center gap-1.5 uppercase text-[10px] tracking-wider text-amber-800">
+                        <FileCheck className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Submitting Criteria Compliance</span>
+                      </span>
+                      <span className="text-[9px] font-mono bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded font-bold">
+                        CRITERIA
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-[11px]">
+                      {activeCriteriaInfo.criteria.map((crit, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5 text-slate-700 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="leading-tight">{crit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Dual Request Mechanism Control Switcher Banner */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-white">Institutional Request Mechanisms</h3>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-400 text-slate-950 font-mono">
+                    EPSS • MOH • RHB • Order Process
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  Select view mechanism: <span className="text-amber-300 font-bold">1. Request Item Tables & Order Process Matrix</span> or <span className="text-cyan-300 font-bold">2. Official Transmittal Dossiers</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-800 p-1.5 rounded-xl border border-slate-700/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setRequestMechanismView('tables')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-2 ${
+                  requestMechanismView === 'tables'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Request Item Tables ({allRequestTableItems.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestMechanismView('dossiers')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-2 ${
+                  requestMechanismView === 'dossiers'
+                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                }`}
+              >
+                <Archive className="w-4 h-4" />
+                <span>Dossier Envelopes ({filteredRecords.length})</span>
+              </button>
+            </div>
+          </div>
+
           {/* Filter and Search Bar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
             <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search DSP ref, letter number, subject, organization..."
+                placeholder="Search material, description, DSP ref, letter number, organization..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
@@ -1668,7 +2051,125 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             </div>
           </div>
 
-      {/* DSP Dossier Records Table */}
+      {/* Mechanism 1: Request Items & Order Process Master Table */}
+      {requestMechanismView === 'tables' ? (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Itemized Request Tables & Order Processing Matrix ({allRequestTableItems.length} Material Rows)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const csv = allRequestTableItems.map((item, idx) => ({
+                  'No': idx + 1,
+                  'Material Code': item.material,
+                  'Description': item.description,
+                  'Hierarchy Stage': item.parentRecord.stageTitle,
+                  'Sender Org': item.parentRecord.senderOrg,
+                  'Recipient Org': item.parentRecord.recipientOrg,
+                  'Target Hub / Facility': item.allocatedFacility || 'N/A',
+                  'Plant': item.plant,
+                  'Quantity': item.quantity,
+                  'Unit Price (ETB)': item.unitPriceETB,
+                  'Total Valuation (ETB)': item.totalValuationETB,
+                  'Ref Number': item.parentRecord.dspRefNumber,
+                  'Status': item.parentRecord.status,
+                  'Date Transmitted': item.parentRecord.dateSubmitted
+                }));
+                downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
+              }}
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export Request Items CSV</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 text-center">#</th>
+                  <th className="py-2.5 px-3">Material Code</th>
+                  <th className="py-2.5 px-3">Item Description</th>
+                  <th className="py-2.5 px-3">Hierarchy Stage / Sub-Step</th>
+                  <th className="py-2.5 px-3">Routing (Sender ➔ Recipient)</th>
+                  <th className="py-2.5 px-3 text-center">Target Plant / Hub</th>
+                  <th className="py-2.5 px-3 text-right">Qty Requested</th>
+                  <th className="py-2.5 px-3 text-right">Unit Val (ETB)</th>
+                  <th className="py-2.5 px-3 text-right">Total Val (ETB)</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-600">
+                {allRequestTableItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Archive className="w-8 h-8 text-slate-200" />
+                        <p className="text-slate-400 font-medium">No request table items found in this selection.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  allRequestTableItems.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{item.material}</td>
+                      <td className="py-2.5 px-3 font-medium text-slate-800">{item.description}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-[10px]">
+                          {item.parentRecord.stageTitle}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-[11px]">
+                        <div className="font-semibold text-slate-800 truncate max-w-[180px]">{item.parentRecord.senderOrg}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">➔ {item.parentRecord.recipientOrg}</div>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
+                        {item.plant}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-700">
+                        {formatNumber(item.quantity)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-600">
+                        {formatCurrency(item.unitPriceETB)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
+                        {formatCurrency(item.totalValuationETB)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.parentRecord.status === 'Endorsed & Approved' ? 'bg-emerald-100 text-emerald-800' :
+                          item.parentRecord.status === 'Under Review' ? 'bg-amber-100 text-amber-800' :
+                          'bg-cyan-100 text-cyan-800'
+                        }`}>
+                          {item.parentRecord.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecord(item.parentRecord)}
+                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition cursor-pointer"
+                        >
+                          View Table
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+      /* Mechanism 2: DSP Transmittal Dossier Records Table */
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
@@ -1834,6 +2335,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <div className="flex items-center justify-center gap-1.5">
                         {rec.stage === 'moh-to-epss' && (
                           <button
+                            type="button"
                             onClick={() => handleOpenActionModal(rec)}
                             className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-sm ${
                               rec.actionTakenDate || rec.status === 'Endorsed & Approved'
@@ -1849,6 +2351,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                         {rec.stage === 'moh-to-rhb' && (
                           <>
                             <button
+                              type="button"
                               onClick={() => handleOpenBreakdownEmail(rec)}
                               className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               title="Send or re-dispatch breakdown via Email"
@@ -1857,6 +2360,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                               <span>Email</span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleOpenBreakdownWhatsApp(rec)}
                               className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
                               title="Send or re-dispatch breakdown via WhatsApp"
@@ -1867,6 +2371,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           </>
                         )}
                         <button
+                          type="button"
                           onClick={() => setSelectedRecord(rec)}
                           className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold transition cursor-pointer border border-slate-200 shadow-sm"
                         >
@@ -1881,6 +2386,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           </table>
         </div>
       </div>
+      )}
       </>
       )}
 

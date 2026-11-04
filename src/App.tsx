@@ -73,7 +73,7 @@ import {
   DEFAULT_STAGE_2_DOSSIERS,
   DEFAULT_STAGE_3_DOSSIERS,
   DEFAULT_STAGE_4_DOSSIERS,
-  DEFAULT_STAGE_5_DOSSIERS
+  normalizeDspRecord
 } from './data/defaultDspWorkflows';
 
 import { MdCdssManagementView } from './components/MdCdssManagementView';
@@ -1064,21 +1064,20 @@ export function App() {
     // 1. Initial Load from IndexedDB with defaults if empty
     loadDspRecordsFromIndexedDB().then(cached => {
       if (cached && cached.length > 0) {
-        // Smart merge with defaults if stages are missing
-        const hasStage1 = cached.some(r => r.stage === 'moh-to-epss');
-        const hasStage2 = cached.some(r => r.stage === 'moh-to-rhb');
-        const hasStage3 = cached.some(r => r.stage === 'rhb-to-moh');
-        const hasStage4 = cached.some(r => r.stage === 'moh-to-epss-ho');
-        const hasStage5 = cached.some(r => r.stage === 'epss-ho-aggregation');
+        const normalizedCached = cached.map(normalizeDspRecord);
+        const hasStage1 = normalizedCached.some(r => r.stage === 'head-office-dsp');
+        const hasStage2 = normalizedCached.some(r => r.stage === 'moh-osp-management');
+        const hasStage3 = normalizedCached.some(r => r.stage === 'rhb-breakdown-management');
+        const hasStage4 = normalizedCached.some(r => r.stage === 'branches-dsp-management');
 
-        let merged = [...cached];
+        let merged = [...normalizedCached];
         if (!hasStage1) merged = [...DEFAULT_STAGE_1_DOSSIERS, ...merged];
         if (!hasStage2) merged = [...DEFAULT_STAGE_2_DOSSIERS, ...merged];
         if (!hasStage3) merged = [...merged, ...DEFAULT_STAGE_3_DOSSIERS];
         if (!hasStage4) merged = [...merged, ...DEFAULT_STAGE_4_DOSSIERS];
-        if (!hasStage5) merged = [...merged, ...DEFAULT_STAGE_5_DOSSIERS];
 
-        setDspRecords(merged);
+        const finalNormalized = merged.map(normalizeDspRecord);
+        setDspRecords(finalNormalized);
       } else {
         setDspRecords(INITIAL_DSP_RECORDS);
       }
