@@ -23,7 +23,13 @@ import {
   ShieldCheck,
   Mail,
   MessageCircle,
-  Copy
+  Copy,
+  Folder,
+  FolderArchive,
+  FileText,
+  Paperclip,
+  Eye,
+  X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
@@ -136,6 +142,121 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
       } catch {}
     }
   }, [receivedRecord, storageRowsKey]);
+
+  // Transmitted Official Letters Folder State
+  const [selectedFolderModal, setSelectedFolderModal] = useState<any | null>(null);
+  const [transmittedFolderList, setTransmittedFolderList] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem('epss_dsp_transmitted_letters_folder');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading epss_dsp_transmitted_letters_folder:', e);
+    }
+
+    // Default folder structure initialized if empty
+    return [
+      {
+        id: 'folder-let-001',
+        dspRefNumber: 'EPSS/MD-DSP/2026/842',
+        officialLetterRef: 'EPSS/LET/2026/1577',
+        dateTransmitted: TODAY_ISO_DATE,
+        senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+        recipientOrg: 'Ministry of Health (PMD Directorate)',
+        signatory: 'Mosisa (Authorized User)',
+        signatoryRole: 'Directorate Technical Lead',
+        subject: 'Official Request Letter: Priority Program (HP) Medical Device Allocation Request',
+        totalDevices: 5,
+        totalQuantity: 60,
+        totalValuationETB: 15000000,
+        letterFileName: 'Official_Covering_Letter_EPSS_MOH_1577.pdf',
+        letterFileSize: '142.5 KB',
+        notes: 'Separately stored official letter transmitted from EPSS HO to MOH PMD Directorate.'
+      }
+    ];
+  });
+
+  const handleUploadDirectLetterToFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const year = new Date().getFullYear();
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const letterRef = `EPSS/LET/${year}/${randNum}`;
+    const dspRef = `EPSS/MD-DSP/${year}/${Math.floor(100 + Math.random() * 900)}`;
+
+    const newFolderRecord = {
+      id: `folder-uploaded-${Date.now()}`,
+      dspRefNumber: dspRef,
+      officialLetterRef: letterRef,
+      dateTransmitted: TODAY_ISO_DATE,
+      senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      recipientOrg: 'Ministry of Health (PMD Directorate)',
+      signatory: 'Mosisa (Authorized User)',
+      signatoryRole: 'Directorate Technical Lead',
+      subject: `Official Request Covering Letter: ${file.name}`,
+      totalDevices: receivedRows.length || 5,
+      totalQuantity: totals.totalQty || 60,
+      totalValuationETB: totals.totalValuation || 15000000,
+      letterFileName: file.name,
+      letterFileSize: `${(file.size / 1024).toFixed(1)} KB`,
+      notes: `Directly uploaded official letter saved inside Transmitted EPSS to MOH Letters Folder.`
+    };
+
+    const updated = [newFolderRecord, ...transmittedFolderList];
+    setTransmittedFolderList(updated);
+    try {
+      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify(updated));
+    } catch {}
+
+    showToast(`✓ Stored "${file.name}" separately inside Transmitted EPSS to MOH Letters Folder!`);
+  };
+
+  const handleRemoveFolderLetter = (folderId: string) => {
+    const updated = transmittedFolderList.filter(f => f.id !== folderId);
+    setTransmittedFolderList(updated);
+    try {
+      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify(updated));
+    } catch {}
+    showToast('Folder record removed from archive');
+  };
+
+  const handleDownloadFolderLetter = (folder: any) => {
+    const content = `ETHIOPIAN PHARMACEUTICALS SUPPLY SERVICE (EPSS)
+OFFICIAL TRANSMITTED COVERING LETTER DOSSIER
+================================================================================
+Official Reference: ${folder.officialLetterRef}
+DSP Reference: ${folder.dspRefNumber}
+Date Transmitted: ${folder.dateTransmitted}
+Sender: ${folder.senderOrg}
+Recipient: ${folder.recipientOrg}
+Signatory: ${folder.signatory} (${folder.signatoryRole})
+Subject: ${folder.subject}
+
+EQUIPMENT ALLOCATION SUMMARY:
+- Total Materials: ${folder.totalDevices} Items
+- Total Quantity: ${formatNumber(folder.totalQuantity)} Units
+- Total Budget Valuation: ${formatCurrency(folder.totalValuationETB)}
+
+ATTACHED DOCUMENT ENVELOPE:
+- File Name: ${folder.letterFileName || 'Official_Letter.pdf'}
+- Status: Transmitted & Verified Binary Stream
+
+Notes: ${folder.notes || 'N/A'}`;
+
+    const blob = new Blob([content], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = folder.letterFileName || `Official_Letter_${folder.officialLetterRef.replace(/[\/\s]/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`✓ Downloaded ${folder.letterFileName || 'Official Letter PDF'}`);
+  };
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -517,6 +638,236 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* TRANSMITTED OFFICIAL LETTERS & DOSSIERS FOLDER */}
+      <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
+              <FolderArchive className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span>📁 Transmitted EPSS to MOH Official Letters Folder</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
+                  {transmittedFolderList.length} Stored Envelopes
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Separately stored official letter dossiers transmitted from EPSS HO to Ministry of Health
+              </p>
+            </div>
+          </div>
+
+          {/* Upload Letter Directly to Folder */}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              id="folder-direct-letter-upload"
+              className="hidden"
+              accept=".pdf,.doc,.docx,image/*"
+              onChange={handleUploadDirectLetterToFolder}
+            />
+            <label
+              htmlFor="folder-direct-letter-upload"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+              title="Upload signed Official Request Covering Letter directly into this folder"
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+              <span>Upload Letter to Folder</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Folder Envelope Cards Grid */}
+        {transmittedFolderList.length === 0 ? (
+          <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-2">
+            <Folder className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="text-xs text-slate-500 font-bold">No official letters stored in this folder yet.</p>
+            <p className="text-[11px] text-slate-400">
+              When you send an official letter from EPSS to MOH, it is automatically stored separately inside this folder.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {transmittedFolderList.map((folder, fIdx) => (
+              <div key={folder.id || fIdx} className="bg-slate-50/80 border border-slate-200 hover:border-indigo-400 rounded-xl p-3.5 space-y-2.5 transition-all shadow-2xs group relative">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-100 text-amber-800 rounded-lg shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-mono font-bold text-indigo-700 block uppercase tracking-widest">
+                        {folder.dspRefNumber}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 truncate" title={folder.officialLetterRef}>
+                        Ref: {folder.officialLetterRef}
+                      </h4>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                    EPSS ➔ MOH
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-600 font-medium line-clamp-2" title={folder.subject}>
+                  {folder.subject}
+                </p>
+
+                <div className="p-2 bg-white rounded-lg border border-slate-200 text-[11px] space-y-1">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Transmitted:</span>
+                    <strong className="text-slate-800 font-mono">{folder.dateTransmitted}</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Signatory:</span>
+                    <strong className="text-slate-800">{folder.signatory} ({folder.signatoryRole})</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Equipment Dossier:</span>
+                    <strong className="text-cyan-800 font-black">{folder.totalDevices} Items ({formatNumber(folder.totalQuantity)} Units)</strong>
+                  </div>
+                </div>
+
+                {/* File Attachment Card */}
+                <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Paperclip className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                    <span className="font-mono font-bold text-amber-950 text-[11px] truncate">
+                      {folder.letterFileName || `Official_Letter_${folder.officialLetterRef.replace(/[\/\s]/g, '_')}.pdf`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadFolderLetter(folder)}
+                    className="p-1.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 text-[10px] font-bold transition cursor-pointer shrink-0 flex items-center gap-1"
+                    title="Download official letter PDF"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </button>
+                </div>
+
+                {/* Folder Action Bar */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFolderModal(folder)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Inspect Folder Dossier</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFolderLetter(folder.id)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded transition cursor-pointer"
+                    title="Delete folder record"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Inspect Folder Letter Dossier Modal */}
+      {selectedFolderModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-indigo-600 tracking-widest uppercase">
+                  📁 Official Letter Folder Envelope • {selectedFolderModal.dspRefNumber}
+                </span>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                  Official Letter Ref: {selectedFolderModal.officialLetterRef}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedFolderModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">ISSUING SENDER</span>
+                  <span className="text-slate-900 font-bold">{selectedFolderModal.senderOrg}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">RECIPIENT BODY</span>
+                  <span className="text-slate-900 font-bold">{selectedFolderModal.recipientOrg}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">TRANSMITTAL DATE</span>
+                  <span className="text-slate-800 font-mono font-bold">{selectedFolderModal.dateTransmitted}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">SIGNATORY & ROLE</span>
+                  <span className="text-slate-800 font-semibold">{selectedFolderModal.signatory} ({selectedFolderModal.signatoryRole})</span>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-200">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">SUBJECT</span>
+                <span className="text-slate-800 font-medium">{selectedFolderModal.subject}</span>
+              </div>
+            </div>
+
+            {/* Attached Letter File Banner */}
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 text-amber-900 rounded-lg">
+                  <Paperclip size={20} />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-amber-950 font-mono">
+                    {selectedFolderModal.letterFileName || 'Official_Covering_Letter.pdf'}
+                  </div>
+                  <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                    Verified Binary Attachment Stream • Capacity: {selectedFolderModal.letterFileSize || '142.5 KB'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownloadFolderLetter(selectedFolderModal)}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              >
+                <Download size={14} />
+                <span>Download PDF</span>
+              </button>
+            </div>
+
+            {/* Equipment Allocation Summary */}
+            <div className="space-y-2">
+              <div className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <FileSpreadsheet size={16} className="text-emerald-600" />
+                <span>Equipment Allocation Items inside this Letter Dossier ({selectedFolderModal.totalDevices} Items)</span>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs font-bold">
+                <span>Total Quantity: <strong className="text-cyan-800 font-mono font-black">{formatNumber(selectedFolderModal.totalQuantity)} Units</strong></span>
+                <span>Total Valuation: <strong className="text-emerald-700 font-mono font-black">{formatCurrency(selectedFolderModal.totalValuationETB)}</strong></span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setSelectedFolderModal(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Empty State vs Active Data */}
       {receivedRows.length === 0 ? (

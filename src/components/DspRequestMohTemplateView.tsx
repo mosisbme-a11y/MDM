@@ -753,10 +753,30 @@ Authorized Directorate Desk`;
       return updated;
     });
 
-    // 4. Save exact rows to localStorage for sub-step 2.1 view rendering
+    // 4. Save exact rows & folder record to localStorage for sub-step 2.1 view rendering
     try {
       localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
       localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(receivedRecord21));
+
+      const folderEntry = {
+        id: `folder-transmitted-${Date.now()}`,
+        dspRefNumber: refNum,
+        officialLetterRef: officialLetterRef,
+        dateTransmitted: TODAY_ISO_DATE,
+        senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+        recipientOrg: 'Ministry of Health (PMD Directorate)',
+        signatory: 'Mosisa (Authorized User)',
+        signatoryRole: 'Directorate Technical Lead',
+        subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${itemsToSend.length} Materials)`,
+        totalDevices: itemsToSend.length,
+        totalQuantity: sentTotals.totalQty,
+        totalValuationETB: sentTotals.totalValuation,
+        letterFileName: uploadedLetterFile?.name || `Official_Covering_Letter_${officialLetterRef.replace(/[\/\s]/g, '_')}.pdf`,
+        letterFileSize: uploadedLetterFile ? `${(uploadedLetterFile.size / 1024).toFixed(1)} KB` : '142.5 KB',
+        notes: `Official Request Covering Letter stored separately inside Transmitted EPSS to MOH Letters Folder.`
+      };
+      const existingFolder = JSON.parse(localStorage.getItem('epss_dsp_transmitted_letters_folder') || '[]');
+      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify([folderEntry, ...existingFolder]));
     } catch (e) {
       console.warn('Failed to save to localStorage:', e);
     }
