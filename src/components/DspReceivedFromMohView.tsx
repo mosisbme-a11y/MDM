@@ -682,14 +682,14 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
               <div className="flex items-center gap-2.5">
                 <FileSpreadsheet className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-black uppercase tracking-wider text-white">
-                  DSP Received from MOH — Stored Transmitted Allocation ({filteredRows.length} Line Items)
+                  {is21 ? 'DSP Received from EPSS' : 'DSP Received from MOH'} — Stored Transmitted Allocation ({filteredRows.length} Line Items)
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-400 text-slate-950">
-                  MOH PMD Endorsed
+                  {is21 ? 'EPSS HO Transmitted' : 'MOH PMD Endorsed'}
                 </span>
               </div>
               <div className="text-[11px] text-slate-300 font-medium">
-                Official Letter: <span className="text-amber-300 font-mono font-bold">{receivedRecord?.officialLetterRef || 'MOH/LET/2026/782'}</span>
+                Official Letter: <span className="text-amber-300 font-mono font-bold">{receivedRecord?.officialLetterRef || (is21 ? 'EPSS/LET/2026/1577' : 'MOH/LET/2026/782')}</span>
               </div>
             </div>
 
@@ -707,7 +707,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Budget Source</th>
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Request Date</th>
                     <th className="py-3 px-3 border-r border-amber-500/80 text-center">Received From</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">MOH Endorsement</th>
+                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">{is21 ? 'EPSS Status' : 'MOH Endorsement'}</th>
                     <th className="py-3 px-3 text-center w-16">Action</th>
                   </tr>
                 </thead>
@@ -771,15 +771,15 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                         {/* 10. Received From */}
                         <td className="py-2.5 px-3 text-center font-black text-slate-900 border-r border-amber-200/50 whitespace-nowrap">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[#1E3A5F] text-white">
-                            MOH PMD
+                            {is21 ? 'EPSS HO' : 'MOH PMD'}
                           </span>
                         </td>
 
-                        {/* 11. MOH Endorsement Status */}
+                        {/* 11. Status */}
                         <td className="py-2.5 px-3 text-center border-r border-amber-200/50 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Approved
+                            {is21 ? 'Received' : 'Approved'}
                           </span>
                         </td>
 
@@ -812,7 +812,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                       {formatCurrency(totals.totalValuation)}
                     </td>
                     <td colSpan={6} className="py-3 px-3 text-slate-900 text-[11px] font-semibold">
-                      ✓ Official ministerial allocation quota ratified by Ministry of Health (PMD Directorate)
+                      {is21 ? '✓ Official equipment quota transmission received from EPSS Head Office' : '✓ Official ministerial allocation quota ratified by Ministry of Health (PMD Directorate)'}
                     </td>
                   </tr>
                 </tfoot>
