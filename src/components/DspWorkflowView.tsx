@@ -1450,69 +1450,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
 
 
-      {/* Regional Breakdown Frequency Analytics */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm" onDoubleClick={() => setInspectStageInfo({ stageKey: 'rhb-to-moh', stageTitle: 'Regional Breakdown Frequency Source Data' })}>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-amber-600" />
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Regional Breakdown Frequency</h3>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Click or double-click any regional bar to inspect detailed source breakdown dossiers</p>
-          </div>
-          <div className="flex items-center gap-1.5 bg-amber-50 p-1 rounded-lg border border-amber-100">
-             <span className="text-[10px] font-bold text-amber-600 px-2 uppercase font-mono tracking-tighter">RHB Engagement Distribution</span>
-          </div>
-        </div>
 
-        <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={regionalFrequencyData} 
-              margin={{ top: 10, right: 30, left: 20, bottom: 40 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="region" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                angle={-45}
-                textAnchor="end"
-                interval={0}
-              />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                allowDecimals={false}
-              />
-              <Tooltip 
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
-              />
-              <Bar 
-                dataKey="count" 
-                name="Dossier Count"
-                radius={[4, 4, 0, 0]} 
-                barSize={32}
-                onClick={(data: any) => {
-                  const regName = data?.region || data?.activePayload?.[0]?.payload?.region || 'Regional';
-                  setInspectStageInfo({ stageKey: 'rhb-to-moh', stageTitle: `Regional Breakdown Frequency - ${regName}` });
-                }}
-              >
-                {regionalFrequencyData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={index % 2 === 0 ? '#4f46e5' : '#6366f1'} 
-                    fillOpacity={0.85}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
 
       {/* KPI Cards for Current Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
