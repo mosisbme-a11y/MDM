@@ -27,7 +27,8 @@ import {
   ExternalLink,
   Link2,
   ShieldCheck,
-  Printer
+  Printer,
+  Paperclip
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -137,6 +138,8 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
 
   // Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const letterInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedLetterFile, setUploadedLetterFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parsedUploadRows, setParsedUploadRows] = useState<DspRequestTemplateRow[]>([]);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
@@ -684,6 +687,7 @@ Authorized Directorate Desk`;
       officialLetterRef: officialLetterRef,
       signatory: 'Mosisa (Authorized User)',
       signatoryRole: 'Directorate Technical Lead',
+      pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
         description: r.materialDescription,
@@ -697,7 +701,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.`
+      notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 2. Incoming Received DSP record (Sub-step 2.1: DSP Received from EPSS in Stage 2 MOH OSP Management)
@@ -720,6 +724,7 @@ Authorized Directorate Desk`;
       officialLetterRef: officialLetterRef,
       signatory: 'Mosisa (Authorized User)',
       signatoryRole: 'Directorate Technical Lead',
+      pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
         description: r.materialDescription,
@@ -733,7 +738,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).`
+      notes: `Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 3. Clear previous default for 2.1 and store exact transmitted records
@@ -827,8 +832,37 @@ Authorized Directorate Desk`;
             </div>
           </div>
 
-          {/* Action Toolbar with Email, WhatsApp, Send to MOH */}
+          {/* Action Toolbar with Email, WhatsApp, Send to MOH, Upload Letter */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Upload Official Covering Letter Button */}
+            <input 
+              type="file" 
+              ref={letterInputRef}
+              id="template-letter-upload" 
+              className="hidden" 
+              accept=".pdf,.doc,.docx,image/*" 
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setUploadedLetterFile(file);
+                if (file) {
+                  showToast(`✓ Official Request Letter attached: ${file.name}`);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => letterInputRef.current?.click()}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border ${
+                uploadedLetterFile 
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 font-black' 
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+              }`}
+              title="Upload signed Official Request Covering Letter (PDF / DOC)"
+            >
+              <Paperclip className="w-3.5 h-3.5 text-amber-600" />
+              <span>{uploadedLetterFile ? 'Letter Attached' : 'Upload Letter'}</span>
+            </button>
+
             {/* Send via Email Button */}
             <button
               type="button"
@@ -895,6 +929,30 @@ Authorized Directorate Desk`;
             </button>
           </div>
         </div>
+
+        {/* Attached Letter Status Card */}
+        {uploadedLetterFile && (
+          <div className="flex items-center justify-between px-3.5 py-2 bg-amber-50/90 border border-amber-300 rounded-xl text-xs mt-2.5 shadow-2xs">
+            <div className="flex items-center gap-2 text-amber-950 font-medium">
+              <FileText className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>Official Request Letter Attached:</span>
+              <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-amber-200">{uploadedLetterFile.name}</span>
+              <span className="text-[10px] text-amber-800 font-bold">({(uploadedLetterFile.size / 1024).toFixed(1)} KB)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setUploadedLetterFile(null);
+                if (letterInputRef.current) letterInputRef.current.value = '';
+                showToast('Official Request Letter removed');
+              }}
+              className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded-lg font-bold flex items-center gap-1 text-[11px] transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove</span>
+            </button>
+          </div>
+        )}
 
         {/* Metrics Summary Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">

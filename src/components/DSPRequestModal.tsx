@@ -1237,12 +1237,33 @@ TRANSMISSION METRICS:
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl cursor-pointer transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              id="modal-header-letter-upload" 
+              className="hidden" 
+              accept=".pdf,.doc,.docx,image/*" 
+              onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+            />
+            <label 
+              htmlFor="modal-header-letter-upload" 
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs border ${
+                attachment 
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 font-black' 
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+              }`}
+              title="Upload Official Request Covering Letter (PDF / DOC)"
+            >
+              <Paperclip size={14} className="text-amber-600" />
+              <span>{attachment ? `Letter Attached (${attachment.name.length > 15 ? attachment.name.slice(0, 15) + '...' : attachment.name})` : 'Upload Letter'}</span>
+            </label>
+            <button 
+              onClick={onClose} 
+              className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl cursor-pointer transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Lifecycle Visual Progress Timeline */}
