@@ -155,23 +155,16 @@ export function buildDspTemplateRowsFromStock(stockItems: any[], todayStr?: stri
   }
 
   return hpItems.map((s, idx) => {
-    let budget = 'WB';
-    const wbs = (s.wbsElement || '').toUpperCase();
-    if (wbs.includes('GF') || wbs.includes('NEO')) budget = 'Global Fund';
-    else if (wbs.includes('MOH') || wbs.includes('EMERG')) budget = 'MOH';
-    else if (wbs.includes('DIAL') || wbs.includes('TREAS')) budget = 'Treasury';
-    else if (wbs.includes('WB') || wbs.includes('SDG')) budget = 'WB';
-
     return {
       id: `stock-hp-${s.id || idx}`,
       srNo: idx + 1,
-      material: s.material,
-      materialDescription: s.materialDescription,
-      qty: s.unrestrictedStock > 0 ? s.unrestrictedStock : 1,
+      material: s.material || '',
+      materialDescription: s.materialDescription || '',
+      qty: s.unrestrictedStock || 0,
       totalAmount: s.currentValueOfUnrestrictedStock || 0,
-      valuationTypeDesc: s.inventoryValuationType || 'Siemens Healthineers',
-      wbsElement: s.wbsElement || 'SDG-ME-23-001-011',
-      budgetSource: budget,
+      valuationTypeDesc: s.inventoryValuationType || '',
+      wbsElement: s.wbsElement || '',
+      budgetSource: s.budgetSource || '',
       requestDate: dateVal,
       dspRequestTo: 'MOH'
     };

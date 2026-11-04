@@ -113,7 +113,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // UI States
   const [searchQuery, setSearchQuery] = useState('');
   const [budgetSourceFilter, setBudgetSourceFilter] = useState('all');
-  const [yellowTheme, setYellowTheme] = useState<'vibrant' | 'classic'>('vibrant');
+  const [yellowTheme, setYellowTheme] = useState<'vibrant' | 'classic' | 'none'>('vibrant');
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<DspRequestTemplateRow>>({});
   
@@ -519,19 +519,28 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     }
 
     const offset = templateRows.length;
-    const newItems: DspRequestTemplateRow[] = selected.map((s, idx) => ({
-      id: `stock-hp-import-${s.id}-${Date.now()}`,
-      srNo: offset + idx + 1,
-      material: s.material,
-      materialDescription: s.materialDescription,
-      qty: s.unrestrictedStock > 0 ? s.unrestrictedStock : 1,
-      totalAmount: s.currentValueOfUnrestrictedStock || 0,
-      valuationTypeDesc: s.inventoryValuationType || 'Standard Price (S)',
-      wbsElement: s.wbsElement || 'SDG-ME-23-001',
-      budgetSource: stockDefaultBudget || 'WB',
-      requestDate: TODAY_ISO_DATE,
-      dspRequestTo: 'MOH'
-    }));
+    const newItems: DspRequestTemplateRow[] = selected.map((s, idx) => {
+      const wbs = (s.wbsElement || '').toUpperCase();
+      let budget = '';
+      if (wbs.includes('GF') || wbs.includes('NEO')) budget = 'Global Fund';
+      else if (wbs.includes('MOH') || wbs.includes('EMERG')) budget = 'MOH';
+      else if (wbs.includes('DIAL') || wbs.includes('TREAS')) budget = 'Treasury';
+      else if (wbs.includes('WB') || wbs.includes('SDG')) budget = 'WB';
+
+      return {
+        id: `stock-hp-import-${s.id}-${Date.now()}`,
+        srNo: offset + idx + 1,
+        material: s.material || '',
+        materialDescription: s.materialDescription || '',
+        qty: s.unrestrictedStock || 0,
+        totalAmount: s.currentValueOfUnrestrictedStock || 0,
+        valuationTypeDesc: s.inventoryValuationType || '',
+        wbsElement: s.wbsElement || '',
+        budgetSource: budget,
+        requestDate: TODAY_ISO_DATE,
+        dspRequestTo: 'MOH'
+      };
+    });
 
     setTemplateRows(prev => [...prev, ...newItems]);
     setIsStockImportModalOpen(false);
@@ -1061,6 +1070,17 @@ Authorized Directorate Desk`;
           >
             Soft Yellow
           </button>
+          <button
+            type="button"
+            onClick={() => setYellowTheme('none')}
+            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition cursor-pointer border ${
+              yellowTheme === 'none'
+                ? 'bg-white text-black border-black shadow-2xs font-mono'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}
+          >
+            No Color
+          </button>
         </div>
       </div>
 
@@ -1117,7 +1137,7 @@ Authorized Directorate Desk`;
             </thead>
 
             {/* Bright Yellow Data Rows matching screenshot */}
-            <tbody className={yellowTheme === 'vibrant' ? 'bg-[#FFFF00]' : 'bg-[#FEF08A]'}>
+            <tbody className={yellowTheme === 'vibrant' ? 'bg-[#FFFF00]' : yellowTheme === 'classic' ? 'bg-[#FEF08A]' : 'bg-white'}>
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="py-10 text-center text-black font-bold border-b border-black">
