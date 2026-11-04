@@ -531,13 +531,15 @@ if (!IS_VERCEL) {
     next();
   });
 
-  importLegacyDiskStoreIfNeeded().finally(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server is running and listening on port ${PORT}`);
-      if (!isSupabaseAdminConfigured) {
-        console.error('WARNING: Supabase is not configured - all /api routes will return 503.');
-      }
-    });
+  importLegacyDiskStoreIfNeeded().catch((err) => {
+    console.error('[Supabase Store] Background legacy import failed:', err);
+  });
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running and listening on port ${PORT}`);
+    if (!isSupabaseAdminConfigured) {
+      console.error('WARNING: Supabase is not configured - all /api routes will return 503.');
+    }
   });
 }
 

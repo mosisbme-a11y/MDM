@@ -19,6 +19,7 @@ import {
   PlusCircle,
   FileCheck,
   Printer,
+  Trash2,
   BadgeAlert,
   ArrowUpRight,
   Sparkles,
@@ -587,6 +588,45 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       setIsBreakdownModalOpen(true);
     }
     setActionTargetRecord(null);
+  };
+
+  const handleRemoveItemFromRecord = (recordId: string, itemIdx: number) => {
+    setRecords(prev => {
+      const targetRecord = prev.find(r => r.id === recordId);
+      if (!targetRecord) return prev;
+
+      const newItems = [...targetRecord.itemsIncluded];
+      newItems.splice(itemIdx, 1);
+
+      const updatedRecord: DspWorkflowRecord = {
+        ...targetRecord,
+        totalDevices: newItems.length,
+        totalQuantity: newItems.reduce((sum, it) => sum + (it.quantity || 0), 0),
+        totalValuationETB: newItems.reduce((sum, it) => {
+           // Fallback valuation logic if not explicitly stored per item
+           const unitVal = targetRecord.totalValuationETB / (targetRecord.totalQuantity || 1);
+           return sum + ((it as any).totalAmount || (it.quantity * unitVal) || 0);
+        }, 0),
+        itemsIncluded: newItems
+      };
+
+      const nextRecs = prev.map(r => r.id === recordId ? updatedRecord : r);
+      saveDspRecordsToIndexedDB(nextRecs);
+      
+      // Also update selectedRecord if it's currently open
+      if (selectedRecord && selectedRecord.id === recordId) {
+        setSelectedRecord(updatedRecord);
+      }
+
+      return nextRecs;
+    });
+    
+    if (onTriggerCloudSync) {
+       onTriggerCloudSync(`Item removed from DSP Record ${recordId}`, {
+         type: 'UPDATE',
+         title: `Update items in ${recordId}`,
+       });
+    }
   };
 
   const handleToggleRegion = (reg: string) => {
@@ -2222,7 +2262,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <th className="p-2 border-r border-slate-300 min-w-[200px]">Item Description</th>
                       <th className="p-2 border-r border-slate-300 min-w-[160px]">Allocated Facility</th>
                       <th className="p-2 border-r border-slate-300 min-w-[90px] text-center">Plant</th>
-                      <th className="p-2 text-right min-w-[90px]">Quantity</th>
+                      <th className="p-2 border-r border-slate-300 text-right min-w-[90px]">Quantity</th>
+                      <th className="p-2 text-center w-12">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -2257,8 +2298,18 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">
                             {item.plant || 'HO01'}
                           </td>
-                          <td className="p-2 text-right font-mono font-black text-cyan-700">
+                          <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-700">
                             {formatNumber(item.quantity)}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItemFromRecord(selectedRecord.id, idx)}
+                              className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                              title="Remove item from this dossier"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </td>
                         </tr>
                       );
