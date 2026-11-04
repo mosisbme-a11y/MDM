@@ -149,6 +149,30 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Row Selection State for sending specific items to MOH
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+
+  const handleToggleRowSelection = (id: string) => {
+    setSelectedRowIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllRows = () => {
+    if (selectedRowIds.length === filteredRows.length) {
+      setSelectedRowIds([]);
+    } else {
+      setSelectedRowIds(filteredRows.map(r => r.id));
+    }
+  };
+
+  const itemsToSend = useMemo(() => {
+    if (selectedRowIds.length > 0) {
+      return templateRows.filter(r => selectedRowIds.includes(r.id));
+    }
+    return templateRows;
+  }, [templateRows, selectedRowIds]);
+
   // New Row Form State with auto-filled date and MOH
   const [newRowData, setNewRowData] = useState<Omit<DspRequestTemplateRow, 'id' | 'srNo'>>({
     material: '',
@@ -619,8 +643,13 @@ Authorized Directorate Desk`;
   };
 
   // 3. SEND OPTION: DIRECT TRANSMIT TO MOH
-  // When transmitting to MOH, store exactly what was sent inside of DSP Received from MOH (1.2) and clear previous default
+  // When transmitting selected items to MOH, store exactly what was sent inside of DSP Received from MOH (1.2), remove sent items from table, and clear previous default
   const handleTransmitDspRequest = () => {
+    if (itemsToSend.length === 0) {
+      alert('Please select at least one item to transmit to MOH');
+      return;
+    }
+
     const year = new Date().getFullYear();
     const randHo = String(Math.floor(100 + Math.random() * 900));
     const randMoh = String(Math.floor(200 + Math.random() * 800));
@@ -628,6 +657,12 @@ Authorized Directorate Desk`;
     const mohReceivedRef = `MOH/PMD-DSP/${year}/${randMoh}`;
     const officialLetterRef = `EPSS/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`;
     const mohLetterRef = `MOH/PMD/ACT/${year}/${randMoh}`;
+
+    const sentTotals = {
+      lineItemsCount: itemsToSend.length,
+      totalQty: itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0),
+      totalValuation: itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0)
+    };
 
     // 1. Outgoing DSP Request record (Sub-step 1.1)
     const newRecord11: DspWorkflowRecord = {
@@ -638,18 +673,18 @@ Authorized Directorate Desk`;
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
       recipientOrg: 'Ministry of Health (PMD Directorate)',
-      subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${templateRows.length} Materials)`,
+      subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${itemsToSend.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
-      totalDevices: templateRows.length,
-      totalQuantity: totals.totalQty,
-      totalValuationETB: totals.totalValuation,
+      totalDevices: itemsToSend.length,
+      totalQuantity: sentTotals.totalQty,
+      totalValuationETB: sentTotals.totalValuation,
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
       officialLetterRef: officialLetterRef,
       signatory: 'Mosisa (Authorized User)',
       signatoryRole: 'Directorate Technical Lead',
-      itemsIncluded: templateRows.map(r => ({
+      itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
         description: r.materialDescription,
         quantity: r.qty,
@@ -662,11 +697,10 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Generated via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP). Budget Sources: ${uniqueBudgetSources.join(', ') || 'WB'}`
+      notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.`
     };
 
     // 2. Incoming Received DSP record (Sub-step 1.2: DSP Received from MOH)
-    // Storing EXACTLY what was sent inside of DSP Received from MOH (sub-step 1.2)
     const receivedRecord12: DspWorkflowRecord = {
       id: `dsp-moh-received-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
@@ -675,7 +709,7 @@ Authorized Directorate Desk`;
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      subject: `DSP Received from MOH: Official Allocation Endorsement for ${refNum} (${templateRows.length} Program HP Items)`,
+      subject: `DSP Received from MOH: Official Allocation Endorsement for ${refNum} (${itemsToSend.length} Program HP Items)`,
       status: 'Endorsed & Approved',
       dateSubmitted: TODAY_ISO_DATE,
       approvedDate: TODAY_ISO_DATE,
@@ -683,17 +717,17 @@ Authorized Directorate Desk`;
       actionTakenBy: 'Dr. Bethlehem (MOH PMD Directorate)',
       actionType: 'Endorsed & Approved',
       actionLetterRef: mohLetterRef,
-      actionNotes: `Official national priority allocation approved for all ${templateRows.length} Program (HP) equipment lines.`,
+      actionNotes: `Official national priority allocation approved for all ${itemsToSend.length} Program (HP) equipment lines.`,
       turnaroundDays: 0,
-      totalDevices: templateRows.length,
-      totalQuantity: totals.totalQty,
-      totalValuationETB: totals.totalValuation,
+      totalDevices: itemsToSend.length,
+      totalQuantity: sentTotals.totalQty,
+      totalValuationETB: sentTotals.totalValuation,
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
       officialLetterRef: `MOH/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`,
       signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
       signatoryRole: 'PMD Directorate Director',
-      itemsIncluded: templateRows.map(r => ({
+      itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
         description: r.materialDescription,
         quantity: r.qty,
@@ -706,14 +740,13 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Official DSP Response from MOH. Exact copy of ${templateRows.length} items transmitted from EPSS HO (Ref: ${refNum}). Previous defaults cleared.`
+      notes: `Official DSP Response from MOH. Exact copy of ${itemsToSend.length} transmitted items (Ref: ${refNum}).`
     };
 
-    // 3. Clear previous default for 1.2 and store the exact transmitted records
+    // 3. Clear previous default for 1.2 and store exact transmitted records
     setRecords(prev => {
       const filtered = prev.filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        // Clear all previous default/mock 1.2 records
         if (sub === '1.2') return false;
         return true;
       });
@@ -722,16 +755,23 @@ Authorized Directorate Desk`;
       return updated;
     });
 
-    // 4. Save exact rows to localStorage for instant sub-step 1.2 view rendering
+    // 4. Save exact rows to localStorage for sub-step 1.2 view rendering
     try {
-      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(templateRows));
+      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(itemsToSend));
       localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(receivedRecord12));
     } catch (e) {
       console.warn('Failed to save to localStorage:', e);
     }
 
+    // 5. Remove transmitted items from active table (templateRows) in Sub-step 1.1
+    setTemplateRows(prev => {
+      const remaining = prev.filter(r => !itemsToSend.some(sent => sent.id === r.id));
+      return remaining.map((r, i) => ({ ...r, srNo: i + 1 }));
+    });
+    setSelectedRowIds([]);
+
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored exact inside DSP Received from MOH (1.2)`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from MOH (1.2)`, {
         type: 'CREATE',
         title: `DSP Transmittal ${refNum}`,
         payload: { request: newRecord11, received: receivedRecord12 }
@@ -739,7 +779,7 @@ Authorized Directorate Desk`;
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Transmitted to MOH! Exact ${templateRows.length} items stored in '• DSP Received from MOH' (1.2) & previous defaults cleared.`);
+    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Removed from imported table & stored in Sub-step 1.2.`);
   };
 
   return (
@@ -960,7 +1000,16 @@ Authorized Directorate Desk`;
             {/* Orange Header with Italic Bold Black Text */}
             <thead>
               <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
-                <th className="py-2.5 px-3 text-center border-r border-black min-w-[60px] whitespace-nowrap">
+                <th className="py-2.5 px-3 text-center border-r border-black min-w-[40px] whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={filteredRows.length > 0 && selectedRowIds.length === filteredRows.length}
+                    onChange={handleSelectAllRows}
+                    className="cursor-pointer rounded accent-black"
+                    title="Select All"
+                  />
+                </th>
+                <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
                   S/N
                 </th>
                 <th className="py-2.5 px-3 text-left border-r border-black min-w-[140px] whitespace-nowrap font-mono">
@@ -1000,7 +1049,7 @@ Authorized Directorate Desk`;
             <tbody className={yellowTheme === 'vibrant' ? 'bg-[#FFFF00]' : 'bg-[#FEF08A]'}>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-10 text-center text-black font-bold border-b border-black">
+                  <td colSpan={12} className="py-10 text-center text-black font-bold border-b border-black">
                     No matching Program (HP) rows found. Click "Sync HP Stock" or "Reset 5" to reload.
                   </td>
                 </tr>
@@ -1011,6 +1060,7 @@ Authorized Directorate Desk`;
                   if (isEditing) {
                     return (
                       <tr key={row.id} className="bg-amber-100 border-b border-black text-black">
+                        <td className="p-1.5 text-center border-r border-black"></td>
                         <td className="p-1.5 text-center border-r border-black font-mono font-bold">
                           {row.srNo}
                         </td>
@@ -1111,11 +1161,23 @@ Authorized Directorate Desk`;
                     );
                   }
 
+                  const isSelected = selectedRowIds.includes(row.id);
+
                   return (
                     <tr 
                       key={row.id} 
-                      className="border-b border-black text-black font-medium hover:brightness-95 transition-all group"
+                      className={`border-b border-black text-black font-medium transition-all group ${isSelected ? 'bg-amber-200/90' : 'hover:brightness-95'}`}
                     >
+                      {/* Checkbox */}
+                      <td className="py-2 px-3 text-center border-r border-black">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleRowSelection(row.id)}
+                          className="cursor-pointer rounded accent-black"
+                        />
+                      </td>
+
                       {/* 1. S/N */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono font-bold">
                         {row.srNo}
@@ -1215,6 +1277,7 @@ Authorized Directorate Desk`;
                   <td className="border-r border-black"></td>
                   <td className="border-r border-black"></td>
                   <td className="border-r border-black"></td>
+                  <td className="border-r border-black"></td>
                   <td></td>
                 </tr>
               ))}
@@ -1223,17 +1286,17 @@ Authorized Directorate Desk`;
             {/* Total Row Footer */}
             <tfoot>
               <tr className="bg-slate-900 text-white font-black text-xs border-t-2 border-black">
-                <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider text-amber-400 font-mono">
-                  Total Requested Allocation:
+                <td colSpan={4} className="py-2.5 px-3 text-right uppercase tracking-wider text-amber-400 font-mono">
+                  Total Requested Allocation ({selectedRowIds.length > 0 ? `${selectedRowIds.length} Selected` : 'All'}):
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono text-cyan-300 border-x border-slate-700">
-                  {formatNumber(totals.totalQty)}
+                  {formatNumber(itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0))}
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono text-emerald-400 border-r border-slate-700">
-                  {formatCurrency(totals.totalValuation)}
+                  {formatCurrency(itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0))}
                 </td>
                 <td colSpan={6} className="py-2.5 px-3 text-[11px] text-slate-300 font-normal">
-                  <span className="font-bold text-amber-300 font-mono">{totals.lineItemsCount}</span> Program (HP) Materials • Destination: <span className="font-bold text-white">Ministry of Health (MOH)</span>
+                  <span className="font-bold text-amber-300 font-mono">{itemsToSend.length}</span> Program (HP) Materials • Destination: <span className="font-bold text-white">Ministry of Health (MOH)</span>
                 </td>
               </tr>
             </tfoot>
