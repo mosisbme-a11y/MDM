@@ -42,6 +42,7 @@ interface DspReceivedFromMohViewProps {
   records: DspWorkflowRecord[];
   setRecords: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   multipleStockItems?: MultipleStockRecord[];
+  subStageTarget?: '1.2' | '2.1';
   onSelectSubTab?: (tab: EpssSubTab) => void;
   onTriggerCloudSync?: (
     successMsg: string,
@@ -57,21 +58,27 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   records,
   setRecords,
   multipleStockItems = [],
+  subStageTarget = '1.2',
   onSelectSubTab,
   onTriggerCloudSync
 }) => {
-  // Find official received record for 1.2
+  const is21 = subStageTarget === '2.1';
+  const storageRowsKey = is21 ? 'epss_dsp_received_epss_rows' : 'epss_dsp_received_moh_rows';
+  const targetSubStage = is21 ? '2.1' : '1.2';
+  const targetStage = is21 ? 'moh-osp-management' : 'head-office-dsp';
+
+  // Find official received record for target subStage
   const receivedRecord = useMemo(() => {
     return records.find(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return sub === '1.2' && r.stage === 'head-office-dsp';
+      return sub === targetSubStage && r.stage === targetStage;
     });
-  }, [records]);
+  }, [records, targetSubStage, targetStage]);
 
   // Load the exact received rows (from localStorage, receivedRecord, or empty)
   const [receivedRows, setReceivedRows] = useState<DspRequestTemplateRow[]>(() => {
     try {
-      const stored = localStorage.getItem('epss_dsp_received_moh_rows');
+      const stored = localStorage.getItem(storageRowsKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -84,10 +91,10 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
         }
       }
     } catch (e) {
-      console.warn('Failed to parse epss_dsp_received_moh_rows:', e);
+      console.warn(`Failed to parse ${storageRowsKey}:`, e);
     }
 
-    // If records has items from a non-sample 1.2 record
+    // If records has items from a non-sample target record
     if (receivedRecord && receivedRecord.itemsIncluded && receivedRecord.itemsIncluded.length > 0 && !receivedRecord.id.includes('sample')) {
       return receivedRecord.itemsIncluded.map((it: any, idx: number) => ({
         id: `rec-item-${idx}`,
@@ -125,10 +132,10 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
       }));
       setReceivedRows(mapped);
       try {
-        localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(mapped));
+        localStorage.setItem(storageRowsKey, JSON.stringify(mapped));
       } catch {}
     }
-  }, [receivedRecord]);
+  }, [receivedRecord, storageRowsKey]);
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -294,11 +301,11 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
   // Clear received records and reset
   const handleClearReceivedData = () => {
-    localStorage.removeItem('epss_dsp_received_moh_rows');
-    localStorage.removeItem('epss_dsp_received_moh_record');
+    localStorage.removeItem(storageRowsKey);
+    localStorage.removeItem(is21 ? 'epss_dsp_received_epss_record' : 'epss_dsp_received_moh_record');
     setReceivedRows([]);
     setRecords(prev => {
-      const filtered = prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== '1.2');
+      const filtered = prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== targetSubStage);
       saveDspRecordsToIndexedDB(filtered);
       return filtered;
     });
@@ -398,7 +405,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#EBF1F6] border border-[#D5E1EC] shadow-sm ring-1 ring-cyan-500/30">
               <span className="w-2.5 h-2.5 rounded-full bg-[#8292A2] shrink-0" />
               <span className="text-xs md:text-sm font-black text-[#1E3A5F] tracking-tight">
-                DSP Received from MOH
+                {is21 ? 'DSP Received from EPSS' : 'DSP Received from MOH'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#1E3A5F] text-white">
                 {receivedRows.length}
@@ -408,7 +415,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Sub-step 1.2: Official MOH Ministerial Endorsement & Response
+                  {is21 ? 'Sub-step 2.1: Official Incoming Transmittal Quota from EPSS HO' : 'Sub-step 1.2: Official MOH Ministerial Endorsement & Response'}
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -416,7 +423,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
                 </span>
               </div>
               <div className="text-xs font-semibold text-slate-700">
-                Ministry of Health (PMD Directorate) ➔ EPSS Head Office (Medical Equipment Directorate)
+                {is21 ? 'EPSS Head Office (Medical Equipment Directorate) ➔ Ministry of Health (PMD Directorate)' : 'Ministry of Health (PMD Directorate) ➔ EPSS Head Office (Medical Equipment Directorate)'}
               </div>
             </div>
           </div>

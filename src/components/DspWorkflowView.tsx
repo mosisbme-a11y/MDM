@@ -1896,6 +1896,16 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           records={records}
           setRecords={setRecords}
           multipleStockItems={multipleStockItems}
+          subStageTarget="1.2"
+          onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '2.1' || currentSubTab === 'dsp-moh-2-1') ? (
+        <DspReceivedFromMohView
+          records={records}
+          setRecords={setRecords}
+          multipleStockItems={multipleStockItems}
+          subStageTarget="2.1"
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
