@@ -89,6 +89,7 @@ import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
 import { DEFAULT_MASTER_STOCK_RECORDS } from '../data/defaultInventoryItems';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 
 export interface DateCountInfo {
   days: number;
@@ -1266,7 +1267,33 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             .flatMap(stg => stg.subSteps)
             .map((sub) => {
               const isSubSelected = currentSubStep === sub.id;
-              const subCount = records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
+              const programHpStockCount = (multipleStockItems || []).filter(isProgramHpStockItem).length || 5;
+              const subCount = sub.id === '1.1' 
+                ? programHpStockCount 
+                : records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
+              const isDspRequestToMoh = sub.id === '1.1';
+
+              if (isDspRequestToMoh) {
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => onSelectSubTab?.(sub.subTab)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      isSubSelected
+                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-amber-400/80 scale-[1.02]'
+                        : 'bg-[#0B1527] hover:bg-[#111f38] text-white border-[#0B1527] shadow-xs'
+                    }`}
+                    title="• DSP Request to MOH: 10-Column Standard Template linked with Multiple Stock (Program HP Only)"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 ${isSubSelected ? 'animate-pulse' : ''}`} />
+                    <span className="tracking-tight text-white font-bold">{sub.label}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#F59E0B] text-slate-950">
+                      {subCount}
+                    </span>
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={sub.id}
@@ -1812,7 +1839,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           hfListItems={hfListItems}
           onTriggerCloudSync={onTriggerCloudSync}
         />
-      ) : (currentSubStep === '1.1' || currentSubTab === 'dsp-ho-1-1') ? (
+      ) : (currentSubStep === '1.1' || currentSubTab === 'dsp-ho-1-1' || currentSubTab === 'dsp-request-moh-epss') ? (
         <DspRequestMohTemplateView
           multipleStockItems={multipleStockItems}
           records={records}
@@ -1829,6 +1856,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               currentSubStep === 'all' && SUBMITTING_CRITERIA_MAP['1.1'] ? SUBMITTING_CRITERIA_MAP['1.1'] : null
             );
             const latestRecord = filteredRecords[0] || records[0];
+            const hpStockCount = (multipleStockItems || []).filter(isProgramHpStockItem).length || 5;
             
             if (!activeCriteriaInfo) return null;
 
@@ -1841,9 +1869,25 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       {currentSubStep === 'all' ? '1.1' : currentSubStep}
                     </span>
                     <div>
-                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                        {activeCriteriaInfo.title} — Sent & Received Data Panel
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                          {activeCriteriaInfo.title} — Sent & Received Data Panel
+                        </h3>
+                        {currentStage === 'head-office-dsp' && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0B1527] hover:bg-[#111f38] text-white text-xs font-bold border border-[#0B1527] shadow-xs ring-1 ring-amber-400/40 cursor-pointer transition ml-2"
+                            title="Click to view 10-Column DSP Request to MOH Template"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse" />
+                            <span>DSP Request to MOH</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-[#F59E0B] text-slate-950">
+                              {hpStockCount}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500">
                         Official Institutional Route: <span className="font-semibold text-slate-800">{activeCriteriaInfo.sender}</span> ➔ <span className="font-semibold text-slate-800">{activeCriteriaInfo.recipient}</span>
                       </p>

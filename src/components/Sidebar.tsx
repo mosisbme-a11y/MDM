@@ -739,13 +739,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               onSelectEpssSubTab?.('head-office-dsp');
                             }}
                             className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'head-office-dsp' || epssSubTab?.startsWith('dsp-ho-'))
+                              isActive && (epssSubTab === 'head-office-dsp')
                                 ? 'bg-amber-600/30 text-amber-300 font-bold border border-amber-500/40 shadow-xs'
                                 : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
                             }`}
                           >
                             <Send className="w-3 h-3 text-amber-400 shrink-0" />
                             <span className="truncate">Head Office DSP Mgmt</span>
+                          </button>
+
+                          {/* 1.1 DSP Request to MOH Sub-step matching user screenshot */}
+                          <button
+                            onClick={() => {
+                              setActiveTab('inventory');
+                              onSelectEpssSubTab?.('dsp-ho-1-1');
+                            }}
+                            className={`w-full flex items-center justify-between ml-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
+                              isActive && (epssSubTab === 'dsp-ho-1-1' || epssSubTab === 'dsp-request-moh-epss')
+                                ? 'bg-[#0B1527] text-white border-amber-400/50 shadow-xs ring-1 ring-amber-400/30'
+                                : 'bg-[#0B1527]/80 hover:bg-[#0B1527] text-white border-transparent'
+                            }`}
+                            title="DSP Request to MOH (10-Column Standard Program HP Template)"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="w-2 h-2 rounded-full bg-[#F59E0B] shrink-0" />
+                              <span className="truncate text-white font-bold">DSP Request to MOH</span>
+                            </div>
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#F59E0B] text-slate-950 shrink-0">
+                              5
+                            </span>
                           </button>
 
                           {/* MOH OSP management */}

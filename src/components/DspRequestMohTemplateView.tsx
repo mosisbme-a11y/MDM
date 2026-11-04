@@ -20,12 +20,14 @@ import {
   Building2, 
   Calendar, 
   Check, 
-  ArrowUpDown,
   Share2,
   FileText,
   Mail,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  Link2,
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -35,6 +37,9 @@ import {
   DspRequestTemplateRow, 
   DSP_REQUEST_TEMPLATE_COLUMNS, 
   DEFAULT_DSP_REQUEST_TEMPLATE_ROWS,
+  TODAY_ISO_DATE,
+  isProgramHpStockItem,
+  buildDspTemplateRowsFromStock,
   downloadDspRequestTemplateExcel,
   downloadDspRequestCSV,
   generateDspRequestExcelBlob
@@ -67,20 +72,37 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   onTriggerCloudSync,
   onOpenDspRequestModal
 }) => {
-  // Load saved template rows from localStorage or defaults
+  // Filter multipleStockItems to ONLY Program (HP) items
+  const programHpStockItems = useMemo(() => {
+    return (multipleStockItems || []).filter(isProgramHpStockItem);
+  }, [multipleStockItems]);
+
+  // Track if live linked to Multiple Stock
+  const [isLinkedToStock, setIsLinkedToStock] = useState<boolean>(() => {
+    const stored = localStorage.getItem('epss_dsp_request_is_linked_stock');
+    return stored !== null ? stored === 'true' : true;
+  });
+
+  // Load saved template rows from localStorage or generate from Program HP stock
   const [templateRows, setTemplateRows] = useState<DspRequestTemplateRow[]>(() => {
     try {
       const stored = localStorage.getItem('epss_dsp_request_template_rows');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Ensure auto-filled today date and MOH target
+          return parsed.map((r, i) => ({
+            ...r,
+            srNo: i + 1,
+            requestDate: r.requestDate || TODAY_ISO_DATE,
+            dspRequestTo: r.dspRequestTo || 'MOH'
+          }));
         }
       }
     } catch (e) {
       console.error('Error loading template rows:', e);
     }
-    return DEFAULT_DSP_REQUEST_TEMPLATE_ROWS;
+    return buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
   });
 
   // UI States
@@ -90,36 +112,49 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<DspRequestTemplateRow>>({});
   
-  // Modals
+  // Modals for Sending & Operations
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isStockImportModalOpen, setIsStockImportModalOpen] = useState(false);
-  const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
-  
+
+  // Email state
+  const [emailTo, setEmailTo] = useState('pmd@moh.gov.et');
+  const [emailCc, setEmailCc] = useState('epss-med-equip@epss.gov.et');
+  const [emailSubject, setEmailSubject] = useState(`Official DSP Request: EPSS to MOH - Priority Program (HP) Equipment Allocation [${TODAY_ISO_DATE}]`);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
+  // WhatsApp state
+  const [waPhone, setWaPhone] = useState('+251911234567');
+  const [waCopied, setWaCopied] = useState(false);
+
   // Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parsedUploadRows, setParsedUploadRows] = useState<DspRequestTemplateRow[]>([]);
   const [uploadMode, setUploadMode] = useState<'replace' | 'append'>('replace');
 
-  // Stock Import State
-  const [selectedStockIds, setSelectedStockIds] = useState<string[]>([]);
+  // Stock Import Search State
   const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [selectedStockIds, setSelectedStockIds] = useState<string[]>([]);
   const [stockDefaultBudget, setStockDefaultBudget] = useState('WB');
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // New Row Form State
+  // New Row Form State with auto-filled date and MOH
   const [newRowData, setNewRowData] = useState<Omit<DspRequestTemplateRow, 'id' | 'srNo'>>({
     material: '',
     materialDescription: '',
     qty: 1,
     totalAmount: 0,
-    valuationTypeDesc: '',
-    wbsElement: '',
+    valuationTypeDesc: 'Siemens Healthineers',
+    wbsElement: 'SDG-ME-23-001-011',
     budgetSource: 'WB',
-    requestDate: new Date().toISOString().slice(0, 10),
+    requestDate: TODAY_ISO_DATE,
     dspRequestTo: 'MOH'
   });
 
@@ -127,14 +162,23 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   useEffect(() => {
     try {
       localStorage.setItem('epss_dsp_request_template_rows', JSON.stringify(templateRows));
+      localStorage.setItem('epss_dsp_request_is_linked_stock', String(isLinkedToStock));
     } catch (e) {
       console.error('Error saving template rows:', e);
     }
-  }, [templateRows]);
+  }, [templateRows, isLinkedToStock]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Synchronize with Multiple Stock (Program HP items only)
+  const handleSyncWithMultipleStock = () => {
+    const updated = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
+    setTemplateRows(updated);
+    setIsLinkedToStock(true);
+    showToast(`✓ Linked & updated with ${updated.length} Program (HP) items from Multiple Stock`);
   };
 
   // Unique budget sources for filter
@@ -178,7 +222,11 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // Inline edit handlers
   const handleStartEdit = (row: DspRequestTemplateRow) => {
     setEditingRowId(row.id);
-    setEditFormData({ ...row });
+    setEditFormData({ 
+      ...row,
+      requestDate: row.requestDate || TODAY_ISO_DATE,
+      dspRequestTo: row.dspRequestTo || 'MOH'
+    });
   };
 
   const handleCancelEdit = () => {
@@ -193,7 +241,9 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
           ...r,
           ...editFormData,
           qty: Number(editFormData.qty) || r.qty,
-          totalAmount: Number(editFormData.totalAmount) || r.totalAmount
+          totalAmount: Number(editFormData.totalAmount) || r.totalAmount,
+          requestDate: editFormData.requestDate || TODAY_ISO_DATE,
+          dspRequestTo: editFormData.dspRequestTo || 'MOH'
         } as DspRequestTemplateRow;
       }
       return r;
@@ -204,7 +254,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   };
 
   const handleDeleteRow = (rowId: string) => {
-    if (window.confirm('Are you sure you want to delete this material row from the DSP request?')) {
+    if (window.confirm('Delete this material item from the DSP Request?')) {
       setTemplateRows(prev => {
         const updated = prev.filter(r => r.id !== rowId).map((r, idx) => ({
           ...r,
@@ -220,13 +270,15 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     const newRow: DspRequestTemplateRow = {
       ...row,
       id: `dsp-row-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      srNo: templateRows.length + 1
+      srNo: templateRows.length + 1,
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
     };
     setTemplateRows(prev => [...prev, newRow]);
     showToast('Row duplicated');
   };
 
-  // Add New Row Submit
+  // Add New Row Submit (auto-fills Request Date and DSP request to)
   const handleAddNewRow = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRowData.material || !newRowData.materialDescription) {
@@ -238,7 +290,9 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       id: `dsp-row-${Date.now()}`,
       srNo: templateRows.length + 1,
       qty: Number(newRowData.qty) || 1,
-      totalAmount: Number(newRowData.totalAmount) || 0
+      totalAmount: Number(newRowData.totalAmount) || 0,
+      requestDate: newRowData.requestDate || TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
     };
     setTemplateRows(prev => [...prev, newRow]);
     setIsAddModalOpen(false);
@@ -247,24 +301,30 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       materialDescription: '',
       qty: 1,
       totalAmount: 0,
-      valuationTypeDesc: '',
-      wbsElement: '',
+      valuationTypeDesc: 'Siemens Healthineers',
+      wbsElement: 'SDG-ME-23-001-011',
       budgetSource: 'WB',
-      requestDate: new Date().toISOString().slice(0, 10),
+      requestDate: TODAY_ISO_DATE,
       dspRequestTo: 'MOH'
     });
-    showToast('✓ New material row added to DSP request');
+    showToast('✓ New Program (HP) material added to DSP Request');
   };
 
-  // Reset to original image template
+  // Reset to default Program HP items
   const handleResetToDefaultTemplate = () => {
-    if (window.confirm('Reset DSP Request to original template format?')) {
-      setTemplateRows(DEFAULT_DSP_REQUEST_TEMPLATE_ROWS);
-      showToast('✓ Restored to default template format');
+    if (window.confirm('Reset DSP Request table to original 5 Program (HP) items?')) {
+      const resetRows = DEFAULT_DSP_REQUEST_TEMPLATE_ROWS.map(r => ({
+        ...r,
+        requestDate: TODAY_ISO_DATE,
+        dspRequestTo: 'MOH'
+      }));
+      setTemplateRows(resetRows);
+      setIsLinkedToStock(true);
+      showToast('✓ Restored to default 5 Program (HP) items');
     }
   };
 
-  // Parse Excel / CSV Upload
+  // Excel / CSV Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -292,7 +352,6 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       };
       reader.readAsText(file);
     } else {
-      // Excel (.xlsx, .xls)
       reader.onload = (event) => {
         try {
           const data = new Uint8Array(event.target?.result as ArrayBuffer);
@@ -318,7 +377,6 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     const mappedRows: DspRequestTemplateRow[] = [];
 
     rows.forEach((row, idx) => {
-      // Flexible key lookup
       const getVal = (possibleKeys: string[]) => {
         for (const k of possibleKeys) {
           for (const rowKey of Object.keys(row)) {
@@ -337,7 +395,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       const valuationTypeDesc = String(getVal(['Valuation Type Desc', 'Valuation Type', 'Manufacturer', 'Supplier', 'Make']) || '').trim();
       const wbsElement = String(getVal(['WBS Element', 'WBS', 'Project Code', 'Grant Ref']) || '').trim();
       const budgetSource = String(getVal(['Budget Source', 'Funding Source', 'Donor', 'Budget']) || 'WB').trim();
-      const requestDate = String(getVal(['Request Date', 'Date', 'Posting Date']) || new Date().toISOString().slice(0, 10)).trim();
+      const requestDate = String(getVal(['Request Date', 'Date']) || TODAY_ISO_DATE).trim();
       const dspRequestTo = String(getVal(['DSP request to', 'DSP Request To', 'Target', 'DSP Target', 'Recipient']) || 'MOH').trim();
 
       if (material || materialDescription) {
@@ -348,17 +406,17 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
           materialDescription: materialDescription || 'Medical Equipment Item',
           qty,
           totalAmount,
-          valuationTypeDesc: valuationTypeDesc || 'Standard Valuation',
-          wbsElement: wbsElement || 'SDG-ME-23-001',
+          valuationTypeDesc: valuationTypeDesc || 'Siemens Healthineers',
+          wbsElement: wbsElement || 'SDG-ME-23-001-011',
           budgetSource: budgetSource || 'WB',
-          requestDate,
+          requestDate: requestDate || TODAY_ISO_DATE,
           dspRequestTo: dspRequestTo || 'MOH'
         });
       }
     });
 
     if (mappedRows.length === 0) {
-      setUploadError('Could not find recognizable material columns. Please check that headers match the template.');
+      setUploadError('Could not find recognizable material columns. Headers must follow: S/N, Material, Material Description, Qty, Total Amount, Valuation Type Desc, WBS Element, Budget Source, Request Date, DSP request to');
       return;
     }
 
@@ -369,14 +427,24 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     if (parsedUploadRows.length === 0) return;
 
     if (uploadMode === 'replace') {
-      const renumbered = parsedUploadRows.map((r, idx) => ({ ...r, srNo: idx + 1 }));
+      const renumbered = parsedUploadRows.map((r, idx) => ({ 
+        ...r, 
+        srNo: idx + 1,
+        requestDate: r.requestDate || TODAY_ISO_DATE,
+        dspRequestTo: 'MOH'
+      }));
       setTemplateRows(renumbered);
-      showToast(`✓ Loaded ${renumbered.length} material rows from template file`);
+      showToast(`✓ Loaded ${renumbered.length} rows from file into DSP Request template`);
     } else {
       const offset = templateRows.length;
-      const renumbered = parsedUploadRows.map((r, idx) => ({ ...r, srNo: offset + idx + 1 }));
+      const renumbered = parsedUploadRows.map((r, idx) => ({ 
+        ...r, 
+        srNo: offset + idx + 1,
+        requestDate: r.requestDate || TODAY_ISO_DATE,
+        dspRequestTo: 'MOH'
+      }));
       setTemplateRows(prev => [...prev, ...renumbered]);
-      showToast(`✓ Appended ${renumbered.length} material rows to DSP request`);
+      showToast(`✓ Appended ${renumbered.length} rows to DSP Request template`);
     }
 
     setIsUploadModalOpen(false);
@@ -385,9 +453,9 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Import from Multiple Stock
-  const filteredMultipleStock = useMemo(() => {
-    return multipleStockItems.filter(item => {
+  // Stock Import filtering - strictly Program (HP) items
+  const filteredStockForImport = useMemo(() => {
+    return programHpStockItems.filter(item => {
       const q = stockSearchQuery.toLowerCase();
       return (
         item.material.toLowerCase().includes(q) ||
@@ -396,7 +464,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         (item.inventoryValuationType && item.inventoryValuationType.toLowerCase().includes(q))
       );
     });
-  }, [multipleStockItems, stockSearchQuery]);
+  }, [programHpStockItems, stockSearchQuery]);
 
   const handleToggleStockItem = (id: string) => {
     setSelectedStockIds(prev => 
@@ -405,42 +473,148 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   };
 
   const handleSelectAllStock = () => {
-    if (selectedStockIds.length === filteredMultipleStock.length) {
+    if (selectedStockIds.length === filteredStockForImport.length) {
       setSelectedStockIds([]);
     } else {
-      setSelectedStockIds(filteredMultipleStock.map(s => s.id));
+      setSelectedStockIds(filteredStockForImport.map(s => s.id));
     }
   };
 
   const handleApplyStockImport = () => {
-    const selected = multipleStockItems.filter(s => selectedStockIds.includes(s.id));
+    const selected = programHpStockItems.filter(s => selectedStockIds.includes(s.id));
     if (selected.length === 0) {
-      alert('Please select at least one stock device');
+      alert('Please select at least one Program (HP) stock device');
       return;
     }
 
     const offset = templateRows.length;
     const newItems: DspRequestTemplateRow[] = selected.map((s, idx) => ({
-      id: `stock-import-${s.id}-${Date.now()}`,
+      id: `stock-hp-import-${s.id}-${Date.now()}`,
       srNo: offset + idx + 1,
       material: s.material,
       materialDescription: s.materialDescription,
       qty: s.unrestrictedStock > 0 ? s.unrestrictedStock : 1,
       totalAmount: s.currentValueOfUnrestrictedStock || 0,
-      valuationTypeDesc: s.inventoryValuationType || 'Standard',
+      valuationTypeDesc: s.inventoryValuationType || 'Standard Price (S)',
       wbsElement: s.wbsElement || 'SDG-ME-23-001',
       budgetSource: stockDefaultBudget || 'WB',
-      requestDate: new Date().toISOString().slice(0, 10),
+      requestDate: TODAY_ISO_DATE,
       dspRequestTo: 'MOH'
     }));
 
     setTemplateRows(prev => [...prev, ...newItems]);
     setIsStockImportModalOpen(false);
     setSelectedStockIds([]);
-    showToast(`✓ Imported ${newItems.length} items from Multiple Stock`);
+    showToast(`✓ Imported ${newItems.length} Program (HP) items into DSP Request`);
   };
 
-  // Transmit DSP Request to MOH
+  // 1. SEND OPTION: EMAIL DISPATCH
+  const emailBodyText = useMemo(() => {
+    const lines = templateRows.map((r, i) => 
+      `${i + 1}. [${r.material}] ${r.materialDescription} | Qty: ${r.qty} | Value: ETB ${r.totalAmount.toLocaleString()} | WBS: ${r.wbsElement} | Budget: ${r.budgetSource} | Date: ${r.requestDate} | Target: ${r.dspRequestTo}`
+    ).join('\n');
+
+    return `Dear Ministry of Health (MOH) PMD Directorate,
+
+Please find attached the official DSP Request for priority Health Program (HP) medical equipment allocation.
+
+Allocated Program (HP) Line Items (${templateRows.length}):
+${lines}
+
+SUMMARY:
+• Total Items: ${totals.lineItemsCount} Materials
+• Total Quantity: ${formatNumber(totals.totalQty)} Units
+• Total Budget Valuation: ${formatCurrency(totals.totalValuation)}
+• Request Date: ${TODAY_ISO_DATE}
+• Transmittal Channel: Official EPSS to MOH DSP Request Protocol
+
+Attached: Official 10-Column DSP Allocation Excel Dossier (${DSP_REQUEST_TEMPLATE_COLUMNS.join(', ')}).
+
+Issued by:
+EPSS Head Office (Medical Equipment Directorate)
+Authorized Directorate Desk`;
+  }, [templateRows, totals]);
+
+  const handleSendViaEmail = async () => {
+    setIsSendingEmail(true);
+    try {
+      // Generate the Excel blob to attach or download
+      const { blob, fileName } = generateDspRequestExcelBlob(templateRows);
+      
+      // Try Google Workspace sign in / access token if available
+      const token = await getAccessToken();
+      if (token) {
+        // Send via Gmail API if user connected Google Workspace
+        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            raw: btoa(
+              `To: ${emailTo}\r\n` +
+              `Cc: ${emailCc}\r\n` +
+              `Subject: ${emailSubject}\r\n` +
+              `Content-Type: text/plain; charset=utf-8\r\n\r\n` +
+              emailBodyText
+            )
+          })
+        });
+        if (res.ok) {
+          setEmailSuccess(true);
+          showToast(`✓ Official DSP Request sent via Gmail to ${emailTo}!`);
+          setTimeout(() => {
+            setIsEmailModalOpen(false);
+            setEmailSuccess(false);
+          }, 2000);
+          return;
+        }
+      }
+
+      // Fallback: download Excel and open mailto link
+      downloadDspRequestTemplateExcel(templateRows);
+      const mailtoUrl = `mailto:${encodeURIComponent(emailTo)}?cc=${encodeURIComponent(emailCc)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBodyText)}`;
+      window.location.href = mailtoUrl;
+      showToast(`✓ Excel downloaded & mail client launched for ${emailTo}`);
+      setIsEmailModalOpen(false);
+    } catch (err: any) {
+      console.error('Email send error:', err);
+      downloadDspRequestTemplateExcel(templateRows);
+      window.location.href = `mailto:${encodeURIComponent(emailTo)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBodyText)}`;
+      showToast(`Excel downloaded. Opened default email client.`);
+      setIsEmailModalOpen(false);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // 2. SEND OPTION: WHATSAPP DISPATCH
+  const whatsAppMessage = useMemo(() => {
+    const lines = templateRows.map((r, i) => 
+      `*${i + 1}. ${r.material}* — ${r.materialDescription}\n   • Qty: *${formatNumber(r.qty)}* | Value: *ETB ${formatNumber(r.totalAmount)}*\n   • WBS: ${r.wbsElement} | Budget: ${r.budgetSource}\n   • Request Date: ${r.requestDate} | DSP Request to: *${r.dspRequestTo}*`
+    ).join('\n\n');
+
+    return `*🏥 ETHIOPIAN PHARMACEUTICAL SUPPLY SERVICE (EPSS)*\n*OFFICIAL DSP REQUEST TO MOH (PROGRAM HP)*\n*Request Date:* ${TODAY_ISO_DATE}\n*DSP Request To:* MOH PMD Directorate\n\n*ALLOCATED PROGRAM (HP) MEDICAL EQUIPMENT (${templateRows.length}):*\n${lines}\n\n*TOTAL ALLOCATION:* \n• Total Items: *${totals.lineItemsCount}*\n• Total Requested Qty: *${formatNumber(totals.totalQty)} Units*\n• Total Valuation: *${formatCurrency(totals.totalValuation)}*\n• Protocol: Standard 10-Column EPSS Quota Allocation`;
+  }, [templateRows, totals]);
+
+  const handleCopyWhatsAppText = () => {
+    navigator.clipboard.writeText(whatsAppMessage);
+    setWaCopied(true);
+    setTimeout(() => setWaCopied(false), 3000);
+    showToast('✓ WhatsApp message copied to clipboard');
+  };
+
+  const handleOpenWhatsAppWeb = () => {
+    downloadDspRequestTemplateExcel(templateRows);
+    const cleanPhone = waPhone.replace(/\D/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsAppMessage)}`;
+    window.open(url, '_blank');
+    showToast(`✓ Opened WhatsApp Web with DSP Request payload & downloaded Excel`);
+    setIsWhatsAppModalOpen(false);
+  };
+
+  // 3. SEND OPTION: DIRECT TRANSMIT TO MOH
   const handleTransmitDspRequest = () => {
     const refNum = `EPSS/MD-DSP/${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`;
     const newRecord: DspWorkflowRecord = {
@@ -451,9 +625,9 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
       recipientOrg: 'Ministry of Health (PMD Directorate)',
-      subject: `DSP Request to MOH: Equipment Allocation Request (${templateRows.length} Materials)`,
+      subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${templateRows.length} Materials)`,
       status: 'Submitted & Pending',
-      dateSubmitted: new Date().toISOString().slice(0, 10),
+      dateSubmitted: TODAY_ISO_DATE,
       totalDevices: templateRows.length,
       totalQuantity: totals.totalQty,
       totalValuationETB: totals.totalValuation,
@@ -469,7 +643,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         plant: 'AA01 Central',
         allocatedFacility: 'Regional Allocation Quota'
       })),
-      notes: `Generated via 10-Column Standard DSP Request Template. Budget Sources: ${uniqueBudgetSources.join(', ') || 'WB'}`
+      notes: `Generated via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP). Budget Sources: ${uniqueBudgetSources.join(', ') || 'WB'}`
     };
 
     setRecords(prev => {
@@ -485,6 +659,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         payload: newRecord
       });
     }
+
     setIsTransmitModalOpen(false);
     showToast(`✓ Official DSP Request ${refNum} transmitted to MOH PMD Directorate!`);
   };
@@ -499,21 +674,30 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         </div>
       )}
 
-      {/* Top Header Card matching Screenshot {8B4F9ED6-4660-4B68-AD79-0040583FA57D}.png */}
+      {/* Top Banner Card featuring EXACT button from user screenshot _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {/* Exactly the pill from {8B4F9ED6-4660-4B68-AD79-0040583FA57D}.png */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EBF1F6] border border-[#D5E1EC] shadow-2xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#8292A2]" />
-              <span className="text-xs md:text-sm font-black text-[#1E3A5F] tracking-tight">
+            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#0B1527] border border-[#0B1527] shadow-md ring-2 ring-amber-400/50">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse" />
+              <span className="text-xs md:text-sm font-black text-white tracking-tight">
                 DSP Request to MOH
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#F59E0B] text-slate-950">
+                {templateRows.length}
               </span>
             </div>
 
-            <div className="hidden sm:block">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Stage 1.1 • Standard Quota Allocation Template
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Linked with Multiple Stock (Program HP Only)
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Auto-fill Active
+                </span>
               </div>
               <div className="text-xs font-semibold text-slate-700">
                 EPSS Head Office ➔ Ministry of Health (PMD Directorate)
@@ -521,96 +705,104 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
             </div>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          {/* Action Toolbar with Email, WhatsApp, Send to MOH */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Send via Email Button */}
             <button
               type="button"
-              onClick={() => downloadDspRequestTemplateExcel(templateRows)}
+              onClick={() => setIsEmailModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              title="Send DSP Request via official email to MOH"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Send via Email</span>
+            </button>
+
+            {/* Send via WhatsApp Button */}
+            <button
+              type="button"
+              onClick={() => setIsWhatsAppModalOpen(true)}
               className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              title="Download formatted Excel (.xlsx) file with orange headers and yellow rows"
+              title="Send DSP Request via WhatsApp"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Download Template (.xlsx)</span>
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>Send via WhatsApp</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => downloadDspRequestCSV(templateRows)}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-              title="Download CSV file"
-            >
-              <Download className="w-3.5 h-3.5 text-teal-600" />
-              <span>CSV</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsUploadModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Upload template Excel or CSV file"
-            >
-              <Upload className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Upload Template</span>
-            </button>
-
-            {multipleStockItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsStockImportModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Import items directly from Multiple Stock"
-              >
-                <Package className="w-3.5 h-3.5 text-cyan-600" />
-                <span>Import from Stock</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Material Row</span>
-            </button>
-
+            {/* Send to MOH (Direct Institutional Transmittal) */}
             <button
               type="button"
               onClick={() => setIsTransmitModalOpen(true)}
               className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              title="Confirm official DSP Request transmittal to MOH PMD Directorate"
             >
               <Send className="w-3.5 h-3.5 text-amber-400" />
-              <span>Transmit to MOH</span>
+              <span>Send to MOH</span>
+            </button>
+
+            {/* Sync from Multiple Stock (Program HP) */}
+            <button
+              type="button"
+              onClick={handleSyncWithMultipleStock}
+              className="px-2.5 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+              title="Sync table with latest Multiple Stock Program (HP) items"
+            >
+              <RefreshCw className="w-3 h-3 text-cyan-600" />
+              <span>Sync HP Stock ({programHpStockItems.length})</span>
+            </button>
+
+            {/* Download Template Excel */}
+            <button
+              type="button"
+              onClick={() => downloadDspRequestTemplateExcel(templateRows)}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+              title="Download formatted Excel (.xlsx) file with orange headers and yellow rows"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Excel (.xlsx)</span>
+            </button>
+
+            {/* Add Row Button */}
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="p-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 transition cursor-pointer shadow-xs"
+              title="Add Material Row"
+            >
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Metrics Summary Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-          <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Material Items</span>
-            <span className="text-sm font-black text-slate-900 font-mono">{totals.lineItemsCount} Rows</span>
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">Program (HP) Items</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-base font-black text-slate-900 font-mono">{totals.lineItemsCount}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">HP Only</span>
+            </div>
           </div>
-          <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Requested Qty</span>
-            <span className="text-sm font-black text-cyan-800 font-mono">{formatNumber(totals.totalQty)} Units</span>
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Requested Qty</span>
+            <span className="text-base font-black text-cyan-800 font-mono mt-0.5 block">{formatNumber(totals.totalQty)} Units</span>
           </div>
-          <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Valuation (ETB)</span>
-            <span className="text-sm font-black text-emerald-700 font-mono">{formatCurrency(totals.totalValuation)}</span>
+            <span className="text-base font-black text-emerald-700 font-mono mt-0.5 block">{formatCurrency(totals.totalValuation)}</span>
           </div>
-          <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
             <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Target Recipient</span>
-              <span className="text-xs font-black text-indigo-700 truncate block">Ministry of Health (MOH)</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Target Recipient (Auto)</span>
+              <span className="text-xs font-black text-indigo-700 block mt-0.5">MOH (Ministry of Health)</span>
             </div>
             <button
               type="button"
               onClick={handleResetToDefaultTemplate}
-              className="text-[10px] font-bold text-slate-400 hover:text-slate-700 underline cursor-pointer ml-1"
-              title="Reset table to initial screenshot template values"
+              className="text-[10px] font-bold text-slate-400 hover:text-slate-700 underline cursor-pointer"
+              title="Reset table to 5 standard Program (HP) items"
             >
-              Reset
+              Reset 5
             </button>
           </div>
         </div>
@@ -672,15 +864,15 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         </div>
       </div>
 
-      {/* THE OFFICIAL 10-COLUMN TEMPLATE TABLE MATCHING SCREENSHOT {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
+      {/* THE OFFICIAL 10-COLUMN TEMPLATE TABLE MATCHING USER REQUEST & SCREENSHOT {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
       <div className="bg-white border-2 border-slate-900 rounded-xl overflow-hidden shadow-md">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs select-text">
-            {/* Orange Header with Italic Bold Black Text matching {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
+            {/* Orange Header with Italic Bold Black Text */}
             <thead>
               <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
                 <th className="py-2.5 px-3 text-center border-r border-black min-w-[60px] whitespace-nowrap">
-                  Sr. No
+                  S/N
                 </th>
                 <th className="py-2.5 px-3 text-left border-r border-black min-w-[140px] whitespace-nowrap font-mono">
                   Material
@@ -715,12 +907,12 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
               </tr>
             </thead>
 
-            {/* Bright Yellow Data Rows matching {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
+            {/* Bright Yellow Data Rows matching screenshot */}
             <tbody className={yellowTheme === 'vibrant' ? 'bg-[#FFFF00]' : 'bg-[#FEF08A]'}>
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-10 text-center text-black font-bold border-b border-black">
-                    No matching material rows found. Click "Add Material Row" or "Reset" to reload template.
+                    No matching Program (HP) rows found. Click "Sync HP Stock" or "Reset 5" to reload.
                   </td>
                 </tr>
               ) : (
@@ -793,7 +985,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                         <td className="p-1 border-r border-black">
                           <input
                             type="date"
-                            value={editFormData.requestDate ?? ''}
+                            value={editFormData.requestDate ?? TODAY_ISO_DATE}
                             onChange={(e) => setEditFormData(prev => ({ ...prev, requestDate: e.target.value }))}
                             className="w-full px-1.5 py-1 bg-white border border-slate-400 rounded text-xs text-center"
                           />
@@ -835,7 +1027,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                       key={row.id} 
                       className="border-b border-black text-black font-medium hover:brightness-95 transition-all group"
                     >
-                      {/* 1. Sr. No */}
+                      {/* 1. S/N */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono font-bold">
                         {row.srNo}
                       </td>
@@ -877,17 +1069,17 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                         {row.budgetSource}
                       </td>
 
-                      {/* 9. Request Date */}
+                      {/* 9. Request Date (Auto-filled with today) */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono text-[11px]">
-                        {row.requestDate || ''}
+                        {row.requestDate || TODAY_ISO_DATE}
                       </td>
 
-                      {/* 10. DSP request to */}
-                      <td className="py-2 px-3 text-center border-r border-black font-bold">
+                      {/* 10. DSP request to (Auto-filled with MOH) */}
+                      <td className="py-2 px-3 text-center border-r border-black font-bold text-slate-950">
                         {row.dspRequestTo || 'MOH'}
                       </td>
 
-                      {/* Row Action Buttons */}
+                      {/* Actions */}
                       <td className="py-2 px-1 text-center bg-yellow-200/50">
                         <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                           <button
@@ -921,7 +1113,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                 })
               )}
 
-              {/* Authentic Spreadsheet Yellow Empty Grid Rows matching screenshot {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
+              {/* Authentic Spreadsheet Yellow Empty Grid Rows */}
               {[1, 2, 3, 4, 5].map((emptyIdx) => (
                 <tr key={`empty-${emptyIdx}`} className="border-b border-black h-7">
                   <td className="border-r border-black"></td>
@@ -952,7 +1144,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                   {formatCurrency(totals.totalValuation)}
                 </td>
                 <td colSpan={6} className="py-2.5 px-3 text-[11px] text-slate-300 font-normal">
-                  <span className="font-bold text-amber-300 font-mono">{totals.lineItemsCount}</span> Equipment Items • Allocated to <span className="font-bold text-white">Ministry of Health (MOH)</span>
+                  <span className="font-bold text-amber-300 font-mono">{totals.lineItemsCount}</span> Program (HP) Materials • Destination: <span className="font-bold text-white">Ministry of Health (MOH)</span>
                 </td>
               </tr>
             </tfoot>
@@ -960,24 +1152,320 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         </div>
       </div>
 
-      {/* Submitting Criteria & Institutional Workflow Footnote */}
+      {/* FOOTER CALLOUT WITH SEND SUMMARY */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
-            <strong className="text-slate-800">10-Column Standard Compliant:</strong> Fits MOH PMD medical equipment allocation protocol.
+            <strong className="text-slate-800">Auto-Filled Fields:</strong> Request Date is set to today (<strong>{TODAY_ISO_DATE}</strong>) and DSP Request To is locked to <strong>MOH</strong>.
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] font-mono">
-          <span>Excel Template: <strong className="text-slate-800">Verified</strong></span>
-          <span>•</span>
-          <span>Target Directorate: <strong className="text-slate-800">MOH PMD</strong></span>
-          <span>•</span>
-          <span>Issuing Authority: <strong className="text-slate-800">EPSS Head Office</strong></span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEmailModalOpen(true)}
+            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
+          >
+            <Mail className="w-3 h-3" />
+            <span>Email MOH</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppModalOpen(true)}
+            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-emerald-700 border border-emerald-200 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
+          >
+            <MessageCircle className="w-3 h-3" />
+            <span>WhatsApp</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsTransmitModalOpen(true)}
+            className="px-2.5 py-1 bg-slate-900 hover:bg-black text-amber-300 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer shadow-xs"
+          >
+            <Send className="w-3 h-3 text-amber-400" />
+            <span>Submit Dossier</span>
+          </button>
         </div>
       </div>
 
-      {/* MODAL 1: ADD MATERIAL ROW */}
+      {/* MODAL 1: SEND VIA EMAIL */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send DSP Request via Email</h3>
+                  <p className="text-[11px] text-slate-400">Transmit official 10-column Excel dossier to MOH PMD Directorate</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">To (Official MOH Email)</label>
+                  <input
+                    type="email"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">CC (EPSS Directorate)</label>
+                  <input
+                    type="email"
+                    value={emailCc}
+                    onChange={(e) => setEmailCc(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Body Preview</label>
+                <textarea
+                  rows={6}
+                  readOnly
+                  value={emailBodyText}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 flex items-center justify-between text-indigo-950">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                  <div>
+                    <div className="font-bold text-xs">DSP_Request_to_MOH_Program_HP_{TODAY_ISO_DATE}.xlsx</div>
+                    <div className="text-[10px] text-indigo-600">10 Columns Standard Template ({templateRows.length} Items)</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadDspRequestTemplateExcel(templateRows)}
+                  className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Download
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSendingEmail}
+                  onClick={handleSendViaEmail}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSendingEmail ? 'Dispatching...' : 'Dispatch Email to MOH'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: SEND VIA WHATSAPP */}
+      {isWhatsAppModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send DSP Request via WhatsApp</h3>
+                  <p className="text-[11px] text-slate-400">Share Program (HP) equipment quota directly to MOH WhatsApp Desk</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">MOH WhatsApp Contact / Phone Number</label>
+                <input
+                  type="text"
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="+251911234567"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700">Formatted Message Payload</label>
+                  <button
+                    type="button"
+                    onClick={handleCopyWhatsAppText}
+                    className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    {waCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{waCopied ? 'Copied!' : 'Copy Message'}</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={8}
+                  readOnly
+                  value={whatsAppMessage}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 flex items-center justify-between">
+                <div>
+                  <span className="font-bold block">10-Column Excel Sheet Auto-Generated</span>
+                  <span className="text-[10px] text-emerald-700">Will be downloaded automatically when launching WhatsApp Web</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadDspRequestTemplateExcel(templateRows)}
+                  className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Download Excel
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWhatsAppModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenWhatsAppWeb}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Launch WhatsApp Web</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) */}
+      {isTransmitModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send DSP Request to MOH</h3>
+                  <p className="text-[11px] text-slate-400">Institutional quota submission to Ministry of Health PMD Directorate</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
+                  <span>Payload Details</span>
+                  <span className="text-amber-600 font-mono font-bold">PROGRAM (HP) DEDICATED</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">TOTAL ITEMS</span>
+                    <span className="font-bold text-slate-900">{totals.lineItemsCount} Materials</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">REQUESTED UNITS</span>
+                    <span className="font-bold text-cyan-800">{formatNumber(totals.totalQty)} Units</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">TOTAL VALUATION</span>
+                    <span className="font-black text-emerald-700">{formatCurrency(totals.totalValuation)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">DESTINATION</span>
+                    <span className="font-bold text-slate-900">MOH PMD Directorate</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Dossier Ready for Official Endorsement</span>
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  Submitting generates an official transmittal reference number (e.g. EPSS/MD-DSP/2026/042) and registers this request into the DSP pipeline with status "Submitted & Pending".
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTransmitDspRequest}
+                  className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-300 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                >
+                  <Send className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Confirm Transmittal to MOH</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: ADD MATERIAL ROW */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
@@ -1102,22 +1590,22 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Request Date
+                    Request Date (Auto Today)
                   </label>
                   <input
                     type="date"
-                    value={newRowData.requestDate}
+                    value={newRowData.requestDate || TODAY_ISO_DATE}
                     onChange={(e) => setNewRowData(prev => ({ ...prev, requestDate: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    DSP Request To
+                    DSP Request To (Auto MOH)
                   </label>
                   <input
                     type="text"
-                    value={newRowData.dspRequestTo}
+                    value={newRowData.dspRequestTo || 'MOH'}
                     onChange={(e) => setNewRowData(prev => ({ ...prev, dspRequestTo: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-amber-500"
                   />
@@ -1144,7 +1632,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         </div>
       )}
 
-      {/* MODAL 2: UPLOAD TEMPLATE FILE */}
+      {/* MODAL 5: UPLOAD TEMPLATE FILE */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
@@ -1172,14 +1660,13 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Dropzone */}
               <div className="border-2 border-dashed border-indigo-200 rounded-2xl p-6 text-center bg-indigo-50/30 hover:bg-indigo-50/50 transition">
                 <FileSpreadsheet className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
                 <p className="text-xs font-bold text-slate-800">
                   Select Excel file (.xlsx) or CSV
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Expected Headers: Sr. No, Material, Material Description, Qty, Total Amount, Valuation Type Desc, WBS Element, Budget Source, Request Date, DSP request to
+                  Headers: S/N, Material, Material Description, Qty, Total Amount, Valuation Type Desc, WBS Element, Budget Source, Request Date, DSP request to
                 </p>
                 <input
                   ref={fileInputRef}
@@ -1209,7 +1696,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                 <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800">
-                      ✓ Successfully parsed {parsedUploadRows.length} material rows
+                      ✓ Parsed {parsedUploadRows.length} rows (Date & MOH auto-filled)
                     </span>
                     <div className="flex items-center gap-2">
                       <label className="flex items-center gap-1 cursor-pointer">
@@ -1231,36 +1718,6 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                         <span className="text-[11px] font-bold">Append</span>
                       </label>
                     </div>
-                  </div>
-
-                  <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-lg bg-white text-[11px]">
-                    <table className="w-full text-left">
-                      <thead className="bg-slate-100 font-bold text-slate-600">
-                        <tr>
-                          <th className="p-1.5">#</th>
-                          <th className="p-1.5">Material</th>
-                          <th className="p-1.5">Description</th>
-                          <th className="p-1.5 text-right">Qty</th>
-                          <th className="p-1.5 text-right">Total Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {parsedUploadRows.slice(0, 5).map((r, i) => (
-                          <tr key={i}>
-                            <td className="p-1.5 font-mono">{i + 1}</td>
-                            <td className="p-1.5 font-mono font-bold">{r.material}</td>
-                            <td className="p-1.5 truncate max-w-[180px]">{r.materialDescription}</td>
-                            <td className="p-1.5 text-right font-bold">{r.qty}</td>
-                            <td className="p-1.5 text-right font-mono">{formatCurrency(r.totalAmount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {parsedUploadRows.length > 5 && (
-                      <div className="p-1.5 text-center text-slate-400 font-bold bg-slate-50">
-                        + {parsedUploadRows.length - 5} more rows...
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1296,229 +1753,6 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
                     Apply to Table ({parsedUploadRows.length})
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: IMPORT FROM MULTIPLE STOCK */}
-      {isStockImportModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-cyan-50 text-cyan-700">
-                  <Package className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Import from Multiple Stock</h3>
-                  <p className="text-[11px] text-slate-400">Populate DSP request with active warehouse equipment inventory</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsStockImportModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={stockSearchQuery}
-                    onChange={(e) => setStockSearchQuery(e.target.value)}
-                    placeholder="Search stock by code, description, WBS..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-600">Assign Budget Source:</span>
-                  <select
-                    value={stockDefaultBudget}
-                    onChange={(e) => setStockDefaultBudget(e.target.value)}
-                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold"
-                  >
-                    <option value="WB">WB (World Bank)</option>
-                    <option value="MOH">MOH PMD</option>
-                    <option value="Global Fund">Global Fund</option>
-                    <option value="Treasury">Government Treasury</option>
-                    <option value="GAVI">GAVI Alliance</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 border-b border-slate-200">
-                    <tr>
-                      <th className="p-2 w-8 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedStockIds.length > 0 && selectedStockIds.length === filteredMultipleStock.length}
-                          onChange={handleSelectAllStock}
-                          className="cursor-pointer"
-                        />
-                      </th>
-                      <th className="p-2">Material Code</th>
-                      <th className="p-2">Description</th>
-                      <th className="p-2 text-right">Unrestricted Qty</th>
-                      <th className="p-2 text-right">Current Value (ETB)</th>
-                      <th className="p-2">WBS Element</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredMultipleStock.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-slate-400">
-                          No stock devices found matching search.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredMultipleStock.map((s) => {
-                        const isSelected = selectedStockIds.includes(s.id);
-                        return (
-                          <tr
-                            key={s.id}
-                            onClick={() => handleToggleStockItem(s.id)}
-                            className={`cursor-pointer transition ${
-                              isSelected ? 'bg-cyan-50/70 font-semibold' : 'hover:bg-slate-50'
-                            }`}
-                          >
-                            <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleStockItem(s.id)}
-                                className="cursor-pointer"
-                              />
-                            </td>
-                            <td className="p-2 font-mono font-bold text-slate-900">{s.material}</td>
-                            <td className="p-2 truncate max-w-[200px] text-slate-800">{s.materialDescription}</td>
-                            <td className="p-2 text-right font-mono font-bold text-cyan-800">
-                              {formatNumber(s.unrestrictedStock)}
-                            </td>
-                            <td className="p-2 text-right font-mono font-bold text-emerald-700">
-                              {formatCurrency(s.currentValueOfUnrestrictedStock)}
-                            </td>
-                            <td className="p-2 font-mono text-[11px] text-slate-600">{s.wbsElement || 'SDG-ME-23'}</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <span className="text-xs font-bold text-slate-600">
-                  {selectedStockIds.length} items selected for import
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsStockImportModalOpen(false)}
-                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={selectedStockIds.length === 0}
-                    onClick={handleApplyStockImport}
-                    className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white rounded-xl font-bold transition cursor-pointer shadow-xs"
-                  >
-                    Import Selected ({selectedStockIds.length})
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: TRANSMIT DSP REQUEST TO MOH */}
-      {isTransmitModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
-                  <Send className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Transmit DSP Request to MOH</h3>
-                  <p className="text-[11px] text-slate-400">Institutional transmittal via standard 10-column Excel dossier</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTransmitModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
-                  <span>Payload Details</span>
-                  <span className="text-indigo-600 font-mono">10 COLUMNS VERIFIED</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TOTAL ITEMS</span>
-                    <span className="font-bold text-slate-900">{totals.lineItemsCount} Materials</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">REQUESTED UNITS</span>
-                    <span className="font-bold text-cyan-800">{formatNumber(totals.totalQty)} Units</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TOTAL VALUATION</span>
-                    <span className="font-black text-emerald-700">{formatCurrency(totals.totalValuation)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">RECIPIENT</span>
-                    <span className="font-bold text-slate-900">MOH PMD Directorate</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Dossier Ready for Official Endorsement</span>
-                </div>
-                <p className="text-[11px] text-emerald-800">
-                  Transmitting registers this request into the DSP Workflow lifecycle, logs the official reference number, and alerts MOH technical evaluators.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsTransmitModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTransmitDspRequest}
-                  className="px-4 py-2 bg-slate-900 hover:bg-black text-amber-300 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md"
-                >
-                  <Send className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Confirm Official Transmittal</span>
-                </button>
               </div>
             </div>
           </div>
