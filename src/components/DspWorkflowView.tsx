@@ -434,7 +434,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
-  const [requestMechanismView, setRequestMechanismView] = useState<'tables' | 'dossiers'>('tables');
+
 
   // Take Action modal state for EPSS to MOH requests
   const [actionTargetRecord, setActionTargetRecord] = useState<DspWorkflowRecord | null>(null);
@@ -1361,106 +1361,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         </div>
       </div>
 
-      {/* Workflow Volume Visualization Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Dossier Volume Distribution Funnel</h3>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">Click or double-click any funnel segment to view detailed source dossiers & DSP requests</p>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-100">
-               <span className="text-[10px] font-bold text-indigo-600 px-2 uppercase font-mono">Interactive Stage Inspection</span>
-            </div>
-          </div>
-          
-          <div className="h-[320px] w-full" onDoubleClick={() => setInspectStageInfo({ stageKey: stagesList[0].stageKey, stageTitle: stagesList[0].label })}>
-            <ResponsiveContainer width="100%" height="100%">
-              <FunnelChart>
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                  cursor={{ fill: 'transparent' }}
-                />
-                <Funnel
-                  data={stagesList.map(stg => ({
-                    name: stg.label.split('. ')[1] || stg.label,
-                    value: stg.count || 0,
-                    fill: stg.color.includes('blue') ? '#2563eb' : 
-                          stg.color.includes('cyan') ? '#0891b2' : 
-                          stg.color.includes('amber') ? '#d97706' : 
-                          stg.color.includes('purple') ? '#9333ea' : 
-                          stg.color.includes('emerald') ? '#059669' : '#e11d48'
-                  }))}
-                  dataKey="value"
-                  onClick={(data: any, index: number) => {
-                    if (stagesList[index]) {
-                      setInspectStageInfo({ stageKey: stagesList[index].stageKey, stageTitle: stagesList[index].label });
-                    }
-                  }}
-                >
-                  <LabelList position="right" fill="#64748b" stroke="none" dataKey="name" fontSize={11} fontWeight={600} />
-                  <LabelList position="center" fill="#fff" stroke="none" dataKey="value" fontSize={14} fontWeight={900} />
-                </Funnel>
-              </FunnelChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Stage Conversion Efficiency</h3>
-          </div>
-          
-          <div className="space-y-4">
-            {stagesList.map((stg, idx) => {
-              const prevCount = idx > 0 ? stagesList[idx-1].count : stg.count;
-              const conversion = prevCount === 0 ? 0 : Math.round((stg.count / prevCount) * 100);
-              
-              return (
-                <div key={stg.id} className="relative">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{stg.label.split('. ')[1]?.split(' ')[0] || 'Stage'} Status</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-700">{stg.count} Active</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full bg-gradient-to-r ${stg.color} transition-all duration-1000`} 
-                      style={{ width: `${Math.min(100, (stg.count / (records.length || 1)) * 100)}%` }}
-                    />
-                  </div>
-                  {idx > 0 && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${conversion > 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                        {conversion}% Progression
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-medium font-mono">System Utilization</span>
-              <span className="text-indigo-600 font-black">HIGH (94.2%)</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1 leading-relaxed italic">
-              Efficiency metric based on the ratio of successfully dispatched dossiers versus total requests initiated in the current cycle.
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Regional Breakdown Frequency Analytics */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm" onDoubleClick={() => setInspectStageInfo({ stageKey: 'rhb-to-moh', stageTitle: 'Regional Breakdown Frequency Source Data' })}>
@@ -2067,27 +1968,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             );
           })()}
 
-          {/* Dual Request Mechanism Control Switcher Banner */}
-          <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <Layers className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-white">Institutional Request Mechanisms</h3>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-400 text-slate-950 font-mono">
-                    EPSS • MOH • RHB • Order Process
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 mt-0.5">
-                  Select view mechanism: <span className="text-amber-300 font-bold">1. Request Item Tables & Order Process Matrix</span> or <span className="text-cyan-300 font-bold">2. Official Transmittal Dossiers</span>
-                </p>
-              </div>
-            </div>
 
-        
-          </div>
 
           {/* Filter and Search Bar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
@@ -2142,7 +2023,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           </div>
 
       {/* Mechanism 1: Request Items & Order Process Master Table */}
-      {requestMechanismView === 'tables' ? (
+
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -2258,225 +2139,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             </table>
           </div>
         </div>
-      ) : (
-      /* Mechanism 2: DSP Transmittal Dossier Records Table */
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">DSP Reference & Letter</th>
-                <th className="py-3 px-4">Stage & Routing Flow</th>
-                <th className="py-3 px-4">Subject / Scope</th>
-                <th className="py-3 px-4 text-center">Allocated Units</th>
-                <th className="py-3 px-4 text-right">Valuation (ETB)</th>
-                <th className="py-3 px-4 text-center">
-                  <div className="flex items-center justify-center gap-1 text-slate-700 font-black">
-                    <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Date Count & SLA</span>
-                  </div>
-                </th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-600">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <Archive className="w-8 h-8 text-slate-200" />
-                      <p className="text-slate-400 font-medium">No DSP workflow dossiers found in this stage or filter.</p>
-                      <p className="text-[10px] text-slate-300">New records will appear here after submission.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((rec) => (
-                  <tr
-                    key={rec.id}
-                    className="hover:bg-slate-50 transition-colors group"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-mono font-bold text-indigo-600 group-hover:text-indigo-700">{rec.dspRefNumber}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">Letter: {rec.officialLetterRef}</div>
-                      <div className="text-[10px] text-slate-400">{rec.dateSubmitted}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 text-[11px]">{rec.stageTitle}</div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-xs">
-                        From: <span className="text-slate-700 font-medium">{rec.senderOrg}</span>
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-xs">
-                        To: <span className="text-slate-700 font-medium">{rec.recipientOrg}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 max-w-xs">
-                      <div className="font-medium text-slate-700 truncate">{rec.subject}</div>
-                      <div className="text-[10px] text-slate-500 font-semibold">Signatory: {rec.signatory}</div>
-                    </td>
-                    <td className="py-3 px-4 text-center font-mono font-black text-cyan-700">
-                      {rec.totalQuantity.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-black text-emerald-700">
-                      {formatCurrency(rec.totalValuationETB)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {(() => {
-                        const dateInfo = computeDateCount(
-                          rec.dateSubmitted,
-                          rec.actionTakenDate || rec.approvedDate,
-                          rec.status,
-                          rec.actionTakenBy,
-                          rec.actionType,
-                          rec.turnaroundDays
-                        );
-                        return (
-                          <div className="inline-flex flex-col items-center">
-                            <div className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold flex items-center gap-1.5 ${dateInfo.badgeClass}`}>
-                              {dateInfo.isActionTaken ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              ) : dateInfo.days > 3 ? (
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 animate-pulse" />
-                              ) : (
-                                <Hourglass className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              )}
-                              <span>{dateInfo.label}</span>
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-medium mt-0.5">
-                              {dateInfo.sublabel}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <span className={`text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 ${
-                          rec.status === 'Endorsed & Approved'
-                            ? 'text-emerald-600'
-                            : rec.status === 'Dispatched to Plants'
-                            ? 'text-purple-600'
-                            : rec.status === 'Under Review'
-                            ? 'text-amber-600'
-                            : 'text-cyan-600'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${
-                            rec.status === 'Endorsed & Approved' ? 'bg-emerald-500' :
-                            rec.status === 'Dispatched to Plants' ? 'bg-purple-500' :
-                            rec.status === 'Under Review' ? 'bg-amber-500' : 'bg-cyan-500'
-                          }`} />
-                          {rec.status}
-                        </span>
 
-                        {/* Visual Badge / Alert Label for days elapsed since sent to MOH */}
-                        {(() => {
-                          const dateInfo = computeDateCount(
-                            rec.dateSubmitted,
-                            rec.actionTakenDate || rec.approvedDate,
-                            rec.status,
-                            rec.actionTakenBy,
-                            rec.actionType,
-                            rec.turnaroundDays
-                          );
-
-                          if (dateInfo.isActionTaken) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>{dateInfo.days}d to Action</span>
-                              </span>
-                            );
-                          }
-
-                          if (dateInfo.days === 0) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-                                <Clock className="w-3 h-3 text-blue-600" />
-                                <span>Sent Today (0d)</span>
-                              </span>
-                            );
-                          } else if (dateInfo.days <= 2) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-50 text-cyan-800 border border-cyan-200 shadow-2xs">
-                                <Hourglass className="w-3 h-3 text-cyan-600" />
-                                <span>{dateInfo.days}d Elapsed</span>
-                              </span>
-                            );
-                          } else if (dateInfo.days <= 5) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
-                                <AlertCircle className="w-3 h-3 text-amber-600" />
-                                <span>⚠️ {dateInfo.days}d at MOH</span>
-                              </span>
-                            );
-                          } else {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs animate-pulse">
-                                <AlertCircle className="w-3 h-3 text-rose-600" />
-                                <span>🚨 {dateInfo.days}d Overdue</span>
-                              </span>
-                            );
-                          }
-                        })()}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {rec.stage === 'moh-to-epss' && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenActionModal(rec)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-sm ${
-                              rec.actionTakenDate || rec.status === 'Endorsed & Approved'
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                            }`}
-                            title="Take action on this DSP request"
-                          >
-                            <Zap className={`w-3 h-3 ${rec.actionTakenDate || rec.status === 'Endorsed & Approved' ? 'text-emerald-600' : 'text-amber-300'}`} />
-                            <span>{rec.actionTakenDate || rec.status === 'Endorsed & Approved' ? 'Action Taken' : 'Take Action'}</span>
-                          </button>
-                        )}
-                        {rec.stage === 'moh-to-rhb' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenBreakdownEmail(rec)}
-                              className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Send or re-dispatch breakdown via Email"
-                            >
-                              <Mail className="w-3 h-3 text-indigo-600" />
-                              <span>Email</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenBreakdownWhatsApp(rec)}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Send or re-dispatch breakdown via WhatsApp"
-                            >
-                              <MessageCircle className="w-3 h-3 text-emerald-600" />
-                              <span>WhatsApp</span>
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRecord(rec)}
-                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold transition cursor-pointer border border-slate-200 shadow-sm"
-                        >
-                          View Dossier
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
       </>
       )}
 
