@@ -44,6 +44,8 @@ import {
   downloadDspRequestCSV,
   generateDspRequestExcelBlob
 } from '../data/defaultDspRequestTemplateData';
+import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { EpssSubTab } from '../types';
 import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 import { getAccessToken, googleSignIn } from '../utils/googleWorkspace';
 import { loadGmailTemplates, formatGmailSubject, formatGmailBody } from '../utils/gmailTemplates';
@@ -62,6 +64,7 @@ interface DspRequestMohTemplateViewProps {
     }
   ) => void;
   onOpenDspRequestModal?: () => void;
+  onSelectSubTab?: (tab: EpssSubTab) => void;
 }
 
 export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps> = ({
@@ -70,7 +73,8 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   setRecords,
   hfListItems = [],
   onTriggerCloudSync,
-  onOpenDspRequestModal
+  onOpenDspRequestModal,
+  onSelectSubTab
 }) => {
   // Filter multipleStockItems to ONLY Program (HP) items
   const programHpStockItems = useMemo(() => {
@@ -615,9 +619,18 @@ Authorized Directorate Desk`;
   };
 
   // 3. SEND OPTION: DIRECT TRANSMIT TO MOH
+  // When transmitting to MOH, store exactly what was sent inside of DSP Received from MOH (1.2) and clear previous default
   const handleTransmitDspRequest = () => {
-    const refNum = `EPSS/MD-DSP/${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`;
-    const newRecord: DspWorkflowRecord = {
+    const year = new Date().getFullYear();
+    const randHo = String(Math.floor(100 + Math.random() * 900));
+    const randMoh = String(Math.floor(200 + Math.random() * 800));
+    const refNum = `EPSS/MD-DSP/${year}/${randHo}`;
+    const mohReceivedRef = `MOH/PMD-DSP/${year}/${randMoh}`;
+    const officialLetterRef = `EPSS/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`;
+    const mohLetterRef = `MOH/PMD/ACT/${year}/${randMoh}`;
+
+    // 1. Outgoing DSP Request record (Sub-step 1.1)
+    const newRecord11: DspWorkflowRecord = {
       id: `dsp-dossier-${Date.now()}`,
       dspRefNumber: refNum,
       stage: 'head-office-dsp',
@@ -633,7 +646,7 @@ Authorized Directorate Desk`;
       totalValuationETB: totals.totalValuation,
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
-      officialLetterRef: `EPSS/LET/${new Date().getFullYear()}/${String(Math.floor(1000 + Math.random() * 9000))}`,
+      officialLetterRef: officialLetterRef,
       signatory: 'Mosisa (Authorized User)',
       signatoryRole: 'Directorate Technical Lead',
       itemsIncluded: templateRows.map(r => ({
@@ -641,27 +654,92 @@ Authorized Directorate Desk`;
         description: r.materialDescription,
         quantity: r.qty,
         plant: 'AA01 Central',
-        allocatedFacility: 'Regional Allocation Quota'
+        allocatedFacility: 'Regional Allocation Quota',
+        valuationTypeDesc: r.valuationTypeDesc,
+        wbsElement: r.wbsElement,
+        budgetSource: r.budgetSource,
+        requestDate: r.requestDate,
+        dspRequestTo: r.dspRequestTo,
+        totalAmount: r.totalAmount
       })),
       notes: `Generated via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP). Budget Sources: ${uniqueBudgetSources.join(', ') || 'WB'}`
     };
 
+    // 2. Incoming Received DSP record (Sub-step 1.2: DSP Received from MOH)
+    // Storing EXACTLY what was sent inside of DSP Received from MOH (sub-step 1.2)
+    const receivedRecord12: DspWorkflowRecord = {
+      id: `dsp-moh-received-${Date.now()}`,
+      dspRefNumber: mohReceivedRef,
+      stage: 'head-office-dsp',
+      subStage: '1.2',
+      stageTitle: 'Head Office DSP Management',
+      senderOrg: 'Ministry of Health (PMD Directorate)',
+      recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      subject: `DSP Received from MOH: Official Allocation Endorsement for ${refNum} (${templateRows.length} Program HP Items)`,
+      status: 'Endorsed & Approved',
+      dateSubmitted: TODAY_ISO_DATE,
+      approvedDate: TODAY_ISO_DATE,
+      actionTakenDate: TODAY_ISO_DATE,
+      actionTakenBy: 'Dr. Bethlehem (MOH PMD Directorate)',
+      actionType: 'Endorsed & Approved',
+      actionLetterRef: mohLetterRef,
+      actionNotes: `Official national priority allocation approved for all ${templateRows.length} Program (HP) equipment lines.`,
+      turnaroundDays: 0,
+      totalDevices: templateRows.length,
+      totalQuantity: totals.totalQty,
+      totalValuationETB: totals.totalValuation,
+      targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
+      targetedFacilitiesCount: 14,
+      officialLetterRef: `MOH/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`,
+      signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
+      signatoryRole: 'PMD Directorate Director',
+      itemsIncluded: templateRows.map(r => ({
+        material: r.material,
+        description: r.materialDescription,
+        quantity: r.qty,
+        plant: 'AA01 Central',
+        allocatedFacility: 'MOH Approved Allocation Quota',
+        valuationTypeDesc: r.valuationTypeDesc,
+        wbsElement: r.wbsElement,
+        budgetSource: r.budgetSource,
+        requestDate: r.requestDate,
+        dspRequestTo: r.dspRequestTo,
+        totalAmount: r.totalAmount
+      })),
+      notes: `Official DSP Response from MOH. Exact copy of ${templateRows.length} items transmitted from EPSS HO (Ref: ${refNum}). Previous defaults cleared.`
+    };
+
+    // 3. Clear previous default for 1.2 and store the exact transmitted records
     setRecords(prev => {
-      const updated = [newRecord, ...prev];
+      const filtered = prev.filter(r => {
+        const sub = canonicalizeSubStage(r.subStage, r.stage);
+        // Clear all previous default/mock 1.2 records
+        if (sub === '1.2') return false;
+        return true;
+      });
+      const updated = [newRecord11, receivedRecord12, ...filtered];
       saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
+    // 4. Save exact rows to localStorage for instant sub-step 1.2 view rendering
+    try {
+      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(templateRows));
+      localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(receivedRecord12));
+    } catch (e) {
+      console.warn('Failed to save to localStorage:', e);
+    }
+
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored exact inside DSP Received from MOH (1.2)`, {
         type: 'CREATE',
-        title: `DSP Request ${refNum}`,
-        payload: newRecord
+        title: `DSP Transmittal ${refNum}`,
+        payload: { request: newRecord11, received: receivedRecord12 }
       });
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Official DSP Request ${refNum} transmitted to MOH PMD Directorate!`);
+    showToast(`✓ Transmitted to MOH! Exact ${templateRows.length} items stored in '• DSP Received from MOH' (1.2) & previous defaults cleared.`);
   };
 
   return (
@@ -677,7 +755,7 @@ Authorized Directorate Desk`;
       {/* Top Banner Card featuring EXACT button from user screenshot _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* EXACT PILL BUTTON FROM USER SCREENSHOT _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#0B1527] border border-[#0B1527] shadow-md ring-2 ring-amber-400/50">
               <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse" />
@@ -688,6 +766,17 @@ Authorized Directorate Desk`;
                 {templateRows.length}
               </span>
             </div>
+
+            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _04C3EE6A-184D-4123-86F4-25891B98DD8C__9cb01a11.png */}
+            <button
+              type="button"
+              onClick={() => onSelectSubTab?.('dsp-ho-1-2')}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#EBF1F6] hover:bg-[#E0E9F2] border border-[#D5E1EC] text-[#1E3A5F] transition cursor-pointer shadow-2xs font-bold text-xs"
+              title="Click to view Sub-step 1.2: DSP Received from MOH"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#8292A2]" />
+              <span className="tracking-tight">DSP Received from MOH</span>
+            </button>
 
             <div>
               <div className="flex items-center gap-2">
@@ -1433,13 +1522,13 @@ Authorized Directorate Desk`;
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1">
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Dossier Ready for Official Endorsement</span>
+                  <span>Exact Storage in Sub-step 1.2 & Previous Default Cleared</span>
                 </div>
-                <p className="text-[11px] text-emerald-800">
-                  Submitting generates an official transmittal reference number (e.g. EPSS/MD-DSP/2026/042) and registers this request into the DSP pipeline with status "Submitted & Pending".
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{totals.lineItemsCount} Program (HP) items ({formatNumber(totals.totalQty)} Units)</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from MOH</strong> (Sub-step 1.2), and previous default mock records will be permanently cleared.
                 </p>
               </div>
 

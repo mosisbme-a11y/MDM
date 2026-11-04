@@ -1070,7 +1070,7 @@ export function App() {
         const hasStage3 = normalizedCached.some(r => r.stage === 'rhb-breakdown-management');
         const hasStage4 = normalizedCached.some(r => r.stage === 'branches-dsp-management');
 
-        let merged = [...normalizedCached];
+        let merged = [...normalizedCached].filter(r => r.id !== 'dsp-epss-sample-02' && !r.subject.includes('Diagnostic Imaging & ICU Ventilator'));
         if (!hasStage1) merged = [...DEFAULT_STAGE_1_DOSSIERS, ...merged];
         if (!hasStage2) merged = [...DEFAULT_STAGE_2_DOSSIERS, ...merged];
         if (!hasStage3) merged = [...merged, ...DEFAULT_STAGE_3_DOSSIERS];
@@ -1079,7 +1079,7 @@ export function App() {
         const finalNormalized = merged.map(normalizeDspRecord);
         setDspRecords(finalNormalized);
       } else {
-        setDspRecords(INITIAL_DSP_RECORDS);
+        setDspRecords(INITIAL_DSP_RECORDS.filter(r => r.id !== 'dsp-epss-sample-02'));
       }
     });
 

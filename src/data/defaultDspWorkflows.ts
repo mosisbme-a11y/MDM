@@ -649,7 +649,7 @@ export const DEFAULT_STAGE_4_DOSSIER_3: DspWorkflowRecord = {
 
 export const DEFAULT_STAGE_1_DOSSIERS = [
   DEFAULT_STAGE_1_DOSSIER_1,
-  DEFAULT_STAGE_1_DOSSIER_2,
+  // DEFAULT_STAGE_1_DOSSIER_2 cleared so previous default mock items are removed and sub-step 1.2 only stores exact transmissions
   DEFAULT_STAGE_1_DOSSIER_3,
   DEFAULT_STAGE_1_DOSSIER_4,
   DEFAULT_STAGE_1_DOSSIER_5,

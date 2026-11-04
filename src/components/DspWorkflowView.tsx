@@ -72,6 +72,7 @@ import {
 import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
 import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
 import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
+import { DspReceivedFromMohView } from './DspReceivedFromMohView';
 import { StageSourceDataModal } from './StageSourceDataModal';
 import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
 import { 
@@ -1268,10 +1269,26 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             .map((sub) => {
               const isSubSelected = currentSubStep === sub.id;
               const programHpStockCount = (multipleStockItems || []).filter(isProgramHpStockItem).length || 5;
-              const subCount = sub.id === '1.1' 
-                ? programHpStockCount 
-                : records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
+              
+              let subCount = records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
+              if (sub.id === '1.1') {
+                subCount = programHpStockCount;
+              } else if (sub.id === '1.2') {
+                try {
+                  const stored = localStorage.getItem('epss_dsp_received_moh_rows');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
+                  }
+                } catch {}
+                const r12 = records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2');
+                if (r12 && r12.itemsIncluded && r12.itemsIncluded.length > 0 && !r12.id.includes('sample')) {
+                  subCount = r12.itemsIncluded.length;
+                }
+              }
+
               const isDspRequestToMoh = sub.id === '1.1';
+              const isDspReceivedFromMoh = sub.id === '1.2';
 
               if (isDspRequestToMoh) {
                 return (
@@ -1290,6 +1307,31 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#F59E0B] text-slate-950">
                       {subCount}
                     </span>
+                  </button>
+                );
+              }
+
+              if (isDspReceivedFromMoh) {
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => onSelectSubTab?.(sub.subTab)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      isSubSelected
+                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-cyan-400/80 scale-[1.02]'
+                        : 'bg-[#EBF1F6] hover:bg-[#E0E9F2] text-[#1E3A5F] border-[#D5E1EC] shadow-2xs'
+                    }`}
+                    title="• DSP Received from MOH: Sub-step 1.2 Official Response & Endorsement Ledger"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSubSelected ? 'bg-cyan-400 animate-pulse' : 'bg-[#8292A2]'}`} />
+                    <span className={`tracking-tight font-bold ${isSubSelected ? 'text-white' : 'text-[#1E3A5F]'}`}>{sub.label}</span>
+                    {subCount > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+                        isSubSelected ? 'bg-cyan-400 text-slate-950' : 'bg-[#1E3A5F] text-white'
+                      }`}>
+                        {subCount}
+                      </span>
+                    )}
                   </button>
                 );
               }
@@ -1847,6 +1889,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           hfListItems={hfListItems}
           onTriggerCloudSync={onTriggerCloudSync}
           onOpenDspRequestModal={() => setIsCreateModalOpen(true)}
+          onSelectSubTab={onSelectSubTab}
+        />
+      ) : (currentSubStep === '1.2' || currentSubTab === 'dsp-ho-1-2') ? (
+        <DspReceivedFromMohView
+          records={records}
+          setRecords={setRecords}
+          multipleStockItems={multipleStockItems}
+          onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (
         <>
