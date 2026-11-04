@@ -253,7 +253,6 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                           'Material Code': item.material,
                           'Description': item.description,
                           'Allocated Facility': item.allocatedFacility || 'N/A',
-                          'Plant / Hub': item.plant,
                           'Quantity': item.quantity
                         }));
                         downloadCSV(`dossier-items-${selectedRecordDetail.dspRefNumber}.csv`, csv);
@@ -275,26 +274,22 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                           <th className="p-2.5 border-r border-slate-300 min-w-[130px]">Material Code</th>
                           <th className="p-2.5 border-r border-slate-300 min-w-[220px]">Item Description</th>
                           <th className="p-2.5 border-r border-slate-300 min-w-[180px]">Allocated Facility</th>
-                          <th className="p-2.5 border-r border-slate-300 min-w-[100px] text-center">Plant</th>
                           <th className="p-2.5 text-right min-w-[100px]">Quantity</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
                         {filteredItems.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="p-8 text-center text-slate-400">
+                            <td colSpan={5} className="p-8 text-center text-slate-400">
                               No matching line items found.
                             </td>
                           </tr>
                         ) : (
                           filteredItems.map((item, idx) => {
-                            const isNew = idx < 2; // highlight first items smartly
                             return (
                               <tr 
                                 key={idx} 
-                                className={`transition-all duration-300 ${
-                                  isNew ? 'bg-amber-50/80 border-l-4 border-amber-500 font-semibold' : 'hover:bg-slate-50'
-                                }`}
+                                className="hover:bg-slate-50 transition-colors"
                               >
                                 <td className="p-2.5 border-r border-slate-200 text-center font-mono text-slate-500">
                                   {idx + 1}
@@ -302,21 +297,11 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                                 <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-slate-900">
                                   {item.material}
                                 </td>
-                                <td className="p-2.5 border-r border-slate-200 text-slate-800">
-                                  <div className="flex items-center gap-1.5">
-                                    <span>{item.description}</span>
-                                    {isNew && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 font-mono animate-pulse">
-                                        ✨ NEW
-                                      </span>
-                                    )}
-                                  </div>
+                                <td className="p-2.5 border-r border-slate-200 text-slate-800 font-medium">
+                                  {item.description}
                                 </td>
                                 <td className="p-2.5 border-r border-slate-200 text-cyan-800 font-medium">
                                   {item.allocatedFacility || 'Regional Hub Allocation'}
-                                </td>
-                                <td className="p-2.5 border-r border-slate-200 text-center font-mono text-slate-600">
-                                  {item.plant || 'HO01'}
                                 </td>
                                 <td className="p-2.5 text-right font-mono font-black text-cyan-700">
                                   {formatNumber(item.quantity)}

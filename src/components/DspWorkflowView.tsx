@@ -2182,7 +2182,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           'Material Code': item.material,
                           'Item Description': item.description || (item as any).materialDescription || 'N/A',
                           'Allocated Facility / Target': item.allocatedFacility || selectedRecord.recipientOrg || 'N/A',
-                          'Plant': item.plant || 'HO01',
                           'Qty Requested': qty,
                           'Unit Val (ETB)': unitVal,
                           'Total Val (ETB)': totalVal
@@ -2206,7 +2205,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <th className="p-2.5 border-r border-slate-300 min-w-[110px]">Material Code</th>
                       <th className="p-2.5 border-r border-slate-300 min-w-[180px]">Item Description</th>
                       <th className="p-2.5 border-r border-slate-300 min-w-[150px]">Allocated Facility / Target</th>
-                      <th className="p-2.5 border-r border-slate-300 min-w-[80px] text-center">Plant</th>
                       <th className="p-2.5 border-r border-slate-300 text-right min-w-[90px]">Qty Requested</th>
                       <th className="p-2.5 border-r border-slate-300 text-right min-w-[100px]">Unit Val (ETB)</th>
                       <th className="p-2.5 border-r border-slate-300 text-right min-w-[110px]">Total Val (ETB)</th>
@@ -2234,9 +2232,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           </td>
                           <td className="p-2 border-r border-slate-200 text-cyan-800 font-medium">
                             {item.allocatedFacility || selectedRecord.recipientOrg || 'Regional Hub Allocation'}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">
-                            {item.plant || 'HO01'}
                           </td>
                           <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-700">
                             {formatNumber(qty)}
