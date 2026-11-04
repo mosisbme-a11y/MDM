@@ -2086,32 +2086,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-800 p-1.5 rounded-xl border border-slate-700/80 shrink-0">
-              <button
-                type="button"
-                onClick={() => setRequestMechanismView('tables')}
-                className={`px-3.5 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-2 ${
-                  requestMechanismView === 'tables'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Request Item Tables ({allRequestTableItems.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRequestMechanismView('dossiers')}
-                className={`px-3.5 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-2 ${
-                  requestMechanismView === 'dossiers'
-                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-                }`}
-              >
-                <Archive className="w-4 h-4" />
-                <span>Dossier Envelopes ({filteredRecords.length})</span>
-              </button>
-            </div>
+        
           </div>
 
           {/* Filter and Search Bar */}
