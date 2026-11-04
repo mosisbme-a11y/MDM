@@ -2052,7 +2052,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {/* Detailed DSP Dossier Modal */}
       {selectedRecord && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`bg-white border border-slate-200 rounded-2xl ${selectedRecord.facilityMatrixData ? 'max-w-5xl' : 'max-w-2xl'} w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4`}>
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -2173,14 +2173,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     type="button"
                     onClick={() => {
-                      const csv = selectedRecord.itemsIncluded.map((item, idx) => ({
-                        'No': idx + 1,
-                        'Material Code': item.material,
-                        'Description': item.description,
-                        'Allocated Facility': item.allocatedFacility || 'N/A',
-                        'Plant': item.plant,
-                        'Quantity': item.quantity
-                      }));
+                      const csv = selectedRecord.itemsIncluded.map((item, idx) => {
+                        const qty = item.quantity || (item as any).qty || 0;
+                        const unitVal = (item as any).unitPrice || (selectedRecord.totalQuantity ? selectedRecord.totalValuationETB / selectedRecord.totalQuantity : 0);
+                        const totalVal = (item as any).totalAmount || (qty * unitVal);
+                        return {
+                          'S/N': idx + 1,
+                          'Material Code': item.material,
+                          'Item Description': item.description || (item as any).materialDescription || 'N/A',
+                          'Allocated Facility / Target': item.allocatedFacility || selectedRecord.recipientOrg || 'N/A',
+                          'Plant': item.plant || 'HO01',
+                          'Qty Requested': qty,
+                          'Unit Val (ETB)': unitVal,
+                          'Total Val (ETB)': totalVal
+                        };
+                      });
                       downloadCSV(`dossier-${selectedRecord.dspRefNumber}-items.csv`, csv);
                     }}
                     className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
@@ -2191,28 +2198,30 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-64 overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-72 overflow-y-auto overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold">
-                      <th className="p-2 border-r border-slate-300 w-10 text-center">#</th>
-                      <th className="p-2 border-r border-slate-300 min-w-[120px]">Material Code</th>
-                      <th className="p-2 border-r border-slate-300 min-w-[200px]">Item Description</th>
-                      <th className="p-2 border-r border-slate-300 min-w-[160px]">Allocated Facility</th>
-                      <th className="p-2 border-r border-slate-300 min-w-[90px] text-center">Plant</th>
-                      <th className="p-2 border-r border-slate-300 text-right min-w-[90px]">Quantity</th>
-                      <th className="p-2 text-center w-12">Action</th>
+                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                      <th className="p-2.5 border-r border-slate-300 w-10 text-center">S/N</th>
+                      <th className="p-2.5 border-r border-slate-300 min-w-[110px]">Material Code</th>
+                      <th className="p-2.5 border-r border-slate-300 min-w-[180px]">Item Description</th>
+                      <th className="p-2.5 border-r border-slate-300 min-w-[150px]">Allocated Facility / Target</th>
+                      <th className="p-2.5 border-r border-slate-300 min-w-[80px] text-center">Plant</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[90px]">Qty Requested</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[100px]">Unit Val (ETB)</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[110px]">Total Val (ETB)</th>
+                      <th className="p-2.5 text-center w-14">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {selectedRecord.itemsIncluded.map((item, idx) => {
-                      const isNew = idx < 2;
+                      const qty = item.quantity || (item as any).qty || 0;
+                      const unitVal = (item as any).unitPrice || (selectedRecord.totalQuantity ? selectedRecord.totalValuationETB / selectedRecord.totalQuantity : 0);
+                      const totalVal = (item as any).totalAmount || (qty * unitVal);
                       return (
                         <tr 
                           key={idx} 
-                          className={`transition-all duration-300 ${
-                            isNew ? 'bg-amber-50/80 border-l-4 border-amber-500 font-semibold' : 'hover:bg-slate-50'
-                          }`}
+                          className="hover:bg-slate-50 transition-colors"
                         >
                           <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">
                             {idx + 1}
@@ -2220,31 +2229,30 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
                             {item.material}
                           </td>
-                          <td className="p-2 border-r border-slate-200 text-slate-800">
-                            <div className="flex items-center gap-1.5">
-                              <span>{item.description}</span>
-                              {isNew && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 font-mono animate-pulse">
-                                  ✨ NEW
-                                </span>
-                              )}
-                            </div>
+                          <td className="p-2 border-r border-slate-200 text-slate-800 font-medium">
+                            {item.description || (item as any).materialDescription || 'Medical Equipment'}
                           </td>
                           <td className="p-2 border-r border-slate-200 text-cyan-800 font-medium">
-                            {item.allocatedFacility || 'Regional Hub Allocation'}
+                            {item.allocatedFacility || selectedRecord.recipientOrg || 'Regional Hub Allocation'}
                           </td>
                           <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">
                             {item.plant || 'HO01'}
                           </td>
                           <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-700">
-                            {formatNumber(item.quantity)}
+                            {formatNumber(qty)}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-600">
+                            {formatCurrency(unitVal)}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-emerald-700">
+                            {formatCurrency(totalVal)}
                           </td>
                           <td className="p-2 text-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItemFromRecord(selectedRecord.id, idx)}
-                              className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
-                              title="Remove item from this dossier"
+                              className="p-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                              title="Delete / Remove item from this dossier"
                             >
                               <Trash2 size={14} />
                             </button>
