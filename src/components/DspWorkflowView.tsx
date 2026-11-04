@@ -39,7 +39,10 @@ import {
   Copy,
   BarChart3,
   TrendingUp,
-  GitMerge
+  GitMerge,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import {
   FunnelChart,
@@ -435,6 +438,24 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
 
+  // Smart Table Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const renderSortIcon = (key: string) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />;
+    return sortConfig.direction === 'asc' 
+      ? <ChevronUp className="w-3 h-3 text-indigo-500 ml-1" />
+      : <ChevronDown className="w-3 h-3 text-indigo-500 ml-1" />;
+  };
+
 
   // Take Action modal state for EPSS to MOH requests
   const [actionTargetRecord, setActionTargetRecord] = useState<DspWorkflowRecord | null>(null);
@@ -795,6 +816,32 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
     return result;
   }, [filteredRecords]);
+
+  const sortedRequestTableItems = useMemo(() => {
+    if (!sortConfig) return allRequestTableItems;
+    const sorted = [...allRequestTableItems].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortConfig.key) {
+        case 'material': aValue = a.material; bValue = b.material; break;
+        case 'description': aValue = a.description; bValue = b.description; break;
+        case 'stage': aValue = a.parentRecord.stageTitle; bValue = b.parentRecord.stageTitle; break;
+        case 'sender': aValue = a.parentRecord.senderOrg; bValue = b.parentRecord.senderOrg; break;
+        case 'recipient': aValue = a.parentRecord.recipientOrg; bValue = b.parentRecord.recipientOrg; break;
+        case 'qty': aValue = a.quantity; bValue = b.quantity; break;
+        case 'unitPrice': aValue = a.unitPriceETB; bValue = b.unitPriceETB; break;
+        case 'totalVal': aValue = a.totalValuationETB; bValue = b.totalValuationETB; break;
+        case 'date': aValue = a.parentRecord.dateSubmitted; bValue = b.parentRecord.dateSubmitted; break;
+        default: return 0;
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [allRequestTableItems, sortConfig]);
 
   const totalValuation = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalValuationETB, 0), [filteredRecords]);
   const totalUnits = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalQuantity, 0), [filteredRecords]);
@@ -2035,21 +2082,18 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             <button
               type="button"
               onClick={() => {
-                const csv = allRequestTableItems.map((item, idx) => ({
-                  'No': idx + 1,
-                  'Material Code': item.material,
-                  'Description': item.description,
-                  'Hierarchy Stage': item.parentRecord.stageTitle,
-                  'Sender Org': item.parentRecord.senderOrg,
-                  'Recipient Org': item.parentRecord.recipientOrg,
-                  'Target Hub / Facility': item.allocatedFacility || 'N/A',
-                  'Plant': item.plant,
-                  'Quantity': item.quantity,
-                  'Unit Price (ETB)': item.unitPriceETB,
-                  'Total Valuation (ETB)': item.totalValuationETB,
-                  'Ref Number': item.parentRecord.dspRefNumber,
-                  'Status': item.parentRecord.status,
-                  'Date Transmitted': item.parentRecord.dateSubmitted
+                const csv = sortedRequestTableItems.map((item, idx) => ({
+                  'S/N': idx + 1,
+                  'MATERIAL CODE': item.material,
+                  'ITEM DESCRIPTION': item.description,
+                  'HIERARCHY STAGE': item.parentRecord.stageTitle,
+                  'SENDER': item.parentRecord.senderOrg,
+                  'RECIPIEN': item.parentRecord.recipientOrg,
+                  'QTY REQUESTED': item.quantity,
+                  'UNIT VAL (ETB)': item.unitPriceETB,
+                  'TOTAL VAL (ETB)': item.totalValuationETB,
+                  'REQUSTED DATE': item.parentRecord.dateSubmitted,
+                  'STATUS': item.parentRecord.status
                 }));
                 downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
               }}
@@ -2063,22 +2107,67 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 text-center">#</th>
-                  <th className="py-2.5 px-3">Material Code</th>
-                  <th className="py-2.5 px-3">Item Description</th>
-                  <th className="py-2.5 px-3">Hierarchy Stage / Sub-Step</th>
-                  <th className="py-2.5 px-3">Routing (Sender ➔ Recipient)</th>
-                  <th className="py-2.5 px-3 text-center">Target Plant / Hub</th>
-                  <th className="py-2.5 px-3 text-right">Qty Requested</th>
-                  <th className="py-2.5 px-3 text-right">Unit Val (ETB)</th>
-                  <th className="py-2.5 px-3 text-right">Total Val (ETB)</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-center">Action</th>
+                <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
+                  <th className="py-2.5 px-3 text-center">S/N</th>
+                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('material')}>
+                    <div className="flex items-center">
+                      MATERIAL CODE
+                      {renderSortIcon('material')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('description')}>
+                    <div className="flex items-center">
+                      ITEM DESCRIPTION
+                      {renderSortIcon('description')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('stage')}>
+                    <div className="flex items-center">
+                      HIERARCHY STAGE
+                      {renderSortIcon('stage')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('sender')}>
+                    <div className="flex items-center">
+                      SENDER
+                      {renderSortIcon('sender')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('recipient')}>
+                    <div className="flex items-center">
+                      RECIPIEN
+                      {renderSortIcon('recipient')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('qty')}>
+                    <div className="flex items-center justify-end">
+                      QTY REQUESTED
+                      {renderSortIcon('qty')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('unitPrice')}>
+                    <div className="flex items-center justify-end">
+                      UNIT VAL (ETB)
+                      {renderSortIcon('unitPrice')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('totalVal')}>
+                    <div className="flex items-center justify-end">
+                      TOTAL VAL (ETB)
+                      {renderSortIcon('totalVal')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('date')}>
+                    <div className="flex items-center justify-center">
+                      REQUSTED DATE
+                      {renderSortIcon('date')}
+                    </div>
+                  </th>
+                  <th className="py-2.5 px-3 text-center">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600">
-                {allRequestTableItems.length === 0 ? (
+                {sortedRequestTableItems.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="py-12 text-center">
                       <div className="flex flex-col items-center gap-2">
@@ -2088,7 +2177,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     </td>
                   </tr>
                 ) : (
-                  allRequestTableItems.map((item, idx) => (
+                  sortedRequestTableItems.map((item, idx) => (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{item.material}</td>
@@ -2098,12 +2187,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           {item.parentRecord.stageTitle}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-[11px]">
-                        <div className="font-semibold text-slate-800 truncate max-w-[180px]">{item.parentRecord.senderOrg}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">➔ {item.parentRecord.recipientOrg}</div>
+                      <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
+                        {item.parentRecord.senderOrg}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
-                        {item.plant}
+                      <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
+                        {item.parentRecord.recipientOrg}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-700">
                         {formatNumber(item.quantity)}
@@ -2114,14 +2202,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
                         {formatCurrency(item.totalValuationETB)}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.parentRecord.status === 'Endorsed & Approved' ? 'bg-emerald-100 text-emerald-800' :
-                          item.parentRecord.status === 'Under Review' ? 'bg-amber-100 text-amber-800' :
-                          'bg-cyan-100 text-cyan-800'
-                        }`}>
-                          {item.parentRecord.status}
-                        </span>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
+                        {item.parentRecord.dateSubmitted}
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <button
