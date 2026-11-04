@@ -97,7 +97,7 @@ export const DEFAULT_STAGE_1_DOSSIER_1: DspWorkflowRecord = {
   signatory: 'Mosisa (Authorized User)',
   signatoryRole: 'Directorate Technical Lead',
   itemsIncluded: [
-    { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 20, plant: 'AA01 Central' },
+    { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 3, plant: 'AA01 Central' },
     { material: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult', quantity: 30, plant: 'AA01 Central' },
     { material: '403-XRRB-0101N', description: 'Bowel - With Stand, Stainless Steel.', quantity: 25, plant: 'HW01 Hawassa' },
     { material: '403-XRRD-0101-001', description: 'Cold box', quantity: 15, plant: 'BD01 Bahir Dar' },

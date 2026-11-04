@@ -262,23 +262,45 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
 
     const rows = selectedItems.map((item, idx) => ({
       'Sr. No': idx + 1,
-      'Material Code': item.material,
+      'Material': item.material,
       'Material Description': item.materialDescription,
-      'Special Stock Type': item.specialStockType || 'Q',
-      'Plant': item.plant || 'Central',
-      'Storage Location': item.storageLocation || 'N/A',
-      'Unrestricted Stock Qty': item.unrestrictedStock,
-      'Current Value (ETB)': item.currentValueOfUnrestrictedStock,
-      'Valuation Type Desc': item.inventoryValuationType || 'N/A',
-      'WBS Element': item.wbsElement || 'N/A',
-      'Budget Source': budgetSources[item.id] || 'N/A',
+      'Qty': item.unrestrictedStock,
+      'Total Amount': item.currentValueOfUnrestrictedStock,
+      'Valuation Type Desc': item.inventoryValuationType || 'Siemens Healthineers',
+      'WBS Element': item.wbsElement || 'SDG-ME-23-001-011',
+      'Budget Source': budgetSources[item.id] || 'WB',
       'Request Date': currentDate,
-      'DSP Target': 'Ministry of Health (MOH)'
+      'DSP request to': 'MOH'
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const worksheet = XLSX.utils.json_to_sheet(rows, {
+      header: [
+        'Sr. No',
+        'Material',
+        'Material Description',
+        'Qty',
+        'Total Amount',
+        'Valuation Type Desc',
+        'WBS Element',
+        'Budget Source',
+        'Request Date',
+        'DSP request to'
+      ]
+    });
+    worksheet['!cols'] = [
+      { wch: 8 },
+      { wch: 18 },
+      { wch: 38 },
+      { wch: 10 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 }
+    ];
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "DSP Request Data");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "DSP_Request_MOH");
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const file = new File([blob], excelFileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -2341,27 +2363,35 @@ TRANSMISSION METRICS:
                     </span>
                   </div>
 
-                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <div className="overflow-x-auto border-2 border-black rounded-xl">
                     <table className="w-full text-xs border-collapse">
-                      <thead className="bg-slate-100 text-slate-700">
+                      <thead className="bg-[#FFA500] text-black font-bold italic border-b-2 border-black">
                         <tr>
-                          <th className="p-2 border text-center">#</th>
-                          <th className="p-2 border text-left">Material Code</th>
-                          <th className="p-2 border text-left">Material Description</th>
-                          <th className="p-2 border text-right">Quantity</th>
-                          <th className="p-2 border text-right">Valuation (ETB)</th>
-                          <th className="p-2 border text-left">Budget Source</th>
+                          <th className="py-2 px-2.5 border-r border-black text-center">Sr. No</th>
+                          <th className="py-2 px-2.5 border-r border-black text-left font-mono">Material</th>
+                          <th className="py-2 px-2.5 border-r border-black text-left">Material Description</th>
+                          <th className="py-2 px-2.5 border-r border-black text-right">Qty</th>
+                          <th className="py-2 px-2.5 border-r border-black text-right">Total Amount</th>
+                          <th className="py-2 px-2.5 border-r border-black text-left">Valuation Type Desc</th>
+                          <th className="py-2 px-2.5 border-r border-black text-left font-mono">WBS Element</th>
+                          <th className="py-2 px-2.5 border-r border-black text-center">Budget Source</th>
+                          <th className="py-2 px-2.5 border-r border-black text-center">Request Date</th>
+                          <th className="py-2 px-2.5 text-center">DSP request to</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="bg-[#FFFF00] text-black font-medium">
                         {selectedItems.map((item, idx) => (
-                          <tr key={item.id} className="border-b hover:bg-slate-50 transition-colors">
-                            <td className="p-2 border text-center text-slate-500 font-mono">{idx + 1}</td>
-                            <td className="p-2 border font-mono font-bold text-slate-900">{item.material}</td>
-                            <td className="p-2 border text-slate-800">{item.materialDescription}</td>
-                            <td className="p-2 border text-right font-semibold text-slate-900">{formatNumber(item.unrestrictedStock)}</td>
-                            <td className="p-2 border text-right font-semibold text-indigo-900">{formatCurrency(item.currentValueOfUnrestrictedStock)}</td>
-                            <td className="p-2 border text-slate-700">{budgetSources[item.id] || 'N/A'}</td>
+                          <tr key={item.id} className="border-b border-black hover:brightness-95 transition-all">
+                            <td className="py-1.5 px-2.5 border-r border-black text-center font-mono font-bold">{idx + 1}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black font-mono font-bold">{item.material}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black font-semibold">{item.materialDescription}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black text-right font-mono font-bold">{formatNumber(item.unrestrictedStock)}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black text-right font-mono font-bold">{formatCurrency(item.currentValueOfUnrestrictedStock)}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black">{item.inventoryValuationType || 'Siemens Healthineers'}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black font-mono text-[11px]">{item.wbsElement || 'SDG-ME-23-001-011'}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black text-center font-bold">{budgetSources[item.id] || 'WB'}</td>
+                            <td className="py-1.5 px-2.5 border-r border-black text-center font-mono text-[11px]">{currentDate}</td>
+                            <td className="py-1.5 px-2.5 text-center font-bold">MOH</td>
                           </tr>
                         ))}
                       </tbody>

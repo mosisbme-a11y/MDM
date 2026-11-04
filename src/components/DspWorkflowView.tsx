@@ -71,6 +71,7 @@ import {
 } from './Stage4MohSubmittedMatrixTable';
 import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
 import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
+import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
 import { StageSourceDataModal } from './StageSourceDataModal';
 import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
 import { 
@@ -1270,17 +1271,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <button
                   key={sub.id}
                   onClick={() => onSelectSubTab?.(sub.subTab)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                     isSubSelected
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-sm ring-2 ring-amber-400/40'
+                      : 'bg-[#EBF1F6] hover:bg-[#E0E9F2] text-[#1E3A5F] border-[#D5E1EC]'
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${isSubSelected ? 'bg-amber-400' : 'bg-slate-400'}`} />
-                  <span>{sub.label}</span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-amber-400 animate-pulse' : 'bg-[#8292A2]'}`} />
+                  <span className="tracking-tight">{sub.label}</span>
                   {subCount > 0 && (
                     <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
-                      isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-700'
+                      isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-[#D5E1EC] text-[#1E3A5F]'
                     }`}>
                       {subCount}
                     </span>
@@ -1810,6 +1811,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords={setRecords}
           hfListItems={hfListItems}
           onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '1.1' || currentSubTab === 'dsp-ho-1-1') ? (
+        <DspRequestMohTemplateView
+          multipleStockItems={multipleStockItems}
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+          onOpenDspRequestModal={() => setIsCreateModalOpen(true)}
         />
       ) : (
         <>
