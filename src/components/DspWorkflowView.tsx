@@ -718,7 +718,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'head-office-dsp', 
       label: 'Head Office DSP Management', 
       color: 'from-blue-600 to-cyan-600', 
-      count: records.filter(r => r.stage === 'head-office-dsp' || r.stage === 'moh-to-epss' || r.stage === 'epss-ho-aggregation').length,
+      count: records.filter(r => r.stage === 'head-office-dsp').length,
       subSteps: [
         { id: '1.1', label: 'DSP Request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
         { id: '1.2', label: 'DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
@@ -733,7 +733,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'moh-osp-management', 
       label: 'MOH OSP Management', 
       color: 'from-cyan-600 to-teal-600', 
-      count: records.filter(r => r.stage === 'moh-osp-management' || r.stage === 'moh-to-rhb' || r.stage === 'moh-to-epss-ho').length,
+      count: records.filter(r => r.stage === 'moh-osp-management').length,
       subSteps: [
         { id: '2.1', label: 'DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
         { id: '2.2', label: 'DSP Breakdown Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
@@ -747,7 +747,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'rhb-breakdown-management', 
       label: 'RHB Breakdown Management', 
       color: 'from-amber-600 to-orange-600', 
-      count: records.filter(r => r.stage === 'rhb-breakdown-management' || r.stage === 'rhb-to-moh').length,
+      count: records.filter(r => r.stage === 'rhb-breakdown-management').length,
       subSteps: [
         { id: '3.1', label: 'Breakdown Received from MOH', subTab: 'dsp-rhb-3-1' as EpssSubTab },
         { id: '3.2', label: 'Submit Breakdown to MOH', subTab: 'dsp-rhb-3-2' as EpssSubTab },
@@ -758,7 +758,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'branches-dsp-management', 
       label: 'Branches DSP Management', 
       color: 'from-purple-600 to-indigo-600', 
-      count: records.filter(r => r.stage === 'branches-dsp-management' || r.stage === 'epss-to-branch').length,
+      count: records.filter(r => r.stage === 'branches-dsp-management').length,
       subSteps: [
         { id: '4.1', label: 'Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
         { id: '4.2', label: 'Analysis and Comparing with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
@@ -770,17 +770,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     return records.filter((r) => {
       let matchStage = true;
       if (currentStage !== 'all') {
-        if (currentStage === 'head-office-dsp') {
-          matchStage = r.stage === 'head-office-dsp' || r.stage === 'moh-to-epss' || r.stage === 'epss-ho-aggregation';
-        } else if (currentStage === 'moh-osp-management') {
-          matchStage = r.stage === 'moh-osp-management' || r.stage === 'moh-to-rhb' || r.stage === 'moh-to-epss-ho';
-        } else if (currentStage === 'rhb-breakdown-management') {
-          matchStage = r.stage === 'rhb-breakdown-management' || r.stage === 'rhb-to-moh';
-        } else if (currentStage === 'branches-dsp-management') {
-          matchStage = r.stage === 'branches-dsp-management' || r.stage === 'epss-to-branch';
-        } else {
-          matchStage = r.stage === currentStage;
-        }
+        matchStage = r.stage === currentStage;
       }
 
       let matchSubStep = true;
@@ -1944,8 +1934,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <FileSpreadsheet className="w-4 h-4 text-amber-600" />
                 <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
                   {summaryViewMode === 'itemized' 
-                    ? `Itemized Request Tables & Order Processing Matrix (${allRequestTableItems.length} Material Rows)`
-                    : `Dossier Summary Tracker (${filteredRecords.length} Documents)`
+                    ? `Itemized Matrix: ${currentStage === 'all' ? 'Unified Tracker' : stagesList.find(s => s.stageKey === currentStage)?.label} (${allRequestTableItems.length} Material Rows)`
+                    : `Summary: ${currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} (${filteredRecords.length} Documents)`
                   }
                 </span>
               </div>
