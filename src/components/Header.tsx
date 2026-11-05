@@ -38,7 +38,8 @@ import {
   PackageCheck,
   Package,
   Users,
-  CloudUpload
+  CloudUpload,
+  Server
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -114,6 +115,7 @@ interface HeaderProps {
   isAdmin?: boolean;
   fileCount?: number;
   onOpenUploadAllVisibleSql?: () => void;
+  onOpenActiveServerDataModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -176,7 +178,8 @@ export const Header: React.FC<HeaderProps> = ({
   availablePlants,
   availableGroups,
   receivingAlertCount = 0,
-  onOpenUploadAllVisibleSql
+  onOpenUploadAllVisibleSql,
+  onOpenActiveServerDataModal
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -379,6 +382,18 @@ export const Header: React.FC<HeaderProps> = ({
                 <CloudUpload className="w-3.5 h-3.5 text-cyan-300" />
                 <span className="hidden sm:inline">Upload All Visible (Cloud & SQL)</span>
                 <span className="sm:hidden">Upload All</span>
+              </button>
+            )}
+
+            {onOpenActiveServerDataModal && (
+              <button
+                onClick={onOpenActiveServerDataModal}
+                className="text-[11px] text-emerald-200 hover:text-white font-semibold flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-emerald-800/80 to-teal-800/80 hover:from-emerald-700 hover:to-teal-700 border border-emerald-400/40 rounded-lg shadow-sm transition-all cursor-pointer"
+                title="View and inspect all currently activated server data, datasets & Firestore state"
+              >
+                <Server className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                <span className="hidden sm:inline">Activated Server Data</span>
+                <span className="sm:hidden">Active Data</span>
               </button>
             )}
           </div>

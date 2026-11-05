@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
+import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
@@ -188,6 +189,16 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   useEffect(() => {
     localStorage.setItem('epss_dsp_2_2_columns', JSON.stringify(columns));
     localStorage.setItem('epss_dsp_2_2_rows', JSON.stringify(rows));
+
+    const timer = setTimeout(() => {
+      pushCentralMasterData({
+        dsp22Columns: columns,
+        dsp22Rows: rows,
+        updatedBy: 'RHB Regional Breakdown Manager',
+        updateKind: `Update Regional Matrix (${rows.length} Regions, ${columns.length} Items)`
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [columns, rows]);
 
   // Extract available items to import from received records or stock

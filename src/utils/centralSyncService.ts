@@ -49,6 +49,12 @@ export interface CentralMasterData {
   agreements?: MedicalDeviceAgreement[];
   uploadedAgreementBatches?: UploadedAgreementBatch[];
   categoryThresholds?: Record<string, CategoryThreshold>;
+  dspReceivedMohRows?: any[];
+  dspReceivedEpssRows?: any[];
+  dsp22Columns?: any[];
+  dsp22Rows?: any[];
+  dspReceivedMohRecord?: any;
+  dspReceivedEpssRecord?: any;
   counts?: CentralMasterDataCounts;
 }
 
@@ -126,7 +132,11 @@ const ARRAY_FIELDS = [
   'confirmedBatches',
   'dspWorkflowRecords',
   'agreements',
-  'uploadedAgreementBatches'
+  'uploadedAgreementBatches',
+  'dspReceivedMohRows',
+  'dspReceivedEpssRows',
+  'dsp22Columns',
+  'dsp22Rows'
 ] as const;
 type ArrayField = typeof ARRAY_FIELDS[number];
 

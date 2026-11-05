@@ -33,6 +33,7 @@ import {
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { MultipleStockRecord, DspWorkflowRecord, HealthFacilityRecord } from '../types';
+import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { 
   DspRequestTemplateRow, 
@@ -809,6 +810,16 @@ Authorized Directorate Desk`;
       // For 2.1
       localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
       localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(receivedRecord21));
+
+      // Push to Supabase Cloud so all users and devices immediately receive exact transmittal data
+      pushCentralMasterData({
+        dspReceivedMohRows: itemsToSend,
+        dspReceivedMohRecord: sentRecord12,
+        dspReceivedEpssRows: itemsToSend,
+        dspReceivedEpssRecord: receivedRecord21,
+        updatedBy: 'EPSS HO Transmittal',
+        updateKind: `Transmit DSP Request to MOH (${itemsToSend.length} Items)`
+      });
 
       const folderEntry = {
         id: `folder-transmitted-${Date.now()}`,

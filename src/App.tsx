@@ -46,6 +46,7 @@ import { PrintLandscapeConfirmModal } from './components/PrintLandscapeConfirmMo
 import { LowStockConfigModal } from './components/LowStockConfigModal';
 import { MultipleDataUploadModal } from './components/MultipleDataUploadModal';
 import { UploadAllVisibleSqlModal } from './components/UploadAllVisibleSqlModal';
+import { ActiveServerDataModal } from './components/ActiveServerDataModal';
 import { ConfirmedDataNavBanner } from './components/ConfirmedDataNavBanner';
 import { HFListView } from './components/HFListView';
 import { ETHIOPIAN_HEALTH_FACILITIES_7500 } from './data/ethiopianHealthFacilities7500';
@@ -249,6 +250,7 @@ export function App() {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [isCdssDropdownOpen, setIsCdssDropdownOpen] = useState(false);
   const [isUploadAllVisibleModalOpen, setIsUploadAllVisibleModalOpen] = useState(false);
+  const [isActiveServerDataModalOpen, setIsActiveServerDataModalOpen] = useState(false);
   const cdssDropdownRef = useRef<HTMLDivElement>(null);
 
   // Global Dashboard Filters
@@ -411,26 +413,51 @@ export function App() {
   // DSP workflows are shared through the central Supabase store. Remote copy wins per record id;
   // records that only exist locally are kept. dspSyncReadyRef stays false until the first cloud load
   // finished so a fresh browser can never overwrite the cloud copy with its default demo data.
+  // DSP workflows are shared through the central Supabase store. Remote copy wins;
+  // dspSyncReadyRef stays false until the first cloud load finished so a fresh browser can never overwrite the cloud copy.
   const dspSyncReadyRef = useRef(false);
   const mergeRemoteDsp = (remote: DspWorkflowRecord[]) => {
-    setDspRecords(prev => {
-      const remoteMap = new Map(remote.map(r => [r.id, r]));
-      const merged = [...remote, ...prev.filter(r => !remoteMap.has(r.id))];
-      saveDspRecordsToIndexedDB(merged).catch(() => {});
-      return merged;
-    });
+    if (!remote || remote.length === 0) return;
+    setDspRecords(remote.map(normalizeDspRecord));
+    saveDspRecordsToIndexedDB(remote.map(normalizeDspRecord)).catch(() => {});
   };
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
   useEffect(() => {
-    if (!currentUser) return;
     let isMounted = true;
 
-    // 1. Initial hydration from Central Server
+    // Sync DSP sub-step matrix rows/columns to localStorage so sub-steps render exact cloud data
+    const syncDspMatrixToStorage = (data: any) => {
+      if (!data) return;
+      if (data.dspReceivedMohRows && Array.isArray(data.dspReceivedMohRows) && data.dspReceivedMohRows.length > 0) {
+        localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(data.dspReceivedMohRows));
+      }
+      if (data.dspReceivedEpssRows && Array.isArray(data.dspReceivedEpssRows) && data.dspReceivedEpssRows.length > 0) {
+        localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(data.dspReceivedEpssRows));
+      }
+      if (data.dsp22Columns && Array.isArray(data.dsp22Columns) && data.dsp22Columns.length > 0) {
+        localStorage.setItem('epss_dsp_2_2_columns', JSON.stringify(data.dsp22Columns));
+      }
+      if (data.dsp22Rows && Array.isArray(data.dsp22Rows) && data.dsp22Rows.length > 0) {
+        localStorage.setItem('epss_dsp_2_2_rows', JSON.stringify(data.dsp22Rows));
+      }
+      if (data.dspReceivedMohRecord) {
+        localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(data.dspReceivedMohRecord));
+      }
+      if (data.dspReceivedEpssRecord) {
+        localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(data.dspReceivedEpssRecord));
+      }
+      window.dispatchEvent(new Event('epss:dsp_matrix_updated'));
+    };
+
+    // 1. Initial hydration from Central Server (Supabase)
     const hydrateFromCentralServer = async () => {
       try {
         const centralData = await fetchCentralMasterData();
         if (!isMounted || !centralData) return;
+        
+        syncDspMatrixToStorage(centralData);
+
         if (centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) {
           mergeRemoteDsp(centralData.dspWorkflowRecords);
         }
@@ -453,19 +480,7 @@ export function App() {
           if (centralData.distributionDataRecords && centralData.distributionDataRecords.length > 0) setDistributionDataRecords(centralData.distributionDataRecords);
           if (centralData.materialMasterItems && centralData.materialMasterItems.length > 0) setMaterialMasterItems(centralData.materialMasterItems);
           if (centralData.hfListItems && centralData.hfListItems.length > 0) {
-            setHfListItems(prev => {
-              if (prev.length === 0) return centralData.hfListItems!;
-              const map = new Map();
-              prev.forEach(p => {
-                const k = p.customer && p.customer.trim() !== '' ? `id-${p.customer.trim().toLowerCase()}` : `desc-${(p.customerDescription || '').trim().toLowerCase()}`;
-                map.set(k, p);
-              });
-              centralData.hfListItems!.forEach(c => {
-                const k = c.customer && c.customer.trim() !== '' ? `id-${c.customer.trim().toLowerCase()}` : `desc-${(c.customerDescription || '').trim().toLowerCase()}`;
-                if (!map.has(k)) map.set(k, c);
-              });
-              return Array.from(map.values());
-            });
+            setHfListItems(centralData.hfListItems);
           }
           if (centralData.noBkdItems && centralData.noBkdItems.length > 0) setNoBkdItems(centralData.noBkdItems);
           if (centralData.confirmedBatches && centralData.confirmedBatches.length > 0) setConfirmedBatches(centralData.confirmedBatches);
@@ -495,6 +510,8 @@ export function App() {
     // 2. Subscribe to continuous cross-browser polling updates
     const unsubscribePolling = subscribeCentralSync((remoteData) => {
       if (!isMounted) return;
+
+      syncDspMatrixToStorage(remoteData);
 
       // Use Functional Updates with Smart Merging for all datasets to prevent fluctuation
       if (remoteData.items && remoteData.items.length > 0) {
@@ -3336,6 +3353,7 @@ export function App() {
             isAdmin={isAdmin}
             fileCount={fileCount}
             onOpenUploadAllVisibleSql={() => setIsUploadAllVisibleModalOpen(true)}
+            onOpenActiveServerDataModal={() => setIsActiveServerDataModalOpen(true)}
           />
         ) : (
           /* Mobile-only compact top bar for vertical layout */
@@ -4048,7 +4066,11 @@ export function App() {
         }}
       />
 
-      {/* Login Cross-Browser Master Data Update Notification Modal */}
+      {/* Active Server Data & State Monitor Modal */}
+      <ActiveServerDataModal
+        isOpen={isActiveServerDataModalOpen}
+        onClose={() => setIsActiveServerDataModalOpen(false)}
+      />
 
     </div>
   );

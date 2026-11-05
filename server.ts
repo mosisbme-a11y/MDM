@@ -101,6 +101,41 @@ app.get('/api/health', asyncRoute(async (req, res) => {
   res.json(out);
 }));
 
+// Public endpoint to show the exact data of the app currently activated across servers
+app.get('/api/active-app-data', asyncRoute(async (req, res) => {
+  const masterData = await getMasterData();
+  const fileRegistry = await getUploadRegistry();
+  const logs = await getMasterDataLogs();
+  
+  res.json({
+    status: 'ACTIVATED',
+    serverTime: new Date().toISOString(),
+    firebaseConfig: {
+      projectId: 'imposing-carver-487611-h9',
+      firestoreDatabaseId: 'ai-studio-medicaldeviceman-ec848d15-6ca6-48e1-ae91-fb5eeddae66b'
+    },
+    version: masterData.version || 0,
+    lastUpdated: masterData.lastUpdated,
+    lastUpdatedBy: masterData.lastUpdatedBy,
+    updateKind: masterData.updateKind,
+    activeCounts: masterData.counts || {},
+    activatedDatasets: {
+      dspWorkflows: masterData.dspWorkflowRecords || [],
+      medicalInventoryItems: masterData.items || [],
+      multipleStockItems: masterData.multipleStockItems || [],
+      materialMasterItems: masterData.materialMasterItems || [],
+      receivingDataRecords: masterData.receivingDataRecords || [],
+      distributionDataRecords: masterData.distributionDataRecords || [],
+      healthFacilityList: masterData.hfListItems || [],
+      programMdRecords: masterData.programMdRecords || [],
+      noBkdItems: masterData.noBkdItems || [],
+      categoryThresholds: masterData.categoryThresholds || {},
+      uploadedFiles: fileRegistry || [],
+      auditLogs: logs || []
+    }
+  });
+}));
+
 // Everything under /api needs a signed-in, active user.
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {

@@ -30,10 +30,18 @@ const ARRAY_FIELDS = [
   'confirmedBatches',
   'dspWorkflowRecords',
   'agreements',
-  'uploadedAgreementBatches'
+  'uploadedAgreementBatches',
+  'dspReceivedMohRows',
+  'dspReceivedEpssRows',
+  'dsp22Columns',
+  'dsp22Rows'
 ];
 // Object dataset
-const OBJECT_FIELDS = ['categoryThresholds'];
+const OBJECT_FIELDS = [
+  'categoryThresholds',
+  'dspReceivedMohRecord',
+  'dspReceivedEpssRecord'
+];
 
 const COUNT_KEY = {
   items: 'items',
@@ -47,7 +55,11 @@ const COUNT_KEY = {
   confirmedBatches: 'confirmedBatches',
   dspWorkflowRecords: 'dspWorkflows',
   agreements: 'agreements',
-  uploadedAgreementBatches: 'uploadedAgreementBatches'
+  uploadedAgreementBatches: 'uploadedAgreementBatches',
+  dspReceivedMohRows: 'dspReceivedMohRows',
+  dspReceivedEpssRows: 'dspReceivedEpssRows',
+  dsp22Columns: 'dsp22Columns',
+  dsp22Rows: 'dsp22Rows'
 };
 
 const EMPTY_COUNTS = Object.fromEntries(Object.values(COUNT_KEY).map((k) => [k, 0]));
