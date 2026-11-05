@@ -1,12 +1,12 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
+/**
+ * Firebase has been fully replaced by Supabase Cloud Storage & IndexedDB Local Persistence.
+ * This file is maintained as a stub so legacy imports resolve cleanly without using Firebase Firestore.
+ */
+import { supabase } from './supabase';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+export const db = null; // Firebase Firestore is disabled on this system
+export const auth = null;
+export const storage = null;
 
-export default app;
+export const isFirebaseActive = false;
+export default supabase;

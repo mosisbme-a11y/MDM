@@ -21,7 +21,7 @@ const asyncRoute = (fn) => (req, res) =>
   });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // express.json() also transparently inflates gzip request bodies (the browser compresses sync uploads).
 app.use((req, res, next) => {
@@ -556,15 +556,24 @@ app.get('/api/download-file/:storedFileName', asyncRoute(async (req, res) => {
 // On Vercel the static site (dist/) and SPA fallback are served by Vercel itself (see vercel.json);
 // this Express app only answers /api/*. For `npm start` / other hosts it also serves the built site.
 if (!IS_VERCEL) {
-  app.use(express.static(path.join(__dirname, 'dist')));
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer } = await import('vite');
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(__dirname, 'dist')));
 
-  // Handle client-side routing fallback without invoking path-to-regexp (Express 5 safe)
-  app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api')) {
-      return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    }
-    next();
-  });
+    // Handle client-side routing fallback without invoking path-to-regexp (Express 5 safe)
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      }
+      next();
+    });
+  }
 
   importLegacyDiskStoreIfNeeded().catch((err) => {
     console.error('[Supabase Store] Background legacy import failed:', err);

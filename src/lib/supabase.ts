@@ -8,10 +8,15 @@ export const DEFAULT_SUPABASE_ANON_KEY =
 
 // Safe environment loading with LocalStorage override and fallback
 const metaEnv = (import.meta as any).env || {};
-export const supabaseUrl =
+let rawClientUrl = (
   metaEnv.VITE_SUPABASE_URL ||
   (typeof window !== 'undefined' ? localStorage.getItem('epss_supabase_url') : null) ||
-  DEFAULT_SUPABASE_URL;
+  DEFAULT_SUPABASE_URL
+).trim();
+if (rawClientUrl && !rawClientUrl.startsWith('http://') && !rawClientUrl.startsWith('https://')) {
+  rawClientUrl = `https://${rawClientUrl.replace(/\.supabase\.co$/, '')}.supabase.co`;
+}
+export const supabaseUrl = rawClientUrl;
 
 export const supabaseAnonKey =
   metaEnv.VITE_SUPABASE_ANON_KEY ||

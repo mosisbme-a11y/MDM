@@ -398,7 +398,7 @@ export async function getManifest() {
       missing.push(f);
     }
   }
-  if (missing.length) {
+  if (missing.length && client) {
     // Datasets written before delta sync existed (or by the full-save endpoint): list their rows, hashes unknown.
     const { data, error } = await client.from(TABLE).select('dataset');
     if (error) throw new Error(`Supabase manifest read failed: ${error.message}`);
@@ -406,6 +406,14 @@ export async function getManifest() {
     for (const f of missing) {
       const indexed = keys.filter((k) => k.startsWith(`${f}:`)).sort();
       const list = indexed.length ? indexed : keys.includes(f) ? [f] : [];
+      fields[f] = { keys: list, hashes: list.map(() => null) };
+    }
+  } else if (missing.length && !client) {
+    const local = readLocalStore();
+    for (const f of missing) {
+      const records = local[f] || [];
+      const numChunks = Math.max(1, Math.ceil(records.length / CHUNK_SIZE));
+      const list = Array.from({ length: numChunks }, (_, i) => chunkKey(f, i));
       fields[f] = { keys: list, hashes: list.map(() => null) };
     }
   }
@@ -440,6 +448,14 @@ function badRequest(message) {
 export async function getDatasetRow(key) {
   const client = requireClient();
   const k = assertDatasetKey(key);
+  if (!client) {
+    const local = readLocalStore();
+    if (k === 'categoryThresholds') return local.categoryThresholds || {};
+    const [field, idx] = k.split(':');
+    const records = local[field] || [];
+    const index = parseInt(idx, 10) || 0;
+    return records.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE);
+  }
   const { data, error } = await client.from(TABLE).select('payload').eq('dataset', k).maybeSingle();
   if (error) throw new Error(`Supabase read (${k}) failed: ${error.message}`);
   return data ? data.payload : OBJECT_FIELDS.includes(k) ? {} : [];
@@ -451,6 +467,14 @@ export async function putChunk(field, index, payload) {
   if (!ARRAY_FIELDS.includes(field)) throw badRequest('Unknown dataset');
   if (!Number.isInteger(index) || index < 0 || index > 100000) throw badRequest('Bad chunk index');
   if (!Array.isArray(payload) || payload.length > MAX_CHUNK_RECORDS) throw badRequest('Chunk must be an array');
+  if (!client) {
+    const local = readLocalStore();
+    local[field] = local[field] || [];
+    const start = index * CHUNK_SIZE;
+    local[field].splice(start, payload.length, ...payload);
+    writeLocalStore(local);
+    return;
+  }
   const { error } = await client
     .from(TABLE)
     .upsert({ dataset: chunkKey(field, index), payload, updated_at: new Date().toISOString() }, { onConflict: 'dataset' });
@@ -477,6 +501,32 @@ export async function commitMasterData({ fields = {}, categoryThresholds, update
     if (!Number.isFinite(total) || total < 0) throw badRequest(`Bad total for ${field}`);
     if (total === 0 && !isExplicitClear) continue; // protect existing data from accidental empty saves
     accepted[field] = { hashes, total };
+  }
+
+  if (!client) {
+    const local = readLocalStore();
+    const newVersion = (local.version || 0) + 1;
+    const counts = { ...(local.counts || EMPTY_COUNTS) };
+    for (const [field, info] of Object.entries(accepted)) {
+      counts[COUNT_KEY[field]] = info.total;
+    }
+    local.version = newVersion;
+    local.lastUpdated = now;
+    local.lastUpdatedBy = updatedBy || local.lastUpdatedBy || 'Inventory Administrator';
+    local.updateKind = updateKind || 'Master Data Update';
+    local.counts = counts;
+    if (categoryThresholds && typeof categoryThresholds === 'object') {
+      local.categoryThresholds = categoryThresholds;
+    }
+    writeLocalStore(local);
+    return {
+      success: true,
+      version: newVersion,
+      lastUpdated: now,
+      lastUpdatedBy: local.lastUpdatedBy,
+      updateKind: local.updateKind,
+      counts
+    };
   }
 
   if (categoryThresholds && typeof categoryThresholds === 'object' && !Array.isArray(categoryThresholds)) {

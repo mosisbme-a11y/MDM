@@ -313,7 +313,7 @@ export function App() {
         }
       }
     } catch {}
-    return []; // Pure Real Data Mode: start empty unless user uploaded data
+    return DEFAULT_MASTER_MEDICAL_DEVICES;
   });
 
   useEffect(() => {
@@ -1053,7 +1053,16 @@ export function App() {
     }
     return ETHIOPIAN_HEALTH_FACILITIES_7500;
   });
-  const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>([]);
+  const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('epss_dsp_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeDspRecord);
+      }
+    } catch {}
+    return INITIAL_DSP_RECORDS.filter(r => r.id !== 'dsp-epss-sample-02');
+  });
 
   // Save DSP workflow changes to Supabase (debounced; unchanged chunks are skipped automatically)
   useEffect(() => {
@@ -1345,10 +1354,19 @@ export function App() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch {
-      // ignore
-    }
-    return [];
+    } catch {}
+    return DEFAULT_MASTER_STOCK_RECORDS.map((s, idx) => ({
+      id: `mm-rec-${idx + 1}`,
+      material: s.material,
+      materialDescription: s.materialDescription,
+      materialGroupName: s.materialGroupName,
+      materialType: 'ZMED',
+      valuationType: s.inventoryValuationType,
+      baseUom: 'EA',
+      price: s.unrestrictedStock > 0 ? Math.round(s.currentValueOfUnrestrictedStock / s.unrestrictedStock) : 65000,
+      manufacturer: 'Siemens / Mindray / Certified Supplier',
+      uploadedAt: s.uploadedAt || new Date().toISOString()
+    }));
   });
 
   const handleUploadMaterialMasterData = (newItems: MaterialMasterRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
@@ -1516,23 +1534,16 @@ export function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const realRecords = parsed.filter((r: any) =>
-            r &&
-            !r.id?.startsWith('mstock-rec-') &&
-            !r.id?.startsWith('default-stock-rec-') &&
-            r.sourceFile !== 'EPSS_Central_Stock_Ledger.xlsx'
-          );
-          // Deduplicate by ID to prevent React key errors from corrupted storage
           const idMap = new Map<string, MultipleStockRecord>();
-          realRecords.forEach((r: MultipleStockRecord) => {
-            if (r.id) idMap.set(r.id, r);
+          parsed.forEach((r: MultipleStockRecord) => {
+            if (r && r.id) idMap.set(r.id, r);
           });
-          return Array.from(idMap.values());
+          if (idMap.size > 0) return Array.from(idMap.values());
         }
       }
-      return [];
+      return DEFAULT_MASTER_STOCK_RECORDS;
     } catch {
-      return [];
+      return DEFAULT_MASTER_STOCK_RECORDS;
     }
   });
 
