@@ -113,7 +113,6 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // UI States
   const [searchQuery, setSearchQuery] = useState('');
   const [budgetSourceFilter, setBudgetSourceFilter] = useState('all');
-  const [yellowTheme, setYellowTheme] = useState<'vibrant' | 'classic' | 'none'>('vibrant');
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<DspRequestTemplateRow>>({});
   
@@ -526,6 +525,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
       else if (wbs.includes('MOH') || wbs.includes('EMERG')) budget = 'MOH';
       else if (wbs.includes('DIAL') || wbs.includes('TREAS')) budget = 'Treasury';
       else if (wbs.includes('WB') || wbs.includes('SDG')) budget = 'WB';
+      else budget = '';
 
       return {
         id: `stock-hp-import-${s.id}-${Date.now()}`,
@@ -655,7 +655,7 @@ Authorized Directorate Desk`;
   };
 
   // 3. SEND OPTION: DIRECT TRANSMIT TO MOH
-  // When transmitting selected items to MOH, store exactly what was sent inside of DSP Received from MOH (1.2), remove sent items from table, and clear previous default
+  // When transmitting selected items to MOH, store exactly what was sent inside of DSP Received from EPSS (2.1), remove sent items from table, and clear previous default
   const handleTransmitDspRequest = () => {
     if (itemsToSend.length === 0) {
       alert('Please select at least one item to transmit to MOH');
@@ -713,7 +713,44 @@ Authorized Directorate Desk`;
       notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
-    // 2. Incoming Received DSP record (Sub-step 2.1: DSP Received from EPSS in Stage 2 MOH OSP Management)
+    // 2. Sent Placeholder for Sub-step 1.2 (DSP Received from MOH - tracking the outgoing request response)
+    const sentRecord12: DspWorkflowRecord = {
+      id: `dsp-ho-received-placeholder-${Date.now()}`,
+      dspRefNumber: mohReceivedRef,
+      stage: 'head-office-dsp',
+      subStage: '1.2',
+      stageTitle: 'Head Office DSP Management',
+      senderOrg: 'Ministry of Health (PMD Directorate)',
+      recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      subject: `DSP Received from MOH: Official Allocation Endorsement Pending for ${refNum}`,
+      status: 'Submitted & Pending',
+      dateSubmitted: TODAY_ISO_DATE,
+      totalDevices: itemsToSend.length,
+      totalQuantity: sentTotals.totalQty,
+      totalValuationETB: sentTotals.totalValuation,
+      targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
+      targetedFacilitiesCount: 14,
+      officialLetterRef: officialLetterRef,
+      signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
+      signatoryRole: 'Director, PMD Directorate',
+      pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
+      itemsIncluded: itemsToSend.map(r => ({
+        material: r.material,
+        description: r.materialDescription,
+        quantity: r.qty,
+        plant: 'AA01 Central',
+        allocatedFacility: 'MOH Approved Allocation',
+        valuationTypeDesc: r.valuationTypeDesc,
+        wbsElement: r.wbsElement,
+        budgetSource: r.budgetSource,
+        requestDate: r.requestDate,
+        dspRequestTo: r.dspRequestTo,
+        totalAmount: r.totalAmount
+      })),
+      notes: `Outgoing DSP Request (Ref: ${refNum}) transmitted. This placeholder is stored in Sub-step 1.2 to track the incoming MOH endorsement.`
+    };
+
+    // 3. Incoming Received DSP record for MOH Side (Sub-step 2.1: DSP Received from EPSS)
     const receivedRecord21: DspWorkflowRecord = {
       id: `dsp-moh-received-epss-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
@@ -750,20 +787,26 @@ Authorized Directorate Desk`;
       notes: `Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
-    // 3. Clear previous default for 2.1 and store exact transmitted records
+    // 4. Clear previous defaults and store exact transmitted records across all 3 steps (1.1, 1.2, 2.1)
     setRecords(prev => {
       const filtered = prev.filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        if (sub === '2.1') return false;
+        // Clear old mock data for 1.2 and 2.1 to make room for exact transmittal
+        if (sub === '1.2' || sub === '2.1') return false;
         return true;
       });
-      const updated = [newRecord11, receivedRecord21, ...filtered];
+      const updated = [newRecord11, sentRecord12, receivedRecord21, ...filtered];
       saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
-    // 4. Save exact rows & folder record to localStorage for sub-step 2.1 view rendering
+    // 5. Save exact rows & records to localStorage for view rendering in 1.2 and 2.1
     try {
+      // For 1.2
+      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(itemsToSend));
+      localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(sentRecord12));
+      
+      // For 2.1
       localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
       localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(receivedRecord21));
 
@@ -790,7 +833,7 @@ Authorized Directorate Desk`;
       console.warn('Failed to save to localStorage:', e);
     }
 
-    // 5. Remove transmitted items from active table (templateRows) in Sub-step 1.1
+    // 6. Remove transmitted items from active table (templateRows) in Sub-step 1.1
     setTemplateRows(prev => {
       const remaining = prev.filter(r => !itemsToSend.some(sent => sent.id === r.id));
       return remaining.map((r, i) => ({ ...r, srNo: i + 1 }));
@@ -798,15 +841,15 @@ Authorized Directorate Desk`;
     setSelectedRowIds([]);
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from EPSS (2.1)`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from MOH (1.2) and Received from EPSS (2.1)`, {
         type: 'CREATE',
         title: `DSP Transmittal ${refNum}`,
-        payload: { request: newRecord11, received: receivedRecord21 }
+        payload: { request: newRecord11, received12: sentRecord12, received21: receivedRecord21 }
       });
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Removed from imported table & stored in Sub-step 2.1 (DSP Received from EPSS).`);
+    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Exact copy stored in Sub-step 1.2 (EPSS) and Sub-step 2.1 (MOH).`);
   };
 
   return (
@@ -1046,42 +1089,6 @@ Authorized Directorate Desk`;
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] font-bold text-slate-500">Theme:</span>
-          <button
-            type="button"
-            onClick={() => setYellowTheme('vibrant')}
-            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition cursor-pointer border ${
-              yellowTheme === 'vibrant'
-                ? 'bg-[#FFFF00] text-black border-black shadow-2xs font-mono'
-                : 'bg-slate-100 text-slate-600 border-slate-200'
-            }`}
-          >
-            Vibrant Yellow
-          </button>
-          <button
-            type="button"
-            onClick={() => setYellowTheme('classic')}
-            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition cursor-pointer border ${
-              yellowTheme === 'classic'
-                ? 'bg-amber-100 text-amber-950 border-amber-400 shadow-2xs font-mono'
-                : 'bg-slate-100 text-slate-600 border-slate-200'
-            }`}
-          >
-            Soft Yellow
-          </button>
-          <button
-            type="button"
-            onClick={() => setYellowTheme('none')}
-            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition cursor-pointer border ${
-              yellowTheme === 'none'
-                ? 'bg-white text-black border-black shadow-2xs font-mono'
-                : 'bg-slate-100 text-slate-600 border-slate-200'
-            }`}
-          >
-            No Color
-          </button>
-        </div>
       </div>
 
       {/* THE OFFICIAL 10-COLUMN TEMPLATE TABLE MATCHING USER REQUEST & SCREENSHOT {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
@@ -1137,7 +1144,7 @@ Authorized Directorate Desk`;
             </thead>
 
             {/* Bright Yellow Data Rows matching screenshot */}
-            <tbody className={yellowTheme === 'vibrant' ? 'bg-[#FFFF00]' : yellowTheme === 'classic' ? 'bg-[#FEF08A]' : 'bg-white'}>
+            <tbody className="bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="py-10 text-center text-black font-bold border-b border-black">
@@ -1659,15 +1666,15 @@ Authorized Directorate Desk`;
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px]">TOTAL ITEMS</span>
-                    <span className="font-bold text-slate-900">{totals.lineItemsCount} Materials</span>
+                    <span className="font-bold text-slate-900">{itemsToSend.length} Materials</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">REQUESTED UNITS</span>
-                    <span className="font-bold text-cyan-800">{formatNumber(totals.totalQty)} Units</span>
+                    <span className="font-bold text-cyan-800">{formatNumber(itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0))} Units</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">TOTAL VALUATION</span>
-                    <span className="font-black text-emerald-700">{formatCurrency(totals.totalValuation)}</span>
+                    <span className="font-black text-emerald-700">{formatCurrency(itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0))}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">DESTINATION</span>
@@ -1676,14 +1683,34 @@ Authorized Directorate Desk`;
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1.5">
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-3">
                 <div className="flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Exact Storage in Sub-step 1.2 & Previous Default Cleared</span>
+                  <span>Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
                 </div>
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{totals.lineItemsCount} Program (HP) items ({formatNumber(totals.totalQty)} Units)</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from MOH</strong> (Sub-step 1.2), and previous default mock records will be permanently cleared.
+                  Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
                 </p>
+                <div className="max-h-40 overflow-y-auto border border-emerald-200 rounded-lg">
+                  <table className="w-full text-[10px] text-left border-collapse bg-white">
+                    <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0">
+                      <tr>
+                        <th className="p-1">Material</th>
+                        <th className="p-1">Qty</th>
+                        <th className="p-1">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-emerald-100">
+                      {itemsToSend.map(r => (
+                        <tr key={r.id}>
+                          <td className="p-1 font-semibold text-slate-800">{r.materialDescription}</td>
+                          <td className="p-1 font-mono text-slate-900 text-right">{formatNumber(r.qty)}</td>
+                          <td className="p-1 font-mono text-slate-900 text-right">{formatCurrency(r.totalAmount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
