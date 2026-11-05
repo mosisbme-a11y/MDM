@@ -1398,14 +1398,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     key={sub.id}
                     onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`px-3 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                       isSubSelected
-                        ? 'text-slate-900 border-amber-500 font-black'
-                        : 'text-slate-500 hover:text-slate-900 border-transparent'
+                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
                     }`}
                     title="• DSP Request to MOH"
                   >
-                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
                     <span className="tracking-tight">{sub.label}</span>
                   </button>
                 );
@@ -1416,14 +1416,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     key={sub.id}
                     onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`px-3 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                       isSubSelected
-                        ? 'text-slate-900 border-amber-500 font-black'
-                        : 'text-slate-500 hover:text-slate-900 border-transparent'
+                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
                     }`}
                     title="• DSP Received from MOH"
                   >
-                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
                     <span className="tracking-tight">{sub.label}</span>
                   </button>
                 );
@@ -1434,17 +1434,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     key={sub.id}
                     onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                       isSubSelected
-                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-amber-400/80 scale-[1.02]'
-                        : 'bg-[#0B1527] hover:bg-[#111f38] text-white border-[#0B1527] shadow-xs'
+                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
                     }`}
                     title="• DSP Breakdown Request to RHB: Horizontal Matrix Quota Template"
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 ${isSubSelected ? 'animate-pulse' : ''}`} />
-                    <span className="tracking-tight text-white font-bold">{sub.label}</span>
+                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
+                    <span className="tracking-tight">{sub.label}</span>
                     {subCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-900">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-black ${isSubSelected ? 'bg-white text-amber-600' : 'bg-slate-300 text-slate-800'}`}>
                         {subCount}
                       </span>
                     )}
@@ -1456,18 +1456,16 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <button
                   key={sub.id}
                   onClick={() => onSelectSubTab?.(sub.subTab)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                     isSubSelected
-                      ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] shadow-sm ring-2 ring-amber-400/40'
-                      : 'bg-[#EBF1F6] hover:bg-[#E0E9F2] text-[#1E3A5F] border-[#D5E1EC]'
+                      ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-amber-400 animate-pulse' : 'bg-[#8292A2]'}`} />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
                   <span className="tracking-tight">{sub.label}</span>
                   {subCount > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
-                      isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-[#D5E1EC] text-[#1E3A5F]'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-black ${isSubSelected ? 'bg-white text-amber-600' : 'bg-slate-300 text-slate-800'}`}>
                       {subCount}
                     </span>
                   )}
