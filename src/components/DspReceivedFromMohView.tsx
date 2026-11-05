@@ -349,6 +349,8 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `Transmitted via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP).`
     };
 
+    const activeDspName = localStorage.getItem('epss_dsp_request_dsp_name') || 'DSP 2026 - MCH Equipment Allocation';
+
     const newRecord12: DspWorkflowRecord = {
       id: `dsp-moh-received-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
@@ -357,7 +359,8 @@ Notes: ${folder.notes || 'N/A'}`;
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      subject: `DSP Received from MOH: Official Allocation Endorsement for ${refNum} (${sourceRows.length} Program HP Items)`,
+      dspName: activeDspName,
+      subject: `DSP [${activeDspName}]: Official MOH Endorsement to EPSS (${sourceRows.length} Materials)`,
       status: 'Endorsed & Approved',
       dateSubmitted: TODAY_ISO_DATE,
       approvedDate: TODAY_ISO_DATE,

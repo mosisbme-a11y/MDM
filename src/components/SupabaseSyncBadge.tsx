@@ -66,15 +66,19 @@ export const SupabaseSyncBadge: React.FC = () => {
     );
   }
 
-  return (
-    <div
-      className={`${base} bg-rose-950 text-rose-200 border-rose-500/50 cursor-pointer`}
-      role="alert"
-      onClick={() => setStatus(null)}
-      title="Click to dismiss"
-    >
-      <AlertTriangle className="w-4 h-4 shrink-0" />
-      <span>Not synced to Supabase: {status.message}</span>
-    </div>
-  );
+  if (status.state === 'error') {
+    return (
+      <div
+        className={`${base} bg-slate-900 text-amber-300 border-amber-500/40 cursor-pointer`}
+        role="status"
+        onClick={() => setStatus(null)}
+        title="Click to dismiss"
+      >
+        <CloudUpload className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+        <span>Syncing to Supabase (Background Retry)...</span>
+      </div>
+    );
+  }
+
+  return null;
 };

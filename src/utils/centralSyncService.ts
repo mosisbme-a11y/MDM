@@ -226,9 +226,8 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
     try {
       manifest = await fetchManifest();
     } catch (err) {
-      if (!isMissingEndpoint(err)) throw err;
+      console.warn('[CentralSyncService] Manifest failed, falling back to full dataset API:', err);
       legacyServer = true;
-      console.warn('[CentralSyncService] Server has no delta-sync endpoints (404) - using full-dataset API. Redeploy the server to enable fast sync.');
       return await finishFetch(await legacyFetch());
     }
     const result: any = {
@@ -333,9 +332,8 @@ export async function pushCentralMasterData(
       try {
         manifest = await fetchManifest();
       } catch (err) {
-        if (!isMissingEndpoint(err)) throw err;
+        console.warn('[CentralSyncService] Manifest failed, falling back to full dataset API:', err);
         legacyServer = true;
-        console.warn('[CentralSyncService] Server has no delta-sync endpoints (404) - using full-dataset API.');
       }
     }
     if (!manifest) {

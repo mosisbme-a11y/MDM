@@ -577,6 +577,8 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
     const totalQty = Object.values(totals).reduce((sum, v) => sum + v, 0);
 
+    const activeDspName = localStorage.getItem('epss_dsp_request_dsp_name') || 'DSP 2026 - MCH Equipment Allocation';
+
     const newRecord: DspWorkflowRecord = {
       id: `dsp-brk-tx-${Date.now()}`,
       dspRefNumber: refNum,
@@ -585,7 +587,8 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       stageTitle: 'MOH OSP Management',
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: targetedActiveRegions.join(', ') + ' Regional Health Bureaus',
-      subject: `DSP Breakdown Request: Authorized Regional Allocation Quota Transmission (${columns.length} Materials)`,
+      dspName: activeDspName,
+      subject: `DSP [${activeDspName}]: Authorized Regional Breakdown Request to RHB (${columns.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: columns.length,

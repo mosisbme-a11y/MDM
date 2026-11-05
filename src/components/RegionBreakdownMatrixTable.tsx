@@ -1703,10 +1703,57 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <button
                   type="button"
                   onClick={() => {
+                    const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
+                    const year = new Date().getFullYear();
+                    const randNum = Math.floor(100 + Math.random() * 900);
+                    const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
+
+                    const rhbRecord: DspWorkflowRecord = {
+                      id: `dsp-rhb-moh-${Date.now()}`,
+                      dspRefNumber: brkRef,
+                      stage: 'rhb-breakdown-management',
+                      subStage: '3.2',
+                      stageTitle: 'RHB Breakdown Management',
+                      senderOrg: `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
+                      recipientOrg: 'Ministry of Health (PMD Directorate)',
+                      dspName: cleanDspName,
+                      subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to MOH (${filteredRows.length} Facilities)`,
+                      status: 'Endorsed & Approved',
+                      dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
+                      approvedDate: internalDate || new Date().toISOString().split('T')[0],
+                      totalDevices: columns.length,
+                      totalQuantity: grandTotalUnits,
+                      totalValuationETB: grandTotalUnits * 250000,
+                      targetedRegions: selectedRegionFilter === 'all' ? ALL_ETHIOPIAN_REGIONS : [selectedRegionFilter],
+                      targetedFacilitiesCount: filteredRows.length,
+                      officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
+                      signatory: 'Regional Health Bureau Director',
+                      signatoryRole: 'Director, RHB Logistics & Medical Devices',
+                      facilityMatrixData: {
+                        date: internalDate,
+                        region: selectedRegionFilter,
+                        columns,
+                        rows: filteredRows
+                      },
+                      itemsIncluded: columns.map(c => ({
+                        material: c.code,
+                        description: c.name,
+                        quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+                        plant: 'AA01 Central'
+                      })),
+                      notes: `Official Regional Health Facility Breakdown Matrix submitted to MOH PMD Directorate (${filteredRows.length} Facilities).`
+                    };
+
                     try {
                       localStorage.setItem('epss_dsp_3_2_rows', JSON.stringify(filteredRows));
+                      const existingRecordsRaw = localStorage.getItem('epss_dsp_indexeddb_records');
+                      const existingRecords: DspWorkflowRecord[] = existingRecordsRaw ? JSON.parse(existingRecordsRaw) : [];
+                      const updatedRecords = [rhbRecord, ...existingRecords.filter(r => r.id !== rhbRecord.id)];
+                      saveDspRecordsToIndexedDB(updatedRecords);
+
                       pushCentralMasterData({
                         dspReceivedMohRows: filteredRows,
+                        dspWorkflowRecords: updatedRecords,
                         updatedBy: 'RHB Regional Logistics',
                         updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
                       });
@@ -1714,7 +1761,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       console.warn(e);
                     }
                     setIsTransmitModalOpen(false);
-                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH PMD Directorate!`);
+                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH as Dossier [${cleanDspName}]!`);
                   }}
                   className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
                 >

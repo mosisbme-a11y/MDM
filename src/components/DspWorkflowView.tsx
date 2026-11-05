@@ -2253,19 +2253,23 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           {rec.dateSubmitted}
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
-                              {rec.dspName || rec.subject.match(/DSP \[(.*?)\]/)?.[1] || rec.subject}
-                            </span>
+                          <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
+                              <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span className="font-extrabold text-slate-900 group-hover:text-amber-700 transition-colors text-xs">
+                                {rec.dspName || rec.subject.match(/DSP \[(.*?)\]/)?.[1] || rec.subject}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200">
                                 REF: {rec.dspRefNumber}
                               </span>
-                              {rec.dspName && (
-                                <span className="text-[9px] text-slate-300 italic truncate max-w-[120px]">
-                                  {rec.subject}
-                                </span>
-                              )}
+                              <span className="text-[10px] font-semibold text-slate-600">
+                                {rec.senderOrg} ➔ {rec.recipientOrg}
+                              </span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {rec.stageTitle}
+                              </span>
                             </div>
                           </div>
                         </td>
