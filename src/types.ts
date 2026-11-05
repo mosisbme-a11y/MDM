@@ -84,6 +84,8 @@ export interface HealthFacilityRecord {
   woreda: string;                   // Woreda
   woredaDescription: string;        // Woreda Description
   hub?: string;                     // Hub
+  plant?: string;                   // Plant
+  deliveringPlantDescr?: string;    // Delivering Plant Description
   uploadedAt?: string;
   sourceFile?: string;
   syncStatus?: 'synced' | 'pending' | 'offline';

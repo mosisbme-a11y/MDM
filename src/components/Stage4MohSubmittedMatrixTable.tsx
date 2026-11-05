@@ -39,6 +39,7 @@ export interface Stage4Row {
   woreda: string;
   healthFacility: string;
   packages: string; // e.g. "MCH"
+  plant?: string; // e.g. "AA01", "HO01", "AD01" (EPSS Hub / Delivering Plant)
   quantities: Record<string, number>;
 }
 
@@ -47,6 +48,44 @@ export interface Stage4MatrixData {
   region: string;
   columns: Stage4Column[];
   rows: Stage4Row[];
+}
+
+export function lookupHubFromHfMasterData(
+  facilityName: string,
+  regionName: string,
+  hfList: HealthFacilityRecord[] = []
+): string {
+  if (!facilityName) return 'AA01';
+  const cleanFac = facilityName.trim().toLowerCase();
+
+  if (hfList && hfList.length > 0) {
+    const match = hfList.find(hf => {
+      const desc = (hf.customerDescription || '').toLowerCase();
+      const cust = (hf.customer || '').toLowerCase();
+      return desc.includes(cleanFac) || cleanFac.includes(desc) || cust === cleanFac;
+    });
+
+    if (match) {
+      if (match.deliveringPlant) return match.deliveringPlant;
+      if (match.plant) return match.plant;
+      if (match.deliveringPlantDescr) return match.deliveringPlantDescr;
+    }
+  }
+
+  // Regional defaults if not found in master data
+  const reg = (regionName || '').toLowerCase();
+  if (reg.includes('addis')) return 'HO01';
+  if (reg.includes('oromia')) return 'AD01';
+  if (reg.includes('amhara')) return 'BD01';
+  if (reg.includes('tigray')) return 'ME01';
+  if (reg.includes('somali')) return 'JI01';
+  if (reg.includes('sidama') || reg.includes('south') || reg.includes('snnpr')) return 'HA01';
+  if (reg.includes('afar')) return 'AS01';
+  if (reg.includes('dire') || reg.includes('harar')) return 'DR01';
+  if (reg.includes('benishangul')) return 'AS01';
+  if (reg.includes('gambella') || reg.includes('gambela')) return 'GB01';
+
+  return 'AA01';
 }
 
 export const DEFAULT_STAGE_4_COLUMNS: Stage4Column[] = [
@@ -564,6 +603,16 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleAutoMapHubs = () => {
+    const updated = rows.map(r => ({
+      ...r,
+      plant: lookupHubFromHfMasterData(r.healthFacility, r.region, hfListItems)
+    }));
+    setRows(updated);
+    notifyChange(columns, updated);
+    showToast(`✓ Auto-mapped EPSS Hubs for all ${updated.length} facilities using Health Facility Master Data!`);
+  };
+
   return (
     <div className={`space-y-4 ${isFullScreen ? 'fixed inset-0 z-50 bg-slate-50 p-6 overflow-y-auto' : ''}`}>
       {/* Toast Notification */}
@@ -593,6 +642,16 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAutoMapHubs}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+            title="Map every health facility to its EPSS Hub / Delivering Plant based on HF Master Data"
+          >
+            <Sparkles size={14} className="text-slate-950" />
+            <span>⚡ Auto-Map Hubs</span>
+          </button>
+
           <input
             type="file"
             ref={fileInputRef}
@@ -838,6 +897,9 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[130px] text-center">
                   List of Packeges
                 </th>
+                <th className="p-2.5 bg-[#facc15] text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center shadow-2xs">
+                  Plant
+                </th>
                 {columns.map(col => (
                   <th
                     key={col.id}
@@ -872,6 +934,9 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold text-center">
                   List of Packeges
                 </th>
+                <th className="p-2 bg-[#fef08a] font-mono font-bold text-yellow-950 border-r border-slate-300 text-center text-[10px]">
+                  Delivering Plant
+                </th>
                 {columns.map(col => (
                   <th
                     key={col.id}
@@ -900,7 +965,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + (isEditingMode ? 6 : 5)} className="py-12 text-center text-slate-400">
+                  <td colSpan={columns.length + (isEditingMode ? 7 : 6)} className="py-12 text-center text-slate-400">
                     No matching facilities found in this filter. Click "+ Add Facility Row" to add a new record.
                   </td>
                 </tr>
@@ -974,6 +1039,23 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                         />
                       ) : (
                         <span>{row.packages}</span>
+                      )}
+                    </td>
+
+                    {/* Plant Column (highlighted yellow background matching user attachment) */}
+                    <td className="p-2 border-r border-slate-200 text-center bg-yellow-50/80 font-mono font-bold text-yellow-950">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.plant || lookupHubFromHfMasterData(row.healthFacility, row.region, hfListItems)}
+                          onChange={(e) => handleRowFieldChange(row.id, 'plant', e.target.value)}
+                          className="w-full text-center bg-white border border-yellow-400 rounded px-1 py-0.5 text-xs font-mono font-bold text-yellow-950"
+                          placeholder="e.g. AA01"
+                        />
+                      ) : (
+                        <span className="inline-block px-2 py-0.5 rounded bg-yellow-200/90 border border-yellow-400 font-mono font-black text-yellow-950 text-[11px] shadow-2xs">
+                          {row.plant || lookupHubFromHfMasterData(row.healthFacility, row.region, hfListItems)}
+                        </span>
                       )}
                     </td>
 
