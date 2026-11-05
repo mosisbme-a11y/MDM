@@ -251,14 +251,14 @@ export const MultipleDataUploadModal: React.FC<MultipleDataUploadModalProps> = (
     const materialGroupName = String(r['Material Group Name'] || r['MaterialGroupName'] || r['Material Type'] || 'Medical Device');
     const valueOfBlockedStock = Number(r['Value of Blocked Stock'] || r['ValueOfBlockedStock'] || 0);
     const valueOfStockInQualityInspection = Number(r['Value of Stock in Quality Inspection'] || r['ValueOfStockInQualityInspection'] || 0);
-    const wbsElement = String(r['WBS Element'] || r['WBS'] || 'RDF-2026-SOH');
+    const wbsElement = String(r['WBS Element'] || r['WBS'] || '');
 
     const qty = unrestrictedStock + stockInQualityInspection + blockedStock;
     const totalAmount = currentValueOfUnrestrictedStock + valueOfBlockedStock + valueOfStockInQualityInspection;
     const unitPrice = qty > 0 ? totalAmount / qty : 65000;
 
-    const rdfNumber = String(r['RDF Number'] || r['RDF'] || r['RDF No'] || (idx % 3 === 0 ? 'RDF-2026-001' : idx % 3 === 1 ? 'RDF-2026-002' : 'RDF-2026-003'));
-    const programName = String(r['Program'] || r['Program Name'] || r['Project'] || (idx % 4 === 0 ? 'MCH Program' : idx % 4 === 1 ? 'ICU Modernization' : idx % 4 === 2 ? 'Emergency Medical Services' : 'General Healthcare'));
+    const rdfNumber = String(r['RDF Number'] || r['RDF'] || r['RDF No'] || '');
+    const programName = String(r['Program'] || r['Program Name'] || r['Project'] || '');
 
     return {
       id: `MD-BATCH-${Date.now().toString(36)}-${idx + 1}`,
@@ -272,10 +272,10 @@ export const MultipleDataUploadModal: React.FC<MultipleDataUploadModalProps> = (
       unitPrice,
       stockType: inventoryValuationType,
       specialStockType,
-      batch: String(r['Batch'] || r['Lot'] || `LOT-${idx + 1}`),
-      expiryDate: String(r['Expiry Date'] || '31.12.2028'),
+      batch: String(r['Batch'] || r['Lot'] || ''),
+      expiryDate: String(r['Expiry Date'] || ''),
       wbsElement,
-      budgetSource: String(r['Budget Source'] || r['Funding'] || 'Federal Government Treasury (EPSS)'),
+      budgetSource: String(r['Budget Source'] || r['Funding'] || ''),
       manufacturer: String(r['Manufacturer'] || r['Brand'] || 'Certified Medical Supplier'),
       materialType: materialGroupName,
       additionalAttributes: {

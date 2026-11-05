@@ -262,7 +262,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
           materialGroupName: match?.materialGroupName || 'Medical Equipment & Devices',
           valueOfBlockedStock: 0,
           valueOfStockInQualityInspection: 0,
-          wbsElement: match?.wbsElement || 'WBS-MOH-EPSS-2026',
+          wbsElement: match?.wbsElement || '',
           allocatedFacility: item.allocatedFacility
         };
       });
@@ -295,7 +295,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
       materialGroupName: 'Medical Equipment & Devices',
       valueOfBlockedStock: 0,
       valueOfStockInQualityInspection: 0,
-      wbsElement: 'WBS-MOH-EPSS-2026'
+      wbsElement: ''
     };
 
     setSelectedDevices(prev => [...prev, newDev]);
@@ -343,7 +343,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
           id: `row-init-${idx}-${Date.now()}`,
           date: currentDate,
           region: reg,
-          budgetSource: 'MCH',
+          budgetSource: '',
           quantities: qtyObj
         };
       });
@@ -390,7 +390,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
             id: `row-init-${idx}`,
             date: currentDate,
             region: reg,
-            budgetSource: 'MCH',
+            budgetSource: '',
             quantities: qtyObj
           };
         });
@@ -438,7 +438,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
             id: `row-init-${idx}`,
             date: currentDate,
             region: reg,
-            budgetSource: 'MCH',
+            budgetSource: '',
             quantities: qtyObj
           };
         });
@@ -528,7 +528,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
         id: `row-sel-${idx}-${Date.now()}`,
         date: currentDate,
         region: regName,
-        budgetSource: 'MCH',
+        budgetSource: '',
         quantities: initialQty
       };
     });
@@ -551,7 +551,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
         id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         date: currentDate,
         region: nextRegion,
-        budgetSource: 'MCH',
+        budgetSource: '',
         quantities: initialQty
       }
     ]);
@@ -1798,7 +1798,7 @@ TRANSMISSION METRICS:
                                   <td className="py-2 px-3 border-r border-slate-100 text-teal-700 font-bold">{item.specialStockType || 'Q'}</td>
                                   <td className="py-2 px-3 border-r border-slate-100 text-center font-black text-cyan-700">{formatNumber(item.unrestrictedStock)}</td>
                                   <td className="py-2 px-3 border-r border-slate-100 text-right font-black text-emerald-700">{formatCurrency(item.currentValueOfUnrestrictedStock)}</td>
-                                  <td className="py-2 px-3 border-r border-slate-100 text-slate-500">{item.wbsElement || 'WBS-MOH-2026'}</td>
+                                  <td className="py-2 px-3 border-r border-slate-100 text-slate-500">{item.wbsElement || ''}</td>
                                   <td className="py-2 px-3 font-sans">
                                     <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wider">
                                       <CheckCircle2 size={10} />
@@ -1830,7 +1830,7 @@ TRANSMISSION METRICS:
                                           </div>
                                           <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                                             <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">WBS Element</span>
-                                            <span className="font-bold text-indigo-700">{item.wbsElement || 'WBS-MOH-2026'}</span>
+                                            <span className="font-bold text-indigo-700">{item.wbsElement || ''}</span>
                                           </div>
 
                                         </div>
@@ -2071,7 +2071,7 @@ TRANSMISSION METRICS:
                                 <td className="py-2 px-3 border-r border-slate-100 text-center font-black text-cyan-700">{formatNumber(item.unrestrictedStock)}</td>
                                 <td className="py-2 px-3 border-r border-slate-100 text-right text-slate-500">{formatCurrency(unitPrice)}</td>
                                 <td className="py-2 px-3 border-r border-slate-100 text-right font-black text-emerald-700">{formatCurrency(item.currentValueOfUnrestrictedStock)}</td>
-                                <td className="py-2 px-3 border-r border-slate-100 text-slate-500">{item.wbsElement || 'WBS-MOH-2026'}</td>
+                                <td className="py-2 px-3 border-r border-slate-100 text-slate-500">{item.wbsElement || ''}</td>
                                 <td className="py-2 px-3 font-sans">
                                   <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wider">
                                     <CheckCircle2 size={10} />

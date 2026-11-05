@@ -89,7 +89,7 @@ export const AddStockDeviceModal: React.FC<AddStockDeviceModalProps> = ({
   const [manufacturer, setManufacturer] = useState('Mindray');
   const [customManufacturer, setCustomManufacturer] = useState('');
   const [materialType, setMaterialType] = useState('ZMED');
-  const [wbsElement, setWbsElement] = useState('RDF-2026-SOH');
+  const [wbsElement, setWbsElement] = useState('');
   const [stockType, setStockType] = useState('Unrestricted Stock');
   const [specialStockType, setSpecialStockType] = useState('Normal SOH');
 
@@ -143,7 +143,7 @@ export const AddStockDeviceModal: React.FC<AddStockDeviceModalProps> = ({
       specialStockType: specialStockType,
       batch: batch.trim() || 'N/A',
       expiryDate: expiryDate.trim() || 'N/A',
-      wbsElement: wbsElement.trim() || 'RDF-2026-SOH',
+      wbsElement: wbsElement.trim() || '',
       manufacturer: finalManufacturer,
       materialType: materialType,
       isNotFunctional: conditionStatus === 'defective',

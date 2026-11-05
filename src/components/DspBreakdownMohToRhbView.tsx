@@ -101,7 +101,33 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [columns, setColumns] = useState<MatrixColumn[]>(() => {
     try {
       const stored = localStorage.getItem('epss_dsp_2_2_columns');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      // Auto-extract exact equipment items from transmitted DSP payload
+      const storedRec = localStorage.getItem('epss_dsp_received_epss_rows') || localStorage.getItem('epss_dsp_received_moh_rows') || localStorage.getItem('epss_dsp_request_template_rows');
+      if (storedRec) {
+        const parsedRec = JSON.parse(storedRec);
+        if (Array.isArray(parsedRec) && parsedRec.length > 0) {
+          const extracted: MatrixColumn[] = [];
+          const seen = new Set<string>();
+          parsedRec.forEach((item: any, idx: number) => {
+            const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
+            const desc = item.materialDescription || item.description || item.deviceName || 'Medical Equipment Unit';
+            const key = `${code}|${desc}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              extracted.push({
+                id: `mat-rec-${idx}-${code}`,
+                materialCode: code,
+                description: desc
+              });
+            }
+          });
+          if (extracted.length > 0) return extracted;
+        }
+      }
     } catch {}
     return [
       { id: 'mat-1', materialCode: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon' },
@@ -117,7 +143,10 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [rows, setRows] = useState<MatrixRow[]>(() => {
     try {
       const stored = localStorage.getItem('epss_dsp_2_2_rows');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
     return [
       { 
@@ -125,7 +154,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
         sn: 1, 
         date: TODAY_ISO_DATE, 
         region: 'Oromia', 
-        budgetSource: 'MCH', 
+        budgetSource: '', 
         quantities: { 'mat-1': 10, 'mat-2': 10, 'mat-3': 10, 'mat-4': 10, 'mat-5': 10, 'mat-6': 10 } 
       },
       { 
@@ -133,7 +162,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
         sn: 2, 
         date: TODAY_ISO_DATE, 
         region: 'Amhara', 
-        budgetSource: 'MCH', 
+        budgetSource: '', 
         quantities: { 'mat-1': 5, 'mat-2': 5, 'mat-3': 5, 'mat-4': 5, 'mat-5': 5, 'mat-6': 5 } 
       }
     ];
@@ -147,7 +176,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   
   const [selectedNewRegion, setSelectedNewRegion] = useState<string>(ETHIOPIAN_REGIONS[0]);
-  const [newRowBudgetSource, setNewRowBudgetSource] = useState<string>('MCH');
+  const [newRowBudgetSource, setNewRowBudgetSource] = useState<string>('');
 
   // Letter Upload State
   const letterInputRef = useRef<HTMLInputElement>(null);
@@ -293,7 +322,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       sn: rows.length + 1,
       date: TODAY_ISO_DATE,
       region: regionName,
-      budgetSource: newRowBudgetSource || 'MCH',
+      budgetSource: newRowBudgetSource || '',
       quantities: defaultQty
     };
 
@@ -319,7 +348,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       sn: rows.length + idx + 1,
       date: TODAY_ISO_DATE,
       region: reg,
-      budgetSource: 'MCH',
+      budgetSource: newRowBudgetSource || '',
       quantities: { ...defaultQty }
     }));
 

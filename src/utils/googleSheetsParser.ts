@@ -326,7 +326,7 @@ export function parseSheetRowsToMedicalDevices(values: any[][], sheetTabName?: s
       const wayOfIntervention = getVal('wayOfIntervention', 22) || (isNotFunctional ? 'Corrective Biomedical Repair' : 'Preventive Maintenance');
       const responsibleBody = getVal('responsibleBody', 23) || 'Biomedical Engineering Directorate';
       const timeFrame = getVal('timeFrame', 24) || 'Q3 2026';
-      const budgetSource = getVal('budgetSource', 16) || getVal('budget', 16) || getVal('funding', 16) || getVal('source', 16) || (wbsElement ? `WBS: ${wbsElement}` : 'Federal Government Treasury (EPSS)');
+      const budgetSource = getVal('budgetSource', 16) || getVal('budget', 16) || getVal('funding', 16) || getVal('source', 16) || (wbsElement ? `WBS: ${wbsElement}` : '');
       
       const fyaEpSSNoBkdStatus =
         getVal('fyaEpSSNoBkdStatus', 25) ||
