@@ -475,7 +475,7 @@ export async function getManifest() {
       counts: { ...EMPTY_COUNTS },
       chunkSize: CHUNK_SIZE,
       fields: {},
-      error: err.message
+      error: err instanceof Error ? err.message : String(err)
     };
   }
 }
