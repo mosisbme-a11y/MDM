@@ -152,6 +152,11 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // DSP Name State - Mandatory and written by EPSS Team
+  const [dspName, setDspName] = useState<string>(() => {
+    return localStorage.getItem('epss_dsp_request_name') || '';
+  });
+
   // Row Selection State for sending specific items to MOH
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
@@ -658,6 +663,10 @@ Authorized Directorate Desk`;
   // 3. SEND OPTION: DIRECT TRANSMIT TO MOH
   // When transmitting selected items to MOH, store exactly what was sent inside of DSP Received from EPSS (2.1), remove sent items from table, and clear previous default
   const handleTransmitDspRequest = () => {
+    if (!dspName.trim()) {
+      alert('DSP Name is mandatory and must be provided by the EPSS team.');
+      return;
+    }
     if (itemsToSend.length === 0) {
       alert('Please select at least one item to transmit to MOH');
       return;
@@ -686,7 +695,7 @@ Authorized Directorate Desk`;
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
       recipientOrg: 'Ministry of Health (PMD Directorate)',
-      subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${itemsToSend.length} Materials)`,
+      subject: `DSP [${dspName}]: Request to MOH (${itemsToSend.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: itemsToSend.length,
@@ -711,7 +720,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
+      notes: `DSP Name: ${dspName}. Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 2. Sent Placeholder for Sub-step 1.2 (DSP Received from MOH - tracking the outgoing request response)
@@ -723,7 +732,7 @@ Authorized Directorate Desk`;
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      subject: `DSP Received from MOH: Official Allocation Endorsement Pending for ${refNum}`,
+      subject: `DSP Received from MOH: Official Endorsement Pending for ${dspName} (${refNum})`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: itemsToSend.length,
@@ -748,7 +757,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Outgoing DSP Request (Ref: ${refNum}) transmitted. This placeholder is stored in Sub-step 1.2 to track the incoming MOH endorsement.`
+      notes: `DSP Name: ${dspName}. Outgoing DSP Request (Ref: ${refNum}) transmitted. This placeholder is stored in Sub-step 1.2 to track the incoming MOH endorsement.`
     };
 
     // 3. Incoming Received DSP record for MOH Side (Sub-step 2.1: DSP Received from EPSS)
@@ -760,7 +769,7 @@ Authorized Directorate Desk`;
       stageTitle: 'MOH OSP Management',
       senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
       recipientOrg: 'Ministry of Health (PMD Directorate)',
-      subject: `DSP Received from EPSS: Official Equipment Quota Transmission for ${refNum} (${itemsToSend.length} Program HP Items)`,
+      subject: `DSP [${dspName}]: Received from EPSS (${itemsToSend.length} Items)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: itemsToSend.length,
@@ -785,7 +794,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
+      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 4. Clear previous defaults and store exact transmitted records across all 3 steps (1.1, 1.2, 2.1)
@@ -1668,6 +1677,26 @@ Authorized Directorate Desk`;
               </button>
             </div>
 
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                DSP Name (Mandatory - EPSS Team Only)
+              </label>
+              <input 
+                type="text"
+                placeholder="Enter Official DSP Project Name (e.g. MCH Support 2026)"
+                value={dspName}
+                onChange={(e) => {
+                  setDspName(e.target.value);
+                  localStorage.setItem('epss_dsp_request_name', e.target.value);
+                }}
+                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-amber-900/30"
+              />
+              <p className="text-[10px] text-amber-700/70 italic leading-tight">
+                This identifier will be used by both EPSS and MOH to track the institutional allocation throughout the workflow.
+              </p>
+            </div>
+
             <div className="space-y-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
@@ -1702,21 +1731,64 @@ Authorized Directorate Desk`;
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
                   Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
                 </p>
-                <div className="max-h-40 overflow-y-auto border border-emerald-200 rounded-lg">
+                <div className="max-h-64 overflow-y-auto border border-emerald-200 rounded-lg shadow-inner">
                   <table className="w-full text-[10px] text-left border-collapse bg-white">
-                    <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0">
+                    <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0 z-10 shadow-sm">
                       <tr>
-                        <th className="p-1">Material</th>
-                        <th className="p-1">Qty</th>
-                        <th className="p-1">Value</th>
+                        <th className="p-2 border-r border-emerald-200 w-8">#</th>
+                        <th className="p-2 border-r border-emerald-200 min-w-[120px]">Description & Qty</th>
+                        <th className="p-2 text-right">Valuation (ETB)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-emerald-100">
-                      {itemsToSend.map(r => (
-                        <tr key={r.id}>
-                          <td className="p-1 font-semibold text-slate-800">{r.materialDescription}</td>
-                          <td className="p-1 font-mono text-slate-900 text-right">{formatNumber(r.qty)}</td>
-                          <td className="p-1 font-mono text-slate-900 text-right">{formatCurrency(r.totalAmount)}</td>
+                      {itemsToSend.map((r, idx) => (
+                        <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-400">{idx + 1}</td>
+                          <td className="p-2 border-r border-emerald-100 space-y-1.5">
+                            <input 
+                              type="text"
+                              value={r.materialDescription}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, materialDescription: val } : row));
+                              }}
+                              className="w-full px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-medium focus:outline-none focus:border-amber-400"
+                            />
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 font-bold uppercase text-[9px]">QTY:</span>
+                              <input 
+                                type="number"
+                                value={r.qty}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  setTemplateRows(prev => prev.map(row => {
+                                    if (row.id === r.id) {
+                                      const unitPrice = row.qty > 0 ? row.totalAmount / row.qty : 350000;
+                                      return { ...row, qty: val, totalAmount: val * unitPrice };
+                                    }
+                                    return row;
+                                  }));
+                                }}
+                                className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-bold focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex flex-col items-end gap-1">
+                              <input 
+                                type="number"
+                                value={r.totalAmount}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, totalAmount: val } : row));
+                                }}
+                                className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-right text-emerald-700 focus:outline-none focus:border-amber-400"
+                              />
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                (Unit: {formatCurrency(r.qty > 0 ? r.totalAmount / r.qty : 0)})
+                              </span>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1735,9 +1807,14 @@ Authorized Directorate Desk`;
                 <button
                   type="button"
                   onClick={handleTransmitDspRequest}
-                  className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-300 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                  disabled={!dspName.trim()}
+                  className={`px-5 py-2 rounded-xl font-black transition-all flex items-center gap-1.5 shadow-md ${
+                    dspName.trim() 
+                      ? 'bg-slate-900 hover:bg-black text-amber-300 cursor-pointer' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'
+                  }`}
                 >
-                  <Send className="w-3.5 h-3.5 text-amber-400" />
+                  <Send className={`w-3.5 h-3.5 ${dspName.trim() ? 'text-amber-400' : 'text-slate-400'}`} />
                   <span>Confirm Transmittal to MOH</span>
                 </button>
               </div>
