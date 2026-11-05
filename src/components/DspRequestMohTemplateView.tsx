@@ -794,7 +794,8 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
+      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`,
+      dspName: dspName
     };
 
     // 4. Clear previous defaults and store exact transmitted records across all 3 steps (1.1, 1.2, 2.1)
@@ -805,7 +806,12 @@ Authorized Directorate Desk`;
         if (sub === '1.2' || sub === '2.1') return false;
         return true;
       });
-      const updated = [newRecord11, sentRecord12, receivedRecord21, ...filtered];
+      const updated = [
+        { ...newRecord11, dspName },
+        { ...sentRecord12, dspName },
+        receivedRecord21,
+        ...filtered
+      ];
       saveDspRecordsToIndexedDB(updated);
       return updated;
     });

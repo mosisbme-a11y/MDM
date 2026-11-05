@@ -45,6 +45,7 @@
     "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "~5.7.2",
     "vite": "^6.4.3",
     "xlsx": "^0.18.5"

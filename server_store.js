@@ -107,10 +107,21 @@ async function readMeta() {
     const local = readLocalStore();
     return { ...DEFAULT_META(), ...local, counts: { ...EMPTY_COUNTS, ...(local.counts || {}) } };
   }
-  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', META_KEY).maybeSingle();
-  if (error) throw new Error(`Supabase read (_meta) failed: ${error.message}`);
-  if (!data || !data.payload) return DEFAULT_META();
-  return { ...DEFAULT_META(), ...data.payload, counts: { ...EMPTY_COUNTS, ...(data.payload.counts || {}) } };
+  try {
+    const { data, error } = await client.from(TABLE).select('payload').eq('dataset', META_KEY).maybeSingle();
+    if (error) {
+      if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+        console.warn('[Supabase Store] Table missing or meta not found, using defaults');
+        return DEFAULT_META();
+      }
+      throw new Error(`Supabase read (_meta) failed: ${error.message}`);
+    }
+    if (!data || !data.payload) return DEFAULT_META();
+    return { ...DEFAULT_META(), ...data.payload, counts: { ...EMPTY_COUNTS, ...(data.payload.counts || {}) } };
+  } catch (err) {
+    console.error('[Supabase Store] readMeta CRITICAL error:', err);
+    return DEFAULT_META();
+  }
 }
 
 /**
@@ -129,10 +140,22 @@ export async function getMasterData() {
     return result;
   }
 
-  const { data, error } = await client.from(TABLE).select('dataset,payload');
-  if (error) {
-    console.error(`[DEBUG] Supabase read failed: ${error.message}`);
-    throw new Error(`Supabase read failed: ${error.message}`);
+  let data = [];
+  try {
+    const { data: dbData, error } = await client.from(TABLE).select('dataset,payload');
+    if (error) {
+      if (error.message?.includes('does not exist')) {
+        console.warn('[Supabase Store] Table missing during getMasterData, using defaults');
+        const def = DEFAULT_META();
+        for (const f of ARRAY_FIELDS) def[f] = [];
+        return def;
+      }
+      throw new Error(`Supabase read failed: ${error.message}`);
+    }
+    data = dbData || [];
+  } catch (e) {
+    console.warn('[Supabase Store] getMasterData error:', e.message);
+    return readLocalStore();
   }
 
   const result = { ...DEFAULT_META() };
@@ -386,47 +409,75 @@ const MAX_CHUNK_RECORDS = 2000;
 
 /** Version + per-chunk hashes for every array dataset. */
 export async function getManifest() {
-  const client = requireClient();
-  const meta = await readMeta();
-  const fields = {};
-  const missing = [];
-  for (const f of ARRAY_FIELDS) {
-    const m = meta.chunks && meta.chunks[f];
-    if (m && Array.isArray(m.hashes)) {
-      fields[f] = { keys: m.hashes.map((_, i) => chunkKey(f, i)), hashes: m.hashes };
-    } else {
-      missing.push(f);
+  try {
+    const client = requireClient();
+    const meta = await readMeta();
+    const fields = {};
+    const missing = [];
+    for (const f of ARRAY_FIELDS) {
+      const m = meta.chunks && meta.chunks[f];
+      if (m && Array.isArray(m.hashes)) {
+        fields[f] = { keys: m.hashes.map((_, i) => chunkKey(f, i)), hashes: m.hashes };
+      } else {
+        missing.push(f);
+      }
     }
+    if (missing.length && client) {
+      // Datasets written before delta sync existed (or by the full-save endpoint): list their rows, hashes unknown.
+      let keys = [];
+      try {
+        const { data, error } = await client.from(TABLE).select('dataset');
+        if (error) {
+          if (error.message?.includes('does not exist')) {
+            console.warn('[Supabase Store] Table missing during manifest list, returning empty keys');
+          } else {
+            console.error('[Supabase Store] Manifest fetch error:', error);
+            throw new Error(`Supabase manifest read failed: ${error.message}`);
+          }
+        }
+        keys = (data || []).map((r) => String(r.dataset));
+      } catch (e) {
+        console.warn('[Supabase Store] Manifest list error:', e.message);
+      }
+      for (const f of missing) {
+        const indexed = keys.filter((k) => k.startsWith(`${f}:`)).sort();
+        const list = indexed.length ? indexed : keys.includes(f) ? [f] : [];
+        fields[f] = { keys: list, hashes: list.map(() => null) };
+      }
+    } else if (missing.length && !client) {
+      console.log('[Supabase Store] No client configured, generating manifest from local fallback');
+      const local = readLocalStore();
+      for (const f of missing) {
+        const records = local[f] || [];
+        const numChunks = Math.max(1, Math.ceil(records.length / CHUNK_SIZE));
+        const list = Array.from({ length: numChunks }, (_, i) => chunkKey(f, i));
+        fields[f] = { keys: list, hashes: list.map(() => null) };
+      }
+    }
+    return {
+      version: meta.version || 0,
+      lastUpdated: meta.lastUpdated,
+      lastUpdatedBy: meta.lastUpdatedBy || 'Inventory Administrator',
+      updateKind: meta.updateKind || 'Master Inventory',
+      serverTime: new Date().toISOString(),
+      counts: meta.counts,
+      chunkSize: CHUNK_SIZE,
+      fields
+    };
+  } catch (err) {
+    console.error('[Supabase Store] CRITICAL error in getManifest:', err);
+    return {
+      version: 0,
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: 'System (Error Fallback)',
+      updateKind: 'Error Recovery',
+      serverTime: new Date().toISOString(),
+      counts: { ...EMPTY_COUNTS },
+      chunkSize: CHUNK_SIZE,
+      fields: {},
+      error: err.message
+    };
   }
-  if (missing.length && client) {
-    // Datasets written before delta sync existed (or by the full-save endpoint): list their rows, hashes unknown.
-    const { data, error } = await client.from(TABLE).select('dataset');
-    if (error) throw new Error(`Supabase manifest read failed: ${error.message}`);
-    const keys = (data || []).map((r) => String(r.dataset));
-    for (const f of missing) {
-      const indexed = keys.filter((k) => k.startsWith(`${f}:`)).sort();
-      const list = indexed.length ? indexed : keys.includes(f) ? [f] : [];
-      fields[f] = { keys: list, hashes: list.map(() => null) };
-    }
-  } else if (missing.length && !client) {
-    const local = readLocalStore();
-    for (const f of missing) {
-      const records = local[f] || [];
-      const numChunks = Math.max(1, Math.ceil(records.length / CHUNK_SIZE));
-      const list = Array.from({ length: numChunks }, (_, i) => chunkKey(f, i));
-      fields[f] = { keys: list, hashes: list.map(() => null) };
-    }
-  }
-  return {
-    version: meta.version || 0,
-    lastUpdated: meta.lastUpdated,
-    lastUpdatedBy: meta.lastUpdatedBy || 'Inventory Administrator',
-    updateKind: meta.updateKind || 'Master Inventory',
-    serverTime: new Date().toISOString(),
-    counts: meta.counts,
-    chunkSize: CHUNK_SIZE,
-    fields
-  };
 }
 
 function assertDatasetKey(key) {

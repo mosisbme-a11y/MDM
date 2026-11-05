@@ -703,4 +703,5 @@ export interface DspWorkflowRecord {
   facilityMatrixData?: RegionBreakdownMatrixData;
   stage4MatrixData?: any;
   hubAggregationData?: any;
+  dspName?: string;
 }

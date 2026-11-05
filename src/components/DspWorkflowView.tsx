@@ -2156,11 +2156,18 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                         <td className="py-3 px-4 border-r border-slate-100">
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
-                              {rec.subject}
+                              {rec.dspName || rec.subject.match(/DSP \[(.*?)\]/)?.[1] || rec.subject}
                             </span>
-                            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
-                              REF: {rec.dspRefNumber}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
+                                REF: {rec.dspRefNumber}
+                              </span>
+                              {rec.dspName && (
+                                <span className="text-[9px] text-slate-300 italic truncate max-w-[120px]">
+                                  {rec.subject}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4 border-r border-slate-100">
