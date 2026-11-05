@@ -1307,32 +1307,47 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
         {/* 4 Major Category Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {stagesList.map((stg) => {
+          {stagesList
+            .filter(stg => currentStage === 'all' || stg.stageKey === currentStage)
+            .map((stg) => {
             const isSelected = currentStage === stg.stageKey;
             return (
               <div
                 key={stg.id}
-                onClick={() => onSelectSubTab?.(stg.id as any)}
-                className={`p-3 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                onClick={() => {
+                  if (isSelected) {
+                    onSelectSubTab?.('dsp-mgmt'); // Reset to all/default
+                  } else {
+                    onSelectSubTab?.(stg.id as any);
+                  }
+                }}
+                className={`p-4 rounded-2xl text-left transition-all border-2 cursor-pointer relative overflow-hidden flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-slate-50 border-amber-500/80 shadow-md ring-2 ring-amber-500/20'
+                    ? 'bg-amber-50 border-amber-500 shadow-xl ring-2 ring-amber-500/20'
                     : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
                 }`}
               >
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${stg.color}`} />
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${stg.color}`} />
+                  {isSelected && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                      ACTIVE STAGE
+                    </span>
+                  )}
                   <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                     {stg.count} Dossiers
                   </span>
                 </div>
-                <div className={`text-xs font-black leading-snug ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
+                <div className={`text-sm font-black leading-snug ${isSelected ? 'text-amber-900' : 'text-slate-700'}`}>
                   {stg.label}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-1 font-mono">
                   {stg.subSteps.length} Sub-Steps
                 </div>
                 {isSelected && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500" />
+                  <div className="absolute top-0 right-0 p-2 text-amber-600 font-bold text-[10px]">
+                    Click to show all
+                  </div>
                 )}
               </div>
             );
