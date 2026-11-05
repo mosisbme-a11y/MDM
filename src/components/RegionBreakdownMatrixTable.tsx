@@ -844,33 +844,33 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           <button
             type="button"
             onClick={() => setIsTransmitModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-amber-400 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+            className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-amber-400 font-black text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] transition-all active:border-b-0 active:translate-y-[4px]"
             title="Send official Region Breakdown Matrix to MOH PMD Directorate"
           >
             <Send className="w-3.5 h-3.5 text-amber-400" />
-            <span>Send TO MOH</span>
+            <span className="uppercase">Send TO MOH</span>
           </button>
 
           {/* Via Email Button */}
           <button
             type="button"
             onClick={() => setIsEmailModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-indigo-800 shadow-[0_4px_0_rgb(55,48,163)] transition-all active:border-b-0 active:translate-y-[4px]"
             title="Dispatch matrix via email to MOH"
           >
             <Mail className="w-3.5 h-3.5 text-white" />
-            <span>Via email</span>
+            <span className="uppercase">Via email</span>
           </button>
 
           {/* WhatsApp Button */}
           <button
             type="button"
             onClick={() => setIsWhatsAppModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-emerald-800 shadow-[0_4px_0_rgb(6,95,70)] transition-all active:border-b-0 active:translate-y-[4px]"
             title="Share matrix payload via WhatsApp"
           >
             <MessageCircle className="w-3.5 h-3.5 text-white" />
-            <span>WhatsApp</span>
+            <span className="uppercase">WhatsApp</span>
           </button>
 
           {onOpenUploadModal && (

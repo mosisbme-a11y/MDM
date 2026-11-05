@@ -184,9 +184,9 @@ export const EpssMohWorkflowSection: React.FC<EpssMohWorkflowSectionProps> = ({ 
           {activeStep < 6 && (
             <button
               onClick={handleNextStep}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-black rounded-xl text-white bg-cyan-600 hover:bg-cyan-700 border border-cyan-700 cursor-pointer transition shadow-md"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-black rounded-xl text-white bg-cyan-600 hover:bg-cyan-700 border-b-4 border-cyan-800 shadow-[0_4px_0_rgb(21,94,117)] cursor-pointer transition active:border-b-0 active:translate-y-[4px]"
             >
-              <span>Advance Step</span>
+              <span className="uppercase">Advance Step</span>
               <ArrowRight className="w-4 h-4 text-cyan-100" />
             </button>
           )}
@@ -207,12 +207,12 @@ export const EpssMohWorkflowSection: React.FC<EpssMohWorkflowSectionProps> = ({ 
               return (
                 <div
                   key={step.id}
-                  className={`p-4 rounded-2xl border transition duration-200 ${
+                  className={`p-4 rounded-2xl transition duration-200 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                     isActive
-                      ? 'bg-cyan-50/50 border-cyan-500 ring-2 ring-cyan-500/10 shadow-xs'
+                      ? 'bg-cyan-50/50 border-cyan-500 shadow-[0_4px_0_rgb(6,182,212)] ring-2 ring-cyan-500/10'
                       : isCompleted
-                      ? 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                      : 'bg-white border-slate-100 opacity-60'
+                      ? 'bg-slate-50 border-slate-200 shadow-[0_4px_0_rgb(226,232,240)] hover:border-slate-300'
+                      : 'bg-white border-slate-100 shadow-[0_4px_0_rgb(241,245,249)] opacity-60'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">

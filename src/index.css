@@ -7,6 +7,29 @@
   }
 }
 
+@layer components {
+  /* High-Appearance 3D Button Utility Classes */
+  .btn-3d-slate {
+    @apply relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400 active:border-b-0 active:translate-y-[4px] active:shadow-none;
+  }
+  
+  .btn-3d-amber {
+    @apply relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)] active:border-b-0 active:translate-y-[4px] active:shadow-none;
+  }
+  
+  .btn-3d-dark {
+    @apply relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 bg-slate-900 text-white border-slate-950 shadow-[0_4px_0_rgb(2,6,23)] active:border-b-0 active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-3d-indigo {
+    @apply relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 bg-indigo-600 text-white border-indigo-800 shadow-[0_4px_0_rgb(55,48,163)] active:border-b-0 active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-3d-teal {
+    @apply relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 bg-teal-600 text-white border-teal-800 shadow-[0_4px_0_rgb(17,94,89)] active:border-b-0 active:translate-y-[4px] active:shadow-none;
+  }
+}
+
 /* Print-Friendly Report Stylesheet */
 @media print {
   @page {

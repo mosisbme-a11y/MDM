@@ -638,8 +638,8 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       <div className="bg-[#0B1527] border border-[#0B1527] rounded-2xl p-4 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#1E3A5F] border border-[#2D4D75] shadow-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#1E3A5F] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
                 DSP Breakdown Request to RHB
               </span>
@@ -735,10 +735,10 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsTransmitModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer border-b-4 border-amber-700 shadow-[0_4px_0_rgb(180,83,9)] active:border-b-0 active:translate-y-[4px]"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Submit to RHBs</span>
+              <span className="uppercase">Submit to RHBs</span>
             </button>
           </div>
         </div>

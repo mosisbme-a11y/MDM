@@ -1321,10 +1321,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     onSelectSubTab?.(stg.id as any);
                   }
                 }}
-                className={`p-4 rounded-2xl text-left transition-all border-2 cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                className={`p-4 rounded-2xl text-left transition-all border-b-4 active:border-b-0 active:translate-y-[4px] cursor-pointer relative overflow-hidden flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-amber-50 border-amber-500 shadow-xl ring-2 ring-amber-500/20'
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                    ? 'bg-amber-50 border-amber-500 shadow-[0_4px_0_rgb(245,158,11)] ring-2 ring-amber-500/10'
+                    : 'bg-white border-slate-200 shadow-[0_4px_0_rgb(226,232,240)] hover:border-slate-300 hover:bg-slate-50/60'
                 }`}
               >
                 <div className="flex items-center justify-between gap-1 mb-2">
@@ -1356,7 +1356,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
         {/* Sub-Steps Selector Pills Bar */}
         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 overflow-x-auto">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mr-1">Sub-Steps:</span>
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 ml-1">SUB-STEPS:</span>
           {stagesList
             .filter(stg => currentStage === 'all' || currentStage === stg.stageKey)
             .flatMap(stg => stg.subSteps)
@@ -1389,83 +1389,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 } catch {}
               }
 
-              const isDspRequestToMoh = sub.id === '1.1';
-              const isDspReceivedFromMoh = sub.id === '1.2';
-              const isDspBreakdownRequest = sub.id === '2.2';
-
-              if (isDspRequestToMoh) {
-                return (
-                  <button
-                    key={sub.id}
-                    onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
-                      isSubSelected
-                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
-                    }`}
-                    title="• DSP Request to MOH"
-                  >
-                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
-                    <span className="tracking-tight">{sub.label}</span>
-                  </button>
-                );
-              }
-
-              if (isDspReceivedFromMoh) {
-                return (
-                  <button
-                    key={sub.id}
-                    onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
-                      isSubSelected
-                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
-                    }`}
-                    title="• DSP Received from MOH"
-                  >
-                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
-                    <span className="tracking-tight">{sub.label}</span>
-                  </button>
-                );
-              }
-
-              if (isDspBreakdownRequest) {
-                return (
-                  <button
-                    key={sub.id}
-                    onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
-                      isSubSelected
-                        ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
-                    }`}
-                    title="• DSP Breakdown Request to RHB: Horizontal Matrix Quota Template"
-                  >
-                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
-                    <span className="tracking-tight">{sub.label}</span>
-                    {subCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-black ${isSubSelected ? 'bg-white text-amber-600' : 'bg-slate-300 text-slate-800'}`}>
-                        {subCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              }
-
               return (
                 <button
                   key={sub.id}
                   onClick={() => onSelectSubTab?.(sub.subTab)}
-                  className={`group relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
+                  className={`group relative px-4 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                     isSubSelected
-                      ? 'bg-amber-600 text-white border-amber-800 shadow-[0_4px_0_rgb(146,64,14)]'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] hover:border-slate-400'
+                      ? 'bg-[#0B1527] text-white border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]'
+                      : 'bg-[#EBF1F6] text-[#1E3A5F] hover:bg-[#DEE7EF] border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] hover:border-[#CAD6E2]'
                   }`}
+                  title={sub.label}
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-white' : 'bg-slate-400'}`} />
-                  <span className="tracking-tight">{sub.label}</span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]' : 'bg-[#8292A2]'}`} />
+                  <span className="tracking-tight uppercase">{sub.label}</span>
                   {subCount > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-black ${isSubSelected ? 'bg-white text-amber-600' : 'bg-slate-300 text-slate-800'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${isSubSelected ? 'bg-amber-400 text-slate-900' : 'bg-[#D5E1EC] text-[#1E3A5F]'}`}>
                       {subCount}
                     </span>
                   )}

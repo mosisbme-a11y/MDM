@@ -1089,10 +1089,10 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
             <button
               onClick={() => setViewTab('order-process')}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition shadow-md flex items-center gap-2 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition border-b-4 border-indigo-800 shadow-[0_4px_0_rgb(30,58,95)] flex items-center gap-2 cursor-pointer active:border-b-0 active:translate-y-[4px] ring-2 ring-blue-400/20"
             >
               <Truck className="w-4 h-4 text-amber-300" />
-              <span>Order Process (SAP STO)</span>
+              <span className="uppercase">Order Process (SAP STO)</span>
               <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
                 {orderProcessItems.length} lines
               </span>
@@ -1101,19 +1101,19 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             <button
               onClick={handleRunAutoMapping}
               disabled={isMappingRunning || !currentDossier}
-              className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition shadow-md flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+              className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition border-b-4 border-teal-800 shadow-[0_4px_0_rgb(17,94,89)] flex items-center gap-2 cursor-pointer active:border-b-0 active:translate-y-[4px] disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 ${isMappingRunning ? 'animate-spin' : 'text-amber-300'}`} />
-              <span>{isMappingRunning ? 'Mapping with HF Master...' : 'Map HF to Hub (HF Master)'}</span>
+              <span className="uppercase">{isMappingRunning ? 'Mapping...' : 'Map HF to Hub (Master Data)'}</span>
             </button>
 
             <button
               onClick={handleAggregateAllRHBSubmissions}
-              className="px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition border-b-4 border-amber-800 shadow-[0_4px_0_rgb(146,64,14)] flex items-center gap-1.5 cursor-pointer active:border-b-0 active:translate-y-[4px]"
               title="Consolidate all regional RHB breakdown submissions into this single MOH-to-EPSS aggregated breakdown"
             >
               <Layers className="w-3.5 h-3.5 text-amber-200" />
-              <span>Aggregate RHBs</span>
+              <span className="uppercase">Aggregate RHBs</span>
             </button>
           </div>
         </div>

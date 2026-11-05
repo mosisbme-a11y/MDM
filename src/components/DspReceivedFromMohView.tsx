@@ -564,10 +564,10 @@ Notes: ${folder.notes || 'N/A'}`;
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _04C3EE6A-184D-4123-86F4-25891B98DD8C__9cb01a11.png */}
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#EBF1F6] border border-[#D5E1EC] shadow-sm ring-1 ring-cyan-500/30">
+            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _04C3EE6A-184D-4123-86F4-25891B98DD8C__9cb01a11.png - ENHANCED 3D */}
+            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#EBF1F6] border-b-4 border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] ring-1 ring-cyan-500/10">
               <span className="w-2.5 h-2.5 rounded-full bg-[#8292A2] shrink-0" />
-              <span className="text-xs md:text-sm font-black text-[#1E3A5F] tracking-tight">
+              <span className="text-xs md:text-sm font-black text-[#1E3A5F] tracking-tight uppercase">
                 {is21 ? 'DSP Received from EPSS' : 'DSP Received from MOH'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#1E3A5F] text-white">
@@ -597,11 +597,11 @@ Notes: ${folder.notes || 'N/A'}`;
             <button
               type="button"
               onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1527] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-200 shadow-2xs"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1527] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] active:border-b-0 active:translate-y-[4px]"
               title="Return to Sub-Step 1.1: DSP Request to MOH"
             >
               <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-              <span>• DSP Request to MOH</span>
+              <span className="uppercase font-black">DSP Request to MOH</span>
             </button>
 
             {/* Download Excel */}
@@ -609,11 +609,11 @@ Notes: ${folder.notes || 'N/A'}`;
               type="button"
               disabled={receivedRows.length === 0}
               onClick={handleDownloadExcel}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-emerald-800 shadow-[0_4px_0_rgb(6,95,70)] active:border-b-0 active:translate-y-[4px]"
               title="Download official received Excel spreadsheet"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download Excel</span>
+              <span className="uppercase font-black">Download Excel</span>
             </button>
 
             {/* Print Official Receipt */}
@@ -632,10 +632,10 @@ Notes: ${folder.notes || 'N/A'}`;
             <button
               type="button"
               onClick={() => onSelectSubTab?.('dsp-ho-1-3-1')}
-              className="px-3.5 py-1.5 rounded-xl bg-[#0B1527] hover:bg-[#111f38] text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              className="px-3.5 py-1.5 rounded-xl bg-[#0B1527] hover:bg-[#111f38] text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] active:border-b-0 active:translate-y-[4px]"
               title="Advance to Sub-Step 1.3: Map HF to Hubs based on Master Data"
             >
-              <span>Proceed to 1.3 Map HF</span>
+              <span className="uppercase font-black">Proceed to 1.3 Map HF</span>
               <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
             </button>
           </div>

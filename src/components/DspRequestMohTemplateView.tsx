@@ -893,9 +893,9 @@ Authorized Directorate Desk`;
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {/* EXACT PILL BUTTON FROM USER SCREENSHOT _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#0B1527] border border-[#0B1527] shadow-md ring-2 ring-amber-400/50">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse" />
-              <span className="text-xs md:text-sm font-black text-white tracking-tight">
+            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0B1527] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] ring-1 ring-amber-400/20">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+              <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
                 DSP Request to MOH
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#F59E0B] text-slate-950">
@@ -907,7 +907,7 @@ Authorized Directorate Desk`;
             <button
               type="button"
               onClick={() => onSelectSubTab?.('dsp-ho-1-2')}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#EBF1F6] hover:bg-[#E0E9F2] border border-[#D5E1EC] text-[#1E3A5F] transition cursor-pointer shadow-2xs font-bold text-xs"
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#EBF1F6] hover:bg-[#DEE7EF] border-b-4 border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] text-[#1E3A5F] transition cursor-pointer font-black text-xs uppercase"
               title="Click to view Sub-step 1.2: DSP Received from MOH"
             >
               <span className="w-2 h-2 rounded-full bg-[#8292A2]" />
@@ -988,37 +988,37 @@ Authorized Directorate Desk`;
               type="button"
               onClick={() => setIsTransmitModalOpen(true)}
               disabled={selectedRowIds.length === 0}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all border-b-4 active:border-b-0 active:translate-y-[4px] ${
                 selectedRowIds.length === 0
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'
-                  : 'bg-slate-900 hover:bg-black text-amber-300 cursor-pointer'
+                  ? 'bg-slate-200 text-slate-400 border-slate-300 shadow-none cursor-not-allowed grayscale'
+                  : 'bg-slate-900 hover:bg-black text-amber-300 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] cursor-pointer'
               }`}
               title={selectedRowIds.length === 0 ? "Select items in the table below to enable transmittal" : "Confirm official DSP Request transmittal to MOH PMD Directorate"}
             >
               <Send className={`w-3.5 h-3.5 ${selectedRowIds.length === 0 ? 'text-slate-400' : 'text-amber-400'}`} />
-              <span>Send to MOH</span>
+              <span className="uppercase">Send to MOH</span>
             </button>
 
             {/* Sync from Multiple Stock (Program HP) */}
             <button
               type="button"
               onClick={handleSyncWithMultipleStock}
-              className="px-2.5 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border-b-4 border-cyan-200 shadow-[0_4px_0_rgb(207,250,254)] text-xs font-bold flex items-center gap-1 transition cursor-pointer active:border-b-0 active:translate-y-[4px]"
               title="Sync table with latest Multiple Stock Program (HP) items (Special Stock 'Q' Only)"
             >
               <RefreshCw className="w-3 h-3 text-cyan-600" />
-              <span>Sync HP Stock ({programHpStockItems.length})</span>
+              <span className="uppercase">Sync HP Stock ({programHpStockItems.length})</span>
             </button>
 
             {/* Download Template Excel */}
             <button
               type="button"
               onClick={() => downloadDspRequestTemplateExcel(templateRows)}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] text-xs font-bold flex items-center gap-1 transition cursor-pointer active:border-b-0 active:translate-y-[4px]"
               title="Download formatted Excel (.xlsx) file with orange headers and yellow rows"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Excel (.xlsx)</span>
+              <span className="uppercase">Excel (.xlsx)</span>
             </button>
 
             {/* Remove Selected Button - Only visible when items are selected */}
