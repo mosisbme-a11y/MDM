@@ -507,6 +507,22 @@ export function App() {
 
     hydrateFromCentralServer();
 
+    // Push local browser records (IndexedDB / localStorage) to Supabase Cloud on startup
+    setTimeout(() => {
+      if (!isMounted) return;
+      pushCentralMasterData({
+        items,
+        multipleStockItems,
+        receivingDataRecords,
+        distributionDataRecords,
+        materialMasterItems,
+        hfListItems,
+        dspWorkflowRecords: dspRecords,
+        updatedBy: currentUser?.name || currentUser?.email || 'EPSS Master Administrator',
+        updateKind: 'Local-to-Cloud Complete Data Migration'
+      }).catch(err => console.warn('Local-to-cloud migration notice:', err));
+    }, 3000);
+
     // 2. Subscribe to continuous cross-browser polling updates
     const unsubscribePolling = subscribeCentralSync((remoteData) => {
       if (!isMounted) return;
