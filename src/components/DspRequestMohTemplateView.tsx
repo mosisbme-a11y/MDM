@@ -981,10 +981,15 @@ Authorized Directorate Desk`;
             <button
               type="button"
               onClick={() => setIsTransmitModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
-              title="Confirm official DSP Request transmittal to MOH PMD Directorate"
+              disabled={selectedRowIds.length === 0}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md ${
+                selectedRowIds.length === 0
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'
+                  : 'bg-slate-900 hover:bg-black text-amber-300 cursor-pointer'
+              }`}
+              title={selectedRowIds.length === 0 ? "Select items in the table below to enable transmittal" : "Confirm official DSP Request transmittal to MOH PMD Directorate"}
             >
-              <Send className="w-3.5 h-3.5 text-amber-400" />
+              <Send className={`w-3.5 h-3.5 ${selectedRowIds.length === 0 ? 'text-slate-400' : 'text-amber-400'}`} />
               <span>Send to MOH</span>
             </button>
 
@@ -993,7 +998,7 @@ Authorized Directorate Desk`;
               type="button"
               onClick={handleSyncWithMultipleStock}
               className="px-2.5 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-              title="Sync table with latest Multiple Stock Program (HP) items"
+              title="Sync table with latest Multiple Stock Program (HP) items (Special Stock 'Q' Only)"
             >
               <RefreshCw className="w-3 h-3 text-cyan-600" />
               <span>Sync HP Stock ({programHpStockItems.length})</span>
@@ -1010,6 +1015,27 @@ Authorized Directorate Desk`;
               <span>Excel (.xlsx)</span>
             </button>
 
+            {/* Remove Selected Button - Only visible when items are selected */}
+            {selectedRowIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to remove ${selectedRowIds.length} selected items from this request?`)) {
+                    const updated = templateRows.filter(r => !selectedRowIds.includes(r.id));
+                    setTemplateRows(updated);
+                    setSelectedRowIds([]);
+                    localStorage.setItem('epss_dsp_request_template_rows', JSON.stringify(updated));
+                    showToast(`✓ Removed ${selectedRowIds.length} items from the request table.`);
+                  }
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer animate-in fade-in zoom-in-95"
+                title="Remove selected items from this request table"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Remove Selected ({selectedRowIds.length})</span>
+              </button>
+            )}
+
             {/* Add Row Button */}
             <button
               type="button"
@@ -1019,8 +1045,24 @@ Authorized Directorate Desk`;
             >
               <Plus className="w-4 h-4" />
             </button>
+
+            {/* Validation / Status Indicator */}
+            {selectedRowIds.length > 0 && (
+              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-black uppercase animate-in slide-in-from-right-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>{selectedRowIds.length} Items Validated & Ready for MOH</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Selection Helper Info */}
+        {selectedRowIds.length === 0 && (
+          <div className="mt-2.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-2 text-[10px] text-blue-700 font-bold uppercase animate-in fade-in">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Select items using the checkboxes below to enable "Send to MOH" and "Remove Selected" actions.</span>
+          </div>
+        )}
 
         {/* Attached Letter Status Card */}
         {uploadedLetterFile && (

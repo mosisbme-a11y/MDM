@@ -110,29 +110,8 @@ export function isProgramHpStockItem(item: any): boolean {
   const desc = (item.materialDescription || '').toUpperCase();
   const mat = (item.material || '').toUpperCase();
 
-  // Special stock 'Q' is the standard SAP / EPSS ERP indicator for Project & Health Program stock
-  if (spec === 'Q' || spec.includes('Q') || spec.includes('HP') || spec.includes('PROG')) {
-    return true;
-  }
-  // Program WBS or grant indicators
-  if (
-    wbs.includes('HP') ||
-    wbs.includes('SDG') ||
-    wbs.includes('GF') ||
-    wbs.includes('WB') ||
-    wbs.includes('PEPFAR') ||
-    wbs.includes('MOH') ||
-    wbs.includes('PROG') ||
-    wbs.includes('GRANT')
-  ) {
-    return true;
-  }
-  // Program group or valuation
-  if (group.includes('HP') || group.includes('PROGRAM') || valType.includes('HP')) {
-    return true;
-  }
-  // Standard template item
-  if (mat === '403-XRRD-0101' || desc.includes('ANESTHESIA MACHINE')) {
+  // Strictly filter by Special Stock 'Q' as requested by the user
+  if (spec === 'Q') {
     return true;
   }
   return false;
