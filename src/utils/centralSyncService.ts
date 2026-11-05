@@ -517,16 +517,19 @@ export function subscribeCentralSync(
   // 1. Initial check
   performCheck('mount');
 
-  // 1b. Instant push from Supabase Realtime: the server bumps the '_meta' row after every save
+  // 1b. Instant push from Supabase Realtime across all inventory, stock, and master data tables
   let realtimeChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
   if (supabase) {
     try {
       realtimeChannel = supabase
-        .channel('system-master-data-meta')
+        .channel('system-master-data-realtime-all')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'system_master_data', filter: 'dataset=eq._meta' },
-          () => performCheck('realtime')
+          { event: '*', schema: 'public', table: 'system_master_data' },
+          (payload) => {
+            console.log('[CentralSyncService] Supabase Realtime update received:', payload.eventType);
+            performCheck('realtime-inventory-stock');
+          }
         )
         .subscribe();
     } catch (err) {
