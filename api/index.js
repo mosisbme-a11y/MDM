@@ -1,4 +1,5 @@
-// Vercel serverless entry point: every /api/* request is handled by the same Express app that `npm start` runs locally.
+// Vercel serverless entry point: registers tsx loader for TypeScript server.ts support
+import 'tsx/esm';
 import app from '../server.ts';
 
 export const config = { maxDuration: 60 };
