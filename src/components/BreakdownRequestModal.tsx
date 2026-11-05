@@ -1748,7 +1748,6 @@ TRANSMISSION METRICS:
                             <th className="py-2.5 px-3 border-r border-slate-200 text-center">Transmitted Qty</th>
                             <th className="py-2.5 px-3 border-r border-slate-200 text-right">Valuation (ETB)</th>
                             <th className="py-2.5 px-3 border-r border-slate-200">WBS Element</th>
-                            <th className="py-2.5 px-3 border-r border-slate-200">Allocated Facility</th>
                             <th className="py-2.5 px-3">Dispatch Status</th>
                           </tr>
                         </thead>
@@ -1800,7 +1799,6 @@ TRANSMISSION METRICS:
                                   <td className="py-2 px-3 border-r border-slate-100 text-center font-black text-cyan-700">{formatNumber(item.unrestrictedStock)}</td>
                                   <td className="py-2 px-3 border-r border-slate-100 text-right font-black text-emerald-700">{formatCurrency(item.currentValueOfUnrestrictedStock)}</td>
                                   <td className="py-2 px-3 border-r border-slate-100 text-slate-500">{item.wbsElement || 'WBS-MOH-2026'}</td>
-                                  <td className="py-2 px-3 border-r border-slate-100 text-slate-700 font-sans font-medium">{(item as any).allocatedFacility || '-'}</td>
                                   <td className="py-2 px-3 font-sans">
                                     <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wider">
                                       <CheckCircle2 size={10} />
@@ -1834,10 +1832,7 @@ TRANSMISSION METRICS:
                                             <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">WBS Element</span>
                                             <span className="font-bold text-indigo-700">{item.wbsElement || 'WBS-MOH-2026'}</span>
                                           </div>
-                                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                                            <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">Allocated Facility</span>
-                                            <span className="font-bold text-emerald-700">{(item as any).allocatedFacility || 'Assigned Regional Facility'}</span>
-                                          </div>
+
                                         </div>
 
                                         <div className="p-3 bg-cyan-50/50 border border-cyan-100 rounded-xl space-y-1 text-xs font-sans">

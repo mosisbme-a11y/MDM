@@ -77,6 +77,7 @@ import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
 import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
 import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
 import { DspReceivedFromMohView } from './DspReceivedFromMohView';
+import { DspBreakdownMohToRhbView } from './DspBreakdownMohToRhbView';
 import { StageSourceDataModal } from './StageSourceDataModal';
 import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
 import { 
@@ -1372,10 +1373,19 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 if (r12 && r12.itemsIncluded && r12.itemsIncluded.length > 0 && !r12.id.includes('sample')) {
                   subCount = r12.itemsIncluded.length;
                 }
+              } else if (sub.id === '2.2') {
+                try {
+                  const stored = localStorage.getItem('epss_dsp_2_2_rows');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
+                  }
+                } catch {}
               }
 
               const isDspRequestToMoh = sub.id === '1.1';
               const isDspReceivedFromMoh = sub.id === '1.2';
+              const isDspBreakdownRequest = sub.id === '2.2';
 
               if (isDspRequestToMoh) {
                 return (
@@ -1416,6 +1426,29 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
                         isSubSelected ? 'bg-cyan-400 text-slate-950' : 'bg-[#1E3A5F] text-white'
                       }`}>
+                        {subCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
+              if (isDspBreakdownRequest) {
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => onSelectSubTab?.(sub.subTab)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      isSubSelected
+                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-amber-400/80 scale-[1.02]'
+                        : 'bg-[#0B1527] hover:bg-[#111f38] text-white border-[#0B1527] shadow-xs'
+                    }`}
+                    title="• DSP Breakdown Request to RHB: Horizontal Matrix Quota Template"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 ${isSubSelected ? 'animate-pulse' : ''}`} />
+                    <span className="tracking-tight text-white font-bold">{sub.label}</span>
+                    {subCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-900">
                         {subCount}
                       </span>
                     )}
@@ -1835,6 +1868,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
+      ) : (currentSubStep === '2.2' || currentSubTab === 'dsp-moh-2-2' || currentSubTab === 'dsp-breakdown-moh-rhb') ? (
+        <DspBreakdownMohToRhbView
+          records={records}
+          setRecords={setRecords}
+          multipleStockItems={multipleStockItems}
+          onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
       ) : (
         <>
 
@@ -2181,7 +2222,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           'S/N': idx + 1,
                           'Material Code': item.material,
                           'Item Description': item.description || (item as any).materialDescription || 'N/A',
-                          'Allocated Facility / Target': item.allocatedFacility || selectedRecord.recipientOrg || 'N/A',
                           'Qty Requested': qty,
                           'Unit Val (ETB)': unitVal,
                           'Total Val (ETB)': totalVal
@@ -2203,11 +2243,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                       <th className="p-2.5 border-r border-slate-300 w-10 text-center">S/N</th>
                       <th className="p-2.5 border-r border-slate-300 min-w-[110px]">Material Code</th>
-                      <th className="p-2.5 border-r border-slate-300 min-w-[180px]">Item Description</th>
-                      <th className="p-2.5 border-r border-slate-300 min-w-[150px]">Allocated Facility / Target</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[90px]">Qty Requested</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[100px]">Unit Val (ETB)</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[110px]">Total Val (ETB)</th>
+                      <th className="p-2.5 border-r border-slate-300 min-w-[200px]">Item Description</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[100px]">Qty Requested</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[110px]">Unit Val (ETB)</th>
+                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[120px]">Total Val (ETB)</th>
                       <th className="p-2.5 text-center w-14">Action</th>
                     </tr>
                   </thead>
@@ -2229,9 +2268,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           </td>
                           <td className="p-2 border-r border-slate-200 text-slate-800 font-medium">
                             {item.description || (item as any).materialDescription || 'Medical Equipment'}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-cyan-800 font-medium">
-                            {item.allocatedFacility || selectedRecord.recipientOrg || 'Regional Hub Allocation'}
                           </td>
                           <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-700">
                             {formatNumber(qty)}

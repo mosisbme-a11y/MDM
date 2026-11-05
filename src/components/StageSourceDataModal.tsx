@@ -252,7 +252,6 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                           'No': idx + 1,
                           'Material Code': item.material,
                           'Description': item.description,
-                          'Allocated Facility': item.allocatedFacility || 'N/A',
                           'Quantity': item.quantity
                         }));
                         downloadCSV(`dossier-items-${selectedRecordDetail.dspRefNumber}.csv`, csv);
@@ -273,7 +272,6 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                           <th className="p-2.5 border-r border-slate-300 w-12 text-center">#</th>
                           <th className="p-2.5 border-r border-slate-300 min-w-[130px]">Material Code</th>
                           <th className="p-2.5 border-r border-slate-300 min-w-[220px]">Item Description</th>
-                          <th className="p-2.5 border-r border-slate-300 min-w-[180px]">Allocated Facility</th>
                           <th className="p-2.5 text-right min-w-[100px]">Quantity</th>
                         </tr>
                       </thead>
