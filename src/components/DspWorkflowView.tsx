@@ -1398,18 +1398,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     key={sub.id}
                     onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                    className={`px-3 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
                       isSubSelected
-                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-amber-400/80 scale-[1.02]'
-                        : 'bg-[#0B1527] hover:bg-[#111f38] text-white border-[#0B1527] shadow-xs'
+                        ? 'text-slate-900 border-amber-500 font-black'
+                        : 'text-slate-500 hover:text-slate-900 border-transparent'
                     }`}
-                    title="• DSP Request to MOH: 10-Column Standard Template linked with Multiple Stock (Program HP Only)"
+                    title="• DSP Request to MOH"
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 ${isSubSelected ? 'animate-pulse' : ''}`} />
-                    <span className="tracking-tight text-white font-bold">{sub.label}</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#F59E0B] text-slate-950">
-                      {subCount}
-                    </span>
+                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                    <span className="tracking-tight">{sub.label}</span>
                   </button>
                 );
               }
@@ -1419,22 +1416,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <button
                     key={sub.id}
                     onClick={() => onSelectSubTab?.(sub.subTab)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                    className={`px-3 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
                       isSubSelected
-                        ? 'bg-[#0B1527] text-white border-[#0B1527] shadow-md ring-2 ring-cyan-400/80 scale-[1.02]'
-                        : 'bg-[#EBF1F6] hover:bg-[#E0E9F2] text-[#1E3A5F] border-[#D5E1EC] shadow-2xs'
+                        ? 'text-slate-900 border-amber-500 font-black'
+                        : 'text-slate-500 hover:text-slate-900 border-transparent'
                     }`}
-                    title="• DSP Received from MOH: Sub-step 1.2 Official Response & Endorsement Ledger"
+                    title="• DSP Received from MOH"
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSubSelected ? 'bg-cyan-400 animate-pulse' : 'bg-[#8292A2]'}`} />
-                    <span className={`tracking-tight font-bold ${isSubSelected ? 'text-white' : 'text-[#1E3A5F]'}`}>{sub.label}</span>
-                    {subCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
-                        isSubSelected ? 'bg-cyan-400 text-slate-950' : 'bg-[#1E3A5F] text-white'
-                      }`}>
-                        {subCount}
-                      </span>
-                    )}
+                    <span className={`w-2 h-2 rounded-full ${isSubSelected ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                    <span className="tracking-tight">{sub.label}</span>
                   </button>
                 );
               }
