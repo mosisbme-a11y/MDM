@@ -439,6 +439,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
+  const [summaryViewMode, setSummaryViewMode] = useState<'itemized' | 'dossier'>('dossier');
 
   // Smart Table Sorting State
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -1937,153 +1938,268 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {/* Mechanism 1: Request Items & Order Process Master Table */}
 
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                Itemized Request Tables & Order Processing Matrix ({allRequestTableItems.length} Material Rows)
-              </span>
+          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
+                  {summaryViewMode === 'itemized' 
+                    ? `Itemized Request Tables & Order Processing Matrix (${allRequestTableItems.length} Material Rows)`
+                    : `Dossier Summary Tracker (${filteredRecords.length} Documents)`
+                  }
+                </span>
+              </div>
+
+              {/* Template Toggle - Based on user screenshot requirements */}
+              <div className="flex items-center gap-1.5 bg-slate-200/50 p-0.5 rounded-lg border border-slate-300/60 shadow-xs">
+                <button 
+                  onClick={() => setSummaryViewMode('dossier')}
+                  className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    summaryViewMode === 'dossier' 
+                      ? 'bg-white text-amber-700 shadow-sm border border-slate-200' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <FileText className="w-3 h-3" />
+                  SUMMARY TEMPLATE
+                </button>
+                <button 
+                  onClick={() => setSummaryViewMode('itemized')}
+                  className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    summaryViewMode === 'itemized' 
+                      ? 'bg-white text-amber-700 shadow-sm border border-slate-200' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Layers className="w-3 h-3" />
+                  ITEMIZED MATRIX
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const csv = sortedRequestTableItems.map((item, idx) => ({
-                  'S/N': idx + 1,
-                  'MATERIAL CODE': item.material,
-                  'ITEM DESCRIPTION': item.description,
-                  'HIERARCHY STAGE': item.parentRecord.stageTitle,
-                  'SENDER': item.parentRecord.senderOrg,
-                  'RECIPIEN': item.parentRecord.recipientOrg,
-                  'QTY REQUESTED': item.quantity,
-                  'UNIT VAL (ETB)': item.unitPriceETB,
-                  'TOTAL VAL (ETB)': item.totalValuationETB,
-                  'REQUSTED DATE': item.parentRecord.dateSubmitted,
-                  'STATUS': item.parentRecord.status
-                }));
-                downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
-              }}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Request Items CSV</span>
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (summaryViewMode === 'itemized') {
+                    const csv = sortedRequestTableItems.map((item, idx) => ({
+                      'S/N': idx + 1,
+                      'MATERIAL CODE': item.material,
+                      'ITEM DESCRIPTION': item.description,
+                      'HIERARCHY STAGE': item.parentRecord.stageTitle,
+                      'SENDER': item.parentRecord.senderOrg,
+                      'RECIPIENT': item.parentRecord.recipientOrg,
+                      'QTY REQUESTED': item.quantity,
+                      'UNIT VAL (ETB)': item.unitPriceETB,
+                      'TOTAL VAL (ETB)': item.totalValuationETB,
+                      'REQUESTED DATE': item.parentRecord.dateSubmitted,
+                      'STATUS': item.parentRecord.status
+                    }));
+                    downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
+                  } else {
+                    const csv = filteredRecords.map((r, idx) => ({
+                      'S/N': idx + 1,
+                      'Date': r.dateSubmitted,
+                      'DSP Name': r.subject,
+                      'Authorized person': r.signatory,
+                      'Status': r.status,
+                      'Reference': r.dspRefNumber
+                    }));
+                    downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
+                  }
+                }}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export {summaryViewMode === 'itemized' ? 'Matrix' : 'Summary'} CSV</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
-                  <th className="py-2.5 px-3 text-center">S/N</th>
-                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('material')}>
-                    <div className="flex items-center">
-                      MATERIAL CODE
-                      {renderSortIcon('material')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('description')}>
-                    <div className="flex items-center">
-                      ITEM DESCRIPTION
-                      {renderSortIcon('description')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('stage')}>
-                    <div className="flex items-center">
-                      HIERARCHY STAGE
-                      {renderSortIcon('stage')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('sender')}>
-                    <div className="flex items-center">
-                      SENDER
-                      {renderSortIcon('sender')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('recipient')}>
-                    <div className="flex items-center">
-                      RECIPIEN
-                      {renderSortIcon('recipient')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('qty')}>
-                    <div className="flex items-center justify-end">
-                      QTY REQUESTED
-                      {renderSortIcon('qty')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('unitPrice')}>
-                    <div className="flex items-center justify-end">
-                      UNIT VAL (ETB)
-                      {renderSortIcon('unitPrice')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('totalVal')}>
-                    <div className="flex items-center justify-end">
-                      TOTAL VAL (ETB)
-                      {renderSortIcon('totalVal')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('date')}>
-                    <div className="flex items-center justify-center">
-                      REQUSTED DATE
-                      {renderSortIcon('date')}
-                    </div>
-                  </th>
-                  <th className="py-2.5 px-3 text-center">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-600">
-                {sortedRequestTableItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Archive className="w-8 h-8 text-slate-200" />
-                        <p className="text-slate-400 font-medium">No request table items found in this selection.</p>
+            {summaryViewMode === 'itemized' ? (
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
+                    <th className="py-2.5 px-3 text-center">S/N</th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('material')}>
+                      <div className="flex items-center">
+                        MATERIAL CODE
+                        {renderSortIcon('material')}
                       </div>
-                    </td>
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('description')}>
+                      <div className="flex items-center">
+                        ITEM DESCRIPTION
+                        {renderSortIcon('description')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('stage')}>
+                      <div className="flex items-center">
+                        HIERARCHY STAGE
+                        {renderSortIcon('stage')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('sender')}>
+                      <div className="flex items-center">
+                        SENDER
+                        {renderSortIcon('sender')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('recipient')}>
+                      <div className="flex items-center">
+                        RECIPIENT
+                        {renderSortIcon('recipient')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('qty')}>
+                      <div className="flex items-center justify-end">
+                        QTY REQUESTED
+                        {renderSortIcon('qty')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('unitPrice')}>
+                      <div className="flex items-center justify-end">
+                        UNIT VAL (ETB)
+                        {renderSortIcon('unitPrice')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('totalVal')}>
+                      <div className="flex items-center justify-end">
+                        TOTAL VAL (ETB)
+                        {renderSortIcon('totalVal')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('date')}>
+                      <div className="flex items-center justify-center">
+                        REQUESTED DATE
+                        {renderSortIcon('date')}
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 text-center">ACTION</th>
                   </tr>
-                ) : (
-                  sortedRequestTableItems.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{item.material}</td>
-                      <td className="py-2.5 px-3 font-medium text-slate-800">{item.description}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-[10px]">
-                          {item.parentRecord.stageTitle}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
-                        {item.parentRecord.senderOrg}
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
-                        {item.parentRecord.recipientOrg}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-700">
-                        {formatNumber(item.quantity)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-600">
-                        {formatCurrency(item.unitPriceETB)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
-                        {formatCurrency(item.totalValuationETB)}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
-                        {item.parentRecord.dateSubmitted}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRecord(item.parentRecord)}
-                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition cursor-pointer"
-                        >
-                          View Table
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-600">
+                  {sortedRequestTableItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="py-12 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <Archive className="w-8 h-8 text-slate-200" />
+                          <p className="text-slate-400 font-medium">No request table items found in this selection.</p>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    sortedRequestTableItems.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{item.material}</td>
+                        <td className="py-2.5 px-3 font-medium text-slate-800">{item.description}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-[10px]">
+                            {item.parentRecord.stageTitle}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
+                          {item.parentRecord.senderOrg}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
+                          {item.parentRecord.recipientOrg}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-700">
+                          {formatNumber(item.quantity)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-600">
+                          {formatCurrency(item.unitPriceETB)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
+                          {formatCurrency(item.totalValuationETB)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
+                          {item.parentRecord.dateSubmitted}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRecord(item.parentRecord)}
+                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition cursor-pointer"
+                          >
+                            View Table
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* User-Requested Summary Template (Image 2) */
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-[11px] font-bold text-slate-800 uppercase tracking-tight select-none">
+                    <th className="py-3 px-4 border-r border-slate-200 w-12 text-center">S/N</th>
+                    <th className="py-3 px-4 border-r border-slate-200 w-32">Date</th>
+                    <th className="py-3 px-4 border-r border-slate-200">DSP Name</th>
+                    <th className="py-3 px-4 border-r border-slate-200">Authorized person</th>
+                    <th className="py-3 px-4 text-center w-24">View</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-700">
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center bg-slate-50/30">
+                        <div className="flex flex-col items-center gap-2">
+                          <FileText className="w-8 h-8 text-slate-200" />
+                          <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((rec, idx) => (
+                      <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group">
+                        <td className="py-3 px-4 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3 px-4 border-r border-slate-100 font-semibold text-slate-600">
+                          {rec.dateSubmitted}
+                        </td>
+                        <td className="py-3 px-4 border-r border-slate-100">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                              {rec.subject}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
+                              REF: {rec.dspRefNumber}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 border-r border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                              <UserCheck className="w-3 h-3 text-slate-500" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-800">{rec.signatory}</span>
+                              <span className="text-[10px] text-slate-400 leading-tight">{rec.signatoryRole || 'Official Representative'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRecord(rec)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                          >
+                            <Eye className="w-3 h-3" />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
