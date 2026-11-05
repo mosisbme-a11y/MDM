@@ -18,12 +18,20 @@ import {
   Minimize2,
   CheckCircle2,
   FileText,
-  X
+  X,
+  Send,
+  Mail,
+  MessageCircle,
+  ShieldCheck,
+  Paperclip,
+  ExternalLink
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { formatNumber } from '../utils/formatters';
-import { HealthFacilityRecord } from '../types';
+import { formatNumber, formatCurrency } from '../utils/formatters';
+import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
 import { DEFAULT_SAMPLE_RECORDS } from './HFListUploadModal';
+import { pushCentralMasterData } from '../utils/centralSyncService';
+import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 
 export interface RegionBreakdownColumn {
   id: string;
@@ -210,6 +218,18 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
+
+  // Action Modals State: Send TO MOH, Via Email, WhatsApp
+  const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+
+  const [dspProjectName, setDspProjectName] = useState('Regional Health Facility Allocation Matrix');
+  const [emailTo, setEmailTo] = useState('moh.pmd@moh.gov.et');
+  const [emailCc, setEmailCc] = useState('epss.directorate@epss.gov.et');
+  const [emailSubject, setEmailSubject] = useState(`Official Regional Health Facility Breakdown Matrix - ${internalDate}`);
+  const [waPhone, setWaPhone] = useState('+251911234567');
+  const [waCopied, setWaCopied] = useState(false);
 
   // Breakdown Request Selector & Column Configurator State
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
@@ -820,10 +840,43 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Send TO MOH Button */}
+          <button
+            type="button"
+            onClick={() => setIsTransmitModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-amber-400 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+            title="Send official Region Breakdown Matrix to MOH PMD Directorate"
+          >
+            <Send className="w-3.5 h-3.5 text-amber-400" />
+            <span>Send TO MOH</span>
+          </button>
+
+          {/* Via Email Button */}
+          <button
+            type="button"
+            onClick={() => setIsEmailModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+            title="Dispatch matrix via email to MOH"
+          >
+            <Mail className="w-3.5 h-3.5 text-white" />
+            <span>Via email</span>
+          </button>
+
+          {/* WhatsApp Button */}
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
+            title="Share matrix payload via WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-white" />
+            <span>WhatsApp</span>
+          </button>
+
           {onOpenUploadModal && (
             <button
               onClick={onOpenUploadModal}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <Plus size={14} />
               <span>Submit / Upload Matrix</span>
@@ -832,16 +885,16 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
           <button
             onClick={handleExportExcel}
-            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
             title="Export current table to Excel with two-tier headers"
           >
-            <FileSpreadsheet size={14} />
+            <FileSpreadsheet size={14} className="text-emerald-600" />
             <span>Export Excel (.xlsx)</span>
           </button>
 
           <button
             onClick={handleDownloadTemplate}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
             title="Download the official blank Excel template"
           >
             <Download size={14} className="text-amber-500" />
@@ -1566,6 +1619,314 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </table>
         </div>
       </div>
+
+      {/* MODAL 1: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) */}
+      {isTransmitModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix to MOH</h3>
+                  <p className="text-[11px] text-slate-400">Official Health Facility breakdown transmittal to Ministry of Health</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                DSP Project / Matrix Reference Title
+              </label>
+              <input 
+                type="text"
+                value={dspProjectName}
+                onChange={(e) => setDspProjectName(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
+              />
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
+                  <span>Matrix Payload Summary</span>
+                  <span className="text-amber-600 font-mono font-bold">{selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">HEALTH FACILITIES</span>
+                    <span className="font-bold text-slate-900">{filteredRows.length} Facilities</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">EQUIPMENT TYPES</span>
+                    <span className="font-bold text-indigo-800">{columns.length} Columns</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">TOTAL EARMARKED UNITS</span>
+                    <span className="font-black text-emerald-700">{formatNumber(grandTotalUnits)} Units</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">TRANSMITTAL DATE</span>
+                    <span className="font-bold text-slate-900 font-mono">{internalDate}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Linked with Health Facility Master Data</span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, and Equipment quantities directly to MOH PMD Directorate (Sub-step 3.2 & 2.3).
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem('epss_dsp_3_2_rows', JSON.stringify(filteredRows));
+                      pushCentralMasterData({
+                        dspReceivedMohRows: filteredRows,
+                        updatedBy: 'RHB Regional Logistics',
+                        updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
+                      });
+                    } catch (e) {
+                      console.warn(e);
+                    }
+                    setIsTransmitModalOpen(false);
+                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH PMD Directorate!`);
+                  }}
+                  className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Confirm Transmit to MOH</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: SEND VIA EMAIL */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix via Email</h3>
+                  <p className="text-[11px] text-slate-400">Dispatch matrix payload to Ministry of Health PMD Directorate</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">To (MOH Email)</label>
+                  <input
+                    type="email"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">CC (EPSS Email)</label>
+                  <input
+                    type="email"
+                    value={emailCc}
+                    onChange={(e) => setEmailCc(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-indigo-500 font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Payload Summary Preview</label>
+                <textarea
+                  rows={5}
+                  readOnly
+                  value={`Region Breakdown Matrix (${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})\nTotal Health Facilities: ${filteredRows.length}\nTotal Equipment Units: ${grandTotalUnits} Units\nDate: ${internalDate}`}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 flex items-center justify-between text-indigo-950">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                  <div>
+                    <div className="font-bold text-xs">DSP_Region_To_MOH_Breakdown_{selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.xlsx</div>
+                    <div className="text-[10px] text-indigo-600">Official Two-Tier Excel Attachment ({filteredRows.length} Facilities)</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Download
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportExcel();
+                    const mailtoUrl = `mailto:${encodeURIComponent(emailTo)}?cc=${encodeURIComponent(emailCc)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent('Please find attached the official Region Breakdown Matrix Excel file.')}`;
+                    window.location.href = mailtoUrl;
+                    setIsEmailModalOpen(false);
+                    showToast(`✓ Excel downloaded & mail client launched for ${emailTo}`);
+                  }}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Dispatch Email to MOH</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: SEND VIA WHATSAPP */}
+      {isWhatsAppModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix via WhatsApp</h3>
+                  <p className="text-[11px] text-slate-400">Share health facility allocation matrix directly to MOH WhatsApp Desk</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">MOH WhatsApp Contact / Phone Number</label>
+                <input
+                  type="text"
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="+251911234567"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold focus:outline-none focus:border-emerald-500 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700">WhatsApp Payload Summary</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = `*EPSS REGIONAL BREAKDOWN MATRIX TO MOH*\nDate: ${internalDate}\nRegion: ${selectedRegionFilter}\nFacilities: ${filteredRows.length}\nTotal Units: ${grandTotalUnits}`;
+                      navigator.clipboard.writeText(msg);
+                      setWaCopied(true);
+                      setTimeout(() => setWaCopied(false), 3000);
+                      showToast('✓ WhatsApp payload copied to clipboard');
+                    }}
+                    className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{waCopied ? 'Copied!' : 'Copy Text'}</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  readOnly
+                  value={`*🏥 ETHIOPIAN PHARMACEUTICAL SUPPLY SERVICE (EPSS)*\n*OFFICIAL REGIONAL HEALTH FACILITY BREAKDOWN MATRIX*\n*Date:* ${internalDate}\n*Region:* ${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All Regions'}\n*Facilities Count:* ${filteredRows.length}\n*Total Units:* ${formatNumber(grandTotalUnits)} Units\n\nFacilities Allocated: ${filteredRows.map(r => r.customerDescription || r.healthFacility).slice(0, 10).join(', ')}${filteredRows.length > 10 ? '...' : ''}`}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWhatsAppModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportExcel();
+                    const cleanPhone = waPhone.replace(/\D/g, '');
+                    const msg = `*EPSS REGIONAL BREAKDOWN MATRIX TO MOH*\nDate: ${internalDate}\nRegion: ${selectedRegionFilter}\nFacilities: ${filteredRows.length}\nTotal Units: ${grandTotalUnits}`;
+                    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+                    window.open(url, '_blank');
+                    setIsWhatsAppModalOpen(false);
+                    showToast(`✓ Opened WhatsApp Web & downloaded Excel file`);
+                  }}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Launch WhatsApp Web</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

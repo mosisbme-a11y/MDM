@@ -1616,7 +1616,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       )}
 
       {/* Stage 3 Format Switcher */}
-      {currentStage === 'rhb-to-moh' && (
+      {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && (
         <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-800">Stage 3 Display Format:</span>
@@ -1647,7 +1647,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           </div>
 
           <div className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-            Two-tier Header: Region / Zone / Woreda / Facility / Packages / Equipment
+            Two-tier Header: Region / Zone / Woreda / Name of health facility / List of Packeges / Equipment
           </div>
         </div>
       )}
@@ -1728,11 +1728,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       )}
 
       {/* Render Facility Breakdown Matrix directly when in Stage 3 and matrix mode */}
-      {currentStage === 'rhb-to-moh' && stage3ViewMode === 'matrix' ? (
+      {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'matrix' ? (
         <RegionBreakdownMatrixTable
           data={
             selectedRecord?.facilityMatrixData ||
-            records.find(r => r.stage === 'rhb-to-moh' && r.facilityMatrixData)?.facilityMatrixData || {
+            records.find(r => (r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management') && r.facilityMatrixData)?.facilityMatrixData || {
               date: '2026-10-27',
               region: 'Oromia',
               columns: DEFAULT_STAGE_3_COLUMNS,
@@ -1742,7 +1742,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           hfListItems={hfListItems}
           isEditable={true}
           breakdownRequests={records}
-          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh')?.id || ''}
+          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id || ''}
           onSelectBreakdownRequest={(reqId) => {
             const req = records.find(r => r.id === reqId);
             if (req) {
@@ -1752,8 +1752,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
           onUpdateData={(updated) => {
             setRecords(prev => {
-              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'rhb-to-moh')?.id;
-              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'rhb-to-moh');
+              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management');
               if (existingIdx >= 0) {
                 const updatedRec = {
                   ...prev[existingIdx],
@@ -1774,9 +1774,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           title="3. DSP Submitted Region to MOH - Health Facility Breakdown Matrix"
           subtitle="Official two-tier template showing medical device allocations per health facility across zones and woredas"
         />
-      ) : currentStage === 'rhb-to-moh' && stage3ViewMode === 'ledger' ? (
+      ) : (currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'ledger' ? (
         <RegionalSubmittedDataView records={records} />
-      ) : currentStage === 'moh-to-epss-ho' && stage4ViewMode === 'matrix' ? (
+      )
+ : currentStage === 'moh-to-epss-ho' && stage4ViewMode === 'matrix' ? (
         <Stage4MohSubmittedMatrixTable
           data={
             selectedRecord?.stage4MatrixData ||
