@@ -1873,6 +1873,99 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
+      ) : (currentSubStep === '2.3' || currentSubTab === 'dsp-moh-2-3') ? (
+        <RegionalSubmittedDataView records={records} />
+      ) : (currentSubStep === '2.4' || currentSubTab === 'dsp-moh-2-4' || currentSubTab === 'regional-aggregator') ? (
+        <RegionBreakdownMatrixTable
+          data={
+            selectedRecord?.facilityMatrixData ||
+            records.find(r => r.facilityMatrixData)?.facilityMatrixData || {
+              date: new Date().toISOString().split('T')[0],
+              region: 'all',
+              columns: DEFAULT_STAGE_3_COLUMNS,
+              rows: DEFAULT_STAGE_3_ROWS
+            }
+          }
+          hfListItems={hfListItems}
+          isEditable={true}
+          breakdownRequests={records}
+          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.facilityMatrixData)?.id || ''}
+          onSelectBreakdownRequest={(reqId) => {
+            const req = records.find(r => r.id === reqId);
+            if (req) {
+              setSelectedRecord(req);
+            }
+          }}
+          onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
+          onUpdateData={(updated) => {
+            setRecords(prev => {
+              const targetId = selectedRecord?.id || prev.find(r => r.facilityMatrixData)?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
+              if (existingIdx >= 0 && prev[existingIdx]) {
+                const updatedRec = {
+                  ...prev[existingIdx],
+                  facilityMatrixData: updated,
+                  targetedFacilitiesCount: updated.rows.length,
+                  totalQuantity: updated.rows.reduce((sum, r) => {
+                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+                  }, 0)
+                };
+                const copy = [...prev];
+                copy[existingIdx] = updatedRec;
+                saveDspRecordsToIndexedDB(copy);
+                return copy;
+              }
+              return prev;
+            });
+          }}
+          title="2.4 Breakdown Aggregation by RHB - Multi-Regional Matrix"
+          subtitle="Official two-tier matrix aggregating health facility breakdowns across all Ethiopian regions submitted to MOH"
+        />
+      ) : (currentSubStep === '2.5' || currentSubTab === 'dsp-moh-2-5' || currentSubTab === 'dsp-submitted-moh-epss-ho') ? (
+        <Stage4MohSubmittedMatrixTable
+          data={
+            selectedRecord?.stage4MatrixData ||
+            records.find(r => r.stage4MatrixData)?.stage4MatrixData || {
+              date: new Date().toISOString().split('T')[0],
+              region: 'Oromia',
+              columns: DEFAULT_STAGE_4_COLUMNS,
+              rows: DEFAULT_STAGE_4_ROWS
+            }
+          }
+          hfListItems={hfListItems}
+          isEditable={true}
+          dossiers={records}
+          selectedDossierId={selectedRecord?.id || records.find(r => r.stage4MatrixData)?.id || ''}
+          onSelectDossier={(dId) => {
+            const req = records.find(r => r.id === dId);
+            if (req) {
+              setSelectedRecord(req);
+            }
+          }}
+          onUpdateData={(updated) => {
+            setRecords(prev => {
+              const targetId = selectedRecord?.id || prev.find(r => r.stage4MatrixData)?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
+              if (existingIdx >= 0 && prev[existingIdx]) {
+                const updatedRec = {
+                  ...prev[existingIdx],
+                  stage4MatrixData: updated,
+                  targetedFacilitiesCount: updated.rows.length,
+                  totalQuantity: updated.rows.reduce((sum, r) => {
+                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+                  }, 0)
+                };
+                const copy = [...prev];
+                copy[existingIdx] = updatedRec;
+                saveDspRecordsToIndexedDB(copy);
+                return copy;
+              }
+              return prev;
+            });
+          }}
+          title="2.5 DSP Agr. DSP Submitted to EPSS - Health Facility Matrix"
+          subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"
+        />
       ) : (
         <>
 
