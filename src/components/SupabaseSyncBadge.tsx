@@ -67,15 +67,27 @@ export const SupabaseSyncBadge: React.FC = () => {
   }
 
   if (status.state === 'error') {
+    const retrying = status.willRetry;
     return (
       <div
-        className={`${base} bg-slate-900 text-amber-300 border-amber-500/40 cursor-pointer`}
-        role="status"
+        className={`${base} bg-slate-900 ${retrying ? 'text-amber-300 border-amber-500/40' : 'text-red-300 border-red-500/50'} cursor-pointer`}
+        role="alert"
         onClick={() => setStatus(null)}
         title="Click to dismiss"
       >
-        <CloudUpload className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
-        <span>Syncing to Supabase (Background Retry)...</span>
+        {retrying ? (
+          <CloudUpload className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+        ) : (
+          <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+        )}
+        <div className="flex flex-col">
+          <span>
+            {retrying
+              ? `Sync failed, retrying automatically (attempt ${status.attempt ?? 1})...`
+              : 'Sync to Supabase failed. Changes are NOT saved to the server.'}
+          </span>
+          {status.message && <span className="font-normal opacity-80 break-words">{status.message}</span>}
+        </div>
       </div>
     );
   }
