@@ -36,7 +36,9 @@ if (isSupabaseConfigured) {
     client = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
-        autoRefreshToken: true
+        autoRefreshToken: true,
+        // Keep the login token in sessionStorage only (cleared when the tab closes). Nothing in localStorage.
+        storage: typeof window !== 'undefined' ? window.sessionStorage : undefined
       }
     });
   } catch (err) {
