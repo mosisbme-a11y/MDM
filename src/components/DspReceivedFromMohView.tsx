@@ -463,13 +463,13 @@ Notes: ${folder.notes || 'N/A'}`;
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _04C3EE6A-184D-4123-86F4-25891B98DD8C__9cb01a11.png - ENHANCED 3D */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#EBF1F6] border-b-4 border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] ring-1 ring-cyan-500/10">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#8292A2] shrink-0" />
-              <span className="text-xs md:text-sm font-black text-[#1E3A5F] tracking-tight uppercase">
-                {is21 ? 'DSP Received from EPSS' : 'DSP Received from MOH'}
+            {/* EXACT PILL BUTTON MATCHING USER ATTACHMENT */}
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#0B1527] text-white shadow-md border border-slate-800">
+              <span className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_10px_#f59e0b] shrink-0" />
+              <span className="text-xs md:text-sm font-black tracking-wide uppercase text-white">
+                {is21 ? 'DSP RECEIVED FROM EPSS' : 'DSP RECEIVED FROM MOH'}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#1E3A5F] text-white">
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-950">
                 {receivedRows.length}
               </span>
             </div>

@@ -34,6 +34,7 @@ export interface Stage4Column {
 
 export interface Stage4Row {
   id: string;
+  date?: string;
   region: string;
   zone: string;
   woreda: string;
@@ -792,8 +793,11 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse font-sans">
             <thead>
-              {/* Header Row 1: Peach / Yellow / Light Blue Styled Matching Image 1 */}
+              {/* Header Row 1: Matching Image 1 (Date, Region, Zone, Woreda, Name of health facility, List of Packeges) */}
               <tr className="border-b border-slate-300 text-xs font-medium">
+                <th className="p-2.5 bg-white font-bold border-r border-slate-300 min-w-[90px] text-slate-900">
+                  Date
+                </th>
                 <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px]">
                   Region
                 </th>
@@ -839,6 +843,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
               {/* Header Row 2: Sub-headers with SAP Material Numbers & Light Blue Subheader */}
               <tr className="border-b border-slate-300 bg-white text-[11px] font-mono">
+                <th className="p-2 bg-white border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#fef9c3] border-r border-slate-300"></th>
@@ -884,6 +889,20 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
               ) : (
                 filteredRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Date */}
+                    <td className="p-2 border-r border-slate-200 text-slate-600 font-mono text-[11px] text-center whitespace-nowrap">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.date || internalDate}
+                          onChange={(e) => handleRowFieldChange(row.id, 'date' as any, e.target.value)}
+                          className="w-full text-center bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-mono"
+                        />
+                      ) : (
+                        <span>{row.date || internalDate}</span>
+                      )}
+                    </td>
+
                     {/* Region */}
                     <td className="p-2 border-r border-slate-200">
                       {isEditingMode ? (
@@ -1011,7 +1030,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             {/* Total Footer Row */}
             <tfoot>
               <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
-                <td colSpan={4} className="p-2.5 border-r border-slate-300">
+                <td colSpan={5} className="p-2.5 border-r border-slate-300">
                   <div className="flex items-center justify-between">
                     <span className="uppercase tracking-wider text-[11px] font-black text-slate-700">Total Approved Allocation</span>
                     <span className="text-[11px] font-mono text-slate-600">{filteredRows.length} Health Facilities</span>
@@ -1019,6 +1038,9 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 </td>
                 <td className="p-2.5 border-r border-slate-300 text-center bg-[#dbeafe] text-blue-900 font-mono font-bold">
                   TOTAL
+                </td>
+                <td className="p-2.5 border-r border-slate-300 text-center bg-[#fef08a] font-mono font-bold text-yellow-950">
+                  -
                 </td>
                 {columns.map(col => (
                   <td key={col.id} className="p-2.5 border-r border-slate-300 text-right font-mono font-black text-purple-900">
