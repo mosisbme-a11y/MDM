@@ -201,7 +201,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     defaultQty: 2
   });
 
-  // Exact Equipment Columns matching user uploaded dossier
+  // Exact Equipment Columns matching user uploaded dossier or sample STO
   const equipmentColumns: Stage5Column[] = useMemo(() => {
     if (currentDossier?.hubAggregationData?.columns && currentDossier.hubAggregationData.columns.length > 0) {
       return currentDossier.hubAggregationData.columns;
@@ -209,7 +209,12 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     if (currentDossier?.stage4MatrixData?.columns && currentDossier.stage4MatrixData.columns.length > 0) {
       return currentDossier.stage4MatrixData.columns;
     }
-    return [];
+    return [
+      { id: '401-WICU-0101N', code: '401-WICU-0101N', name: 'Couch - Delivery' },
+      { id: '403-XRRB-0101N', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainles' },
+      { id: '403-XRRD-0101', code: '403-XRRD-0101', name: 'Anesthesia machine' },
+      { id: '403-XRRD-0101-001', code: '403-XRRD-0101-001', name: 'Cold box' }
+    ];
   }, [currentDossier]);
 
   // Allocations list
@@ -218,30 +223,70 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       return currentDossier.hubAggregationData.allocations;
     }
 
-    // Fallback: build from Stage 4 or sample data
+    // Fallback: build from Stage 4 or sample data matching image_c19bef21.png
     const sourceRows = currentDossier?.stage4MatrixData?.rows || [];
-    return sourceRows.map((r: any, idx: number) => {
-      const match = mapFacilityToHub(r.healthFacility, r.region, r.zone, r.woreda, hfListItems);
-      const quantities = r.quantities || {};
-      const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
+    if (sourceRows.length > 0) {
+      return sourceRows.map((r: any, idx: number) => {
+        const match = mapFacilityToHub(r.healthFacility, r.region, r.zone, r.woreda, hfListItems);
+        const quantities = r.quantities || {};
+        const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
 
-      return {
-        id: r.id || `alloc-s5-${idx}`,
-        healthFacility: r.healthFacility || 'Health Facility',
-        region: r.region || 'Oromia',
-        zone: r.zone || 'Central Zone',
-        woreda: r.woreda || 'Woreda 01',
-        packages: r.packages || 'MCH',
-        hubCode: match.hubCode,
-        hubName: match.hubName,
-        masterCustomerCode: match.masterCustomerCode,
-        masterFacilityName: match.masterFacilityName,
-        matchMethod: match.matchMethod,
-        matchConfidence: match.matchConfidence,
-        quantities,
-        totalQty: totalQty || 12
-      };
-    });
+        return {
+          id: r.id || `alloc-s5-${idx}`,
+          healthFacility: r.healthFacility || 'Health Facility',
+          region: r.region || 'Oromia',
+          zone: r.zone || 'Central Zone',
+          woreda: r.woreda || 'Woreda 01',
+          packages: r.packages || 'MCH',
+          hubCode: match.hubCode,
+          hubName: match.hubName,
+          masterCustomerCode: match.masterCustomerCode,
+          masterFacilityName: match.masterFacilityName,
+          matchMethod: match.matchMethod,
+          matchConfidence: match.matchConfidence,
+          quantities,
+          totalQty: totalQty || 12
+        };
+      });
+    }
+
+    // Default sample allocations matching image_c19bef21.png
+    return [
+      {
+        id: 'alloc-aa01-1',
+        healthFacility: 'Tikur Anbessa Specialized Hospital',
+        region: 'Addis Ababa',
+        zone: 'Lideta Zone',
+        woreda: 'Woreda 08',
+        packages: 'MCH',
+        hubCode: 'AA01',
+        hubName: 'Addis Ababa (Hub 1)',
+        quantities: {
+          '401-WICU-0101N': 4,
+          '403-XRRB-0101N': 2,
+          '403-XRRD-0101': 4,
+          '403-XRRD-0101-001': 2
+        },
+        totalQty: 12
+      },
+      {
+        id: 'alloc-ad01-1',
+        healthFacility: 'Adama General Hospital',
+        region: 'Oromia',
+        zone: 'East Shoa Zone',
+        woreda: 'Adama Woreda',
+        packages: 'MCH',
+        hubCode: 'AD01',
+        hubName: 'Adama Hub',
+        quantities: {
+          '401-WICU-0101N': 16,
+          '403-XRRB-0101N': 8,
+          '403-XRRD-0101': 16,
+          '403-XRRD-0101-001': 8
+        },
+        totalQty: 48
+      }
+    ];
   }, [currentDossier, hfListItems]);
 
   // Filtered allocations for Matrix
@@ -1754,31 +1799,31 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                       I
                     </th>
                     <th className="py-2.5 px-3 border-r border-slate-700 min-w-[150px]" title="Material: Code of item">
-                      Material
+                      MATERIAL
                     </th>
                     <th className="py-2.5 px-3 border-r border-slate-700 min-w-[160px]">
-                      Description
+                      DESCRIPTION
                     </th>
                     <th className="py-2.5 px-3 border-r border-slate-700 text-center w-24 bg-amber-900/40" title="Quantity: Summary total across all assigned facilities">
-                      Quantity
+                      QUANTITY
                     </th>
                     <th className="py-2.5 px-3 border-r border-slate-700 min-w-[140px]" title="Plant: Mapped HUB (Receiving Plant)">
-                      Plant
+                      PLANT
                     </th>
                     <th className="py-2.5 px-3 border-r border-slate-700 w-24 text-center" title="Stor.Location: Storage Location (e.g. 0001)">
-                      Stor.Location
+                      STOR.LOCATION
                     </th>
-                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="PGr: Purchasing Group (Auto HP4)">
-                      PGr
+                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="PGR: Purchasing Group (Auto HP4)">
+                      PGR
                     </th>
-                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="SPlt: Supplying Plant (Auto HO01)">
-                      SPlt
+                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="SPLT: Supplying Plant (Auto HO01)">
+                      SPLT
                     </th>
-                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="POrg: Purchasing Organization (Auto HP02)">
-                      POrg
+                    <th className="py-2.5 px-3 border-r border-slate-700 w-16 text-center" title="PORG: Purchasing Organization (Auto HP02)">
+                      PORG
                     </th>
                     <th className="py-2.5 px-3 min-w-[150px] text-center">
-                      Source Facilities
+                      SOURCE FACILITIES
                     </th>
                   </tr>
                 </thead>
@@ -1793,7 +1838,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                         <React.Fragment key={item.id}>
                           <tr className={`transition-colors hover:bg-blue-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                             {/* Line # */}
-                            <td className="py-2.5 px-3 font-mono text-[11px] text-slate-400 text-center border-r border-slate-100">
+                            <td className="py-2.5 px-3 font-mono text-xs text-slate-400 text-center border-r border-slate-100">
                               {lineNum}
                             </td>
 
@@ -1832,7 +1877,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                                     }
                                   }));
                                 }}
-                                className="w-16 text-center font-mono font-black text-xs text-amber-950 bg-white border border-amber-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-xs"
+                                className="w-16 text-center font-mono font-black text-xs text-amber-950 bg-white border-2 border-amber-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-xs"
                               />
                             </td>
 
@@ -1866,18 +1911,18 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                               />
                             </td>
 
-                            {/* 6. PGr (Auto HP4) */}
-                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-slate-700 bg-slate-50">
+                            {/* 6. PGR (Auto HP4) */}
+                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-slate-800 bg-slate-50">
                               {item.purchasingGroup}
                             </td>
 
-                            {/* 7. SPlt (Auto HO01) */}
-                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-emerald-800 bg-emerald-50/60">
+                            {/* 7. SPLT (Auto HO01) */}
+                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-emerald-700 bg-emerald-50/50">
                               {item.supplyingPlant}
                             </td>
 
-                            {/* 8. POrg (Auto HP02) */}
-                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-indigo-800 bg-indigo-50/60">
+                            {/* 8. PORG (Auto HP02) */}
+                            <td className="py-2.5 px-2 text-center border-r border-slate-100 font-mono font-bold text-purple-700 bg-purple-50/50">
                               {item.purchasingOrg}
                             </td>
 
