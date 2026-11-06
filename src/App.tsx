@@ -138,6 +138,7 @@ import {
   loadCachedCentralMasterData,
   clearCentralSyncCache,
   pushCentralMasterData,
+  getLastPushFailure,
   checkCentralSyncStatus,
   subscribeCentralSync,
   CentralSyncStatus,
@@ -1024,21 +1025,27 @@ export function App() {
       });
     }
 
-    pushCentralMasterData({
+    setToastMessage(`Syncing ${updated.length} facilities to Supabase...`);
+    // Wait for the REAL server answer. Never claim "Synced" before the server confirms it.
+    const pushResult = await pushCentralMasterData({
       hfListItems: updated,
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
       updateKind: `Upload HF List (${updated.length} Facilities)`
     });
-    broadcastAdminUpdate('HF Master List', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
 
-    triggerCloudSyncToast(
-      `✓ Data Safety Verified: Successfully merged ${newItems.length} records. Total: ${updated.length} Facilities preserved (Synced to Supabase).`,
-      {
-        type: 'CREATE',
-        title: `Upload ${newItems.length} Health Facilities`,
-        payload: newItems
-      }
-    );
+    if (!pushResult) {
+      const failure = getLastPushFailure();
+      const reason = failure?.status === 401
+        ? 'Your session is not accepted by the server. Sign out and sign in again.'
+        : (failure?.message || 'Unknown error');
+      setToastMessage(`❌ NOT SAVED TO SERVER: ${updated.length} facilities are only in this browser right now. ${reason}`);
+      setTimeout(() => setToastMessage(null), 10000);
+      return false;
+    }
+
+    broadcastAdminUpdate('HF Master List', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
+    setToastMessage(`✓ Saved to Supabase: merged ${newItems.length} records. Total: ${updated.length} facilities (server v${pushResult.version}).`);
+    return true;
   };
 
   const handleAddSingleFacility = (facility: HealthFacilityRecord) => {
