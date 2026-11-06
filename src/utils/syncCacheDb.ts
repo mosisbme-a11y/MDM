@@ -1,125 +1,38 @@
 /**
- * Tiny IndexedDB key-value store used by centralSyncService to keep downloaded dataset chunks
- * on this device. After a hard refresh the app can show the last known data immediately and then
- * only download the chunks that changed on the server.
- *
- * Every function fails silently (private mode, quota, blocked DB) - the cache is an optimisation only.
+ * Browser data caching is DISABLED on purpose: no app data is stored in the browser.
+ * All data lives in Supabase and is downloaded fresh from the server on every load.
+ * These functions are kept as no-ops so existing imports keep working.
+ * On first load they also delete any old "epss-sync-cache" database left by earlier versions.
  */
-const DB_NAME = 'epss-sync-cache';
-const STORE = 'kv';
-
-let dbPromise: Promise<IDBDatabase | null> | null = null;
-
-function openDb(): Promise<IDBDatabase | null> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve) => {
-    try {
-      if (typeof indexedDB === 'undefined') return resolve(null);
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-  return dbPromise;
+let purged = false;
+function purgeOldCache(): void {
+  if (purged) return;
+  purged = true;
+  try {
+    if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase('epss-sync-cache');
+  } catch {
+    // ignore
+  }
 }
 
-export async function cacheGet<T = any>(key: string): Promise<T | undefined> {
-  const db = await openDb();
-  if (!db) return undefined;
-  return new Promise((resolve) => {
-    try {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
-      req.onsuccess = () => resolve(req.result as T | undefined);
-      req.onerror = () => resolve(undefined);
-    } catch {
-      resolve(undefined);
-    }
-  });
+export async function cacheGet<T = any>(_key: string): Promise<T | undefined> {
+  purgeOldCache();
+  return undefined;
 }
 
-/** Loads every entry whose key starts with `prefix` in a single cursor pass. */
-export async function cacheGetAllWithPrefix<T = any>(prefix: string): Promise<Map<string, T>> {
-  const out = new Map<string, T>();
-  const db = await openDb();
-  if (!db) return out;
-  return new Promise((resolve) => {
-    try {
-      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).openCursor(range);
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) return resolve(out);
-        out.set(String(cursor.key), cursor.value as T);
-        cursor.continue();
-      };
-      req.onerror = () => resolve(out);
-    } catch {
-      resolve(out);
-    }
-  });
+export async function cacheGetAllWithPrefix<T = any>(_prefix: string): Promise<Map<string, T>> {
+  purgeOldCache();
+  return new Map<string, T>();
 }
 
-export async function cacheSetMany(entries: [string, any][]): Promise<void> {
-  if (!entries.length) return;
-  const db = await openDb();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
-    try {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      for (const [k, v] of entries) store.put(v, k);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
-    } catch {
-      resolve();
-    }
-  });
+export async function cacheSetMany(_entries: [string, any][]): Promise<void> {
+  purgeOldCache();
 }
 
-/** Deletes every entry with the prefix, except keys listed in `keep`. */
-export async function cacheDeleteWithPrefix(prefix: string, keep?: Set<string>): Promise<void> {
-  const db = await openDb();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
-    try {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
-      const req = store.openCursor(range);
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) return;
-        if (!keep || !keep.has(String(cursor.key))) cursor.delete();
-        cursor.continue();
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
-    } catch {
-      resolve();
-    }
-  });
+export async function cacheDeleteWithPrefix(_prefix: string, _keep?: Set<string>): Promise<void> {
+  purgeOldCache();
 }
 
 export async function cacheClearAll(): Promise<void> {
-  const db = await openDb();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
-    try {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-      tx.onabort = () => resolve();
-    } catch {
-      resolve();
-    }
-  });
+  purgeOldCache();
 }
