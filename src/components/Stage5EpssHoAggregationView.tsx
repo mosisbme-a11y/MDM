@@ -1413,7 +1413,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
               <table className="w-full text-left border-collapse select-text">
                 <thead>
-                  {/* TIER 1 HEADER ROW (Peach for demographics/Hub, Light Blue for Packages, Peach for Equipment Names) */}
+                  {/* TIER 1 HEADER ROW (Peach for demographics, Light Blue for Packages, Bright Yellow for Plant, Peach for Equipment Names) */}
                   <tr className="text-xs font-semibold">
                     <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[110px]">
                       Region
@@ -1427,11 +1427,11 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                     <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[220px]">
                       Name of health facility
                     </th>
-                    <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[190px] font-bold">
-                      Hub
-                    </th>
                     <th className="bg-[#dbeafe] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[120px]">
                       List of Packeges
+                    </th>
+                    <th className="bg-[#facc15] text-slate-950 font-black border border-slate-400 py-2 px-3 min-w-[130px] text-center shadow-2xs">
+                      Plant
                     </th>
 
                     {/* Equipment Columns - Row 1: Equipment Name */}
@@ -1452,16 +1452,17 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                     </th>
                   </tr>
 
-                  {/* TIER 2 SUBHEADER ROW (Peach empty cells for demographics/Hub, Light Blue for Packages, White for Material Codes) */}
+                  {/* TIER 2 SUBHEADER ROW */}
                   <tr className="text-xs font-normal">
                     <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
                     <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
                     <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
                     <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-                    <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-
                     <th className="bg-[#dbeafe] text-slate-900 italic border border-slate-400 py-1 px-3 text-left font-normal text-[11px]">
                       List of Packeges
+                    </th>
+                    <th className="bg-[#fef08a] font-mono font-bold text-yellow-950 border border-slate-400 text-center text-[10px] py-1 px-2">
+                      Plant
                     </th>
 
                     {/* Equipment Columns - Row 2: Equipment Material Code */}
@@ -1511,16 +1512,21 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                             </div>
                           </td>
 
-                          {/* HUB COLUMN */}
-                          <td className="py-1.5 px-2 border border-slate-300 bg-amber-50/30">
+                          {/* List of Packeges */}
+                          <td className="py-2 px-3 border border-slate-300 bg-[#eff6ff] text-slate-800 font-semibold text-center">
+                            {item.packages || 'MCH'}
+                          </td>
+
+                          {/* PLANT (HUB) COLUMN - Highlighted Yellow Cell */}
+                          <td className="py-1.5 px-2 border border-slate-300 bg-amber-50/60">
                             <select
                               value={item.hubCode}
                               onChange={(e) => handleHubChange(item.id, e.target.value)}
-                              className="w-full bg-white border border-amber-300 text-xs font-bold text-slate-900 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
+                              className="w-full bg-white border border-amber-400 text-xs font-bold text-slate-900 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
                             >
                               {EPSS_HUBS_REGISTRY.map(hub => (
                                 <option key={hub.code} value={hub.code}>
-                                  {hub.name} ({hub.code})
+                                  {hub.code} ({hub.name})
                                 </option>
                               ))}
                             </select>
@@ -1551,11 +1557,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                                 <BookmarkCheck className="w-3 h-3" />
                               </button>
                             </div>
-                          </td>
-
-                          {/* List of Packeges */}
-                          <td className="py-2 px-3 border border-slate-300 bg-[#eff6ff] text-slate-800 font-semibold text-center">
-                            {item.packages || 'MCH'}
                           </td>
 
                           {/* Equipment Quantity Cells */}

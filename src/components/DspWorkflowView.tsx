@@ -716,10 +716,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       subSteps: [
         { id: '1.1', label: 'DSP Request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
         { id: '1.2', label: 'DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
-        { id: '1.3.1', label: 'Map HF to Hubs', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
-        { id: '1.3.2', label: 'Send DSP to Hubs / Submit', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
-        { id: '1.3.3', label: 'Item Aggregation', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
-        { id: '1.3.4', label: 'Order Process', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
+        { id: '1.3.1', label: 'MAP HF TO HUBS', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
+        { id: '1.3.2', label: 'SEND DSP TO HUBS / SUBMIT', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
+        { id: '1.3.3', label: 'ITEM AGGREGATION', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
+        { id: '1.3.4', label: 'ORDER PROCESS', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
       ]
     },
     { 
