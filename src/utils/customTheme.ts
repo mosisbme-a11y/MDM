@@ -230,54 +230,34 @@ export const applyCustomThemeCSSVariables = (config: CustomThemeConfig): void =>
   }
 };
 
-const CUSTOM_THEME_STORAGE_KEY = 'epss_custom_theme_config';
-const CUSTOM_THEME_HISTORY_KEY = 'epss_custom_theme_history';
+let memoryThemeHistory: CustomThemeConfig[] = [];
 
 export const loadCustomThemeConfig = (): CustomThemeConfig | null => {
-  try {
-    const raw = localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.warn('Could not load custom theme from localStorage', e);
-  }
   return null;
 };
 
 export const saveCustomThemeConfig = (config: CustomThemeConfig): void => {
   try {
     const updated = { ...config, updatedAt: new Date().toISOString() };
-    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(updated));
-
-    // Save to history list
-    const historyRaw = localStorage.getItem(CUSTOM_THEME_HISTORY_KEY);
-    let history: CustomThemeConfig[] = historyRaw ? JSON.parse(historyRaw) : [];
-    history = history.filter(h => h.id !== updated.id && h.name !== updated.name);
-    history.unshift(updated);
-    if (history.length > 8) history.pop();
-    localStorage.setItem(CUSTOM_THEME_HISTORY_KEY, JSON.stringify(history));
+    
+    // Save to memory history
+    memoryThemeHistory = memoryThemeHistory.filter(h => h.id !== updated.id && h.name !== updated.name);
+    memoryThemeHistory.unshift(updated);
+    if (memoryThemeHistory.length > 8) memoryThemeHistory.pop();
 
     applyCustomThemeCSSVariables(updated);
     window.dispatchEvent(new CustomEvent('epss_custom_theme_saved', { detail: updated }));
   } catch (e) {
-    console.error('Failed to save custom theme', e);
+    console.error('Failed to apply custom theme', e);
   }
 };
 
 export const loadCustomThemeHistory = (): CustomThemeConfig[] => {
-  try {
-    const raw = localStorage.getItem(CUSTOM_THEME_HISTORY_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Could not load theme history', e);
-  }
-  return [];
+  return memoryThemeHistory;
 };
 
 export const deleteCustomThemeConfig = (): void => {
   try {
-    localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY);
     const root = document.documentElement;
     root.style.removeProperty('--epss-primary');
     root.style.removeProperty('--epss-secondary');

@@ -93,13 +93,10 @@ export async function uploadAndRecordFile(
   };
 
   try {
-    const saved = localStorage.getItem('epss_documents_archive');
-    const docs = saved ? JSON.parse(saved) : [];
-    docs.unshift(docEntry);
-    localStorage.setItem('epss_documents_archive', JSON.stringify(docs));
+    // localStorage removal
     window.dispatchEvent(new Event('epss:documents:updated'));
   } catch (e) {
-    console.warn('Could not update documents archive in localStorage:', e);
+    // ignore
   }
   return fileRecord;
 }

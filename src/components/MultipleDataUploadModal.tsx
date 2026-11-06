@@ -545,16 +545,8 @@ export const MultipleDataUploadModal: React.FC<MultipleDataUploadModalProps> = (
     if (onAddDocument) {
       onAddDocument(doc);
     }
-    try {
-      const raw = localStorage.getItem('epss_documents_archive');
-      let list: DeviceDocument[] = raw ? JSON.parse(raw) : [];
-      list = list.filter(d => d.id !== doc.id && (!doc.referenceNumber || d.referenceNumber !== doc.referenceNumber));
-      list = [doc, ...list];
-      localStorage.setItem('epss_documents_archive', JSON.stringify(list));
-      window.dispatchEvent(new CustomEvent('epss:documents:updated', { detail: doc }));
-    } catch (err) {
-      console.warn('Failed to update localStorage directly:', err);
-    }
+    // localStorage removal
+    window.dispatchEvent(new CustomEvent('epss:documents:updated', { detail: doc }));
   };
 
   // Submit and archive document for an individual queued upload

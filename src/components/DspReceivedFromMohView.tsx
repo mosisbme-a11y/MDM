@@ -42,7 +42,6 @@ import {
   buildDspTemplateRowsFromStock
 } from '../data/defaultDspRequestTemplateData';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
-import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 
 interface DspReceivedFromMohViewProps {
   records: DspWorkflowRecord[];
@@ -81,44 +80,8 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
     });
   }, [records, targetSubStage, targetStage]);
 
-  // Load the exact received rows (from localStorage, receivedRecord, or empty)
-  const [receivedRows, setReceivedRows] = useState<DspRequestTemplateRow[]>(() => {
-    try {
-      const stored = localStorage.getItem(storageRowsKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((r, i) => ({
-            ...r,
-            srNo: i + 1,
-            requestDate: r.requestDate || TODAY_ISO_DATE,
-            dspRequestTo: r.dspRequestTo || 'MOH'
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn(`Failed to parse ${storageRowsKey}:`, e);
-    }
-
-    // If records has items from a non-sample target record
-    if (receivedRecord && receivedRecord.itemsIncluded && receivedRecord.itemsIncluded.length > 0 && !receivedRecord.id.includes('sample')) {
-      return receivedRecord.itemsIncluded.map((it: any, idx: number) => ({
-        id: `rec-item-${idx}`,
-        srNo: idx + 1,
-        material: it.material,
-        materialDescription: it.description,
-        qty: it.quantity || 1,
-        totalAmount: it.totalAmount || (it.quantity * 250000),
-        valuationTypeDesc: it.valuationTypeDesc || 'Standard Price (S)',
-        wbsElement: it.wbsElement || 'SDG-ME-23-001-011',
-        budgetSource: it.budgetSource || 'WB',
-        requestDate: it.requestDate || receivedRecord.dateSubmitted || TODAY_ISO_DATE,
-        dspRequestTo: 'MOH'
-      }));
-    }
-
-    return [];
-  });
+  // Load the exact received rows (from receivedRecord or empty)
+  const [receivedRows, setReceivedRows] = useState<DspRequestTemplateRow[]>([]);
 
   // Re-sync if receivedRecord changes
   useEffect(() => {
@@ -137,46 +100,12 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
         dspRequestTo: 'MOH'
       }));
       setReceivedRows(mapped);
-      try {
-        localStorage.setItem(storageRowsKey, JSON.stringify(mapped));
-      } catch {}
     }
-  }, [receivedRecord, storageRowsKey]);
+  }, [receivedRecord]);
 
   // Transmitted Official Letters Folder State
   const [selectedFolderModal, setSelectedFolderModal] = useState<any | null>(null);
-  const [transmittedFolderList, setTransmittedFolderList] = useState<any[]>(() => {
-    try {
-      const stored = localStorage.getItem('epss_dsp_transmitted_letters_folder');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.warn('Error reading epss_dsp_transmitted_letters_folder:', e);
-    }
-
-    // Default folder structure initialized if empty
-    return [
-      {
-        id: 'folder-let-001',
-        dspRefNumber: 'EPSS/MD-DSP/2026/842',
-        officialLetterRef: 'EPSS/LET/2026/1577',
-        dateTransmitted: TODAY_ISO_DATE,
-        senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-        recipientOrg: 'Ministry of Health (PMD Directorate)',
-        signatory: 'Mosisa (Authorized User)',
-        signatoryRole: 'Directorate Technical Lead',
-        subject: 'Official Request Letter: Priority Program (HP) Medical Device Allocation Request',
-        totalDevices: 5,
-        totalQuantity: 60,
-        totalValuationETB: 15000000,
-        letterFileName: 'Official_Covering_Letter_EPSS_MOH_1577.pdf',
-        letterFileSize: '142.5 KB',
-        notes: 'Separately stored official letter transmitted from EPSS HO to MOH PMD Directorate.'
-      }
-    ];
-  });
+  const [transmittedFolderList, setTransmittedFolderList] = useState<any[]>([]);
 
   const handleUploadDirectLetterToFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -207,9 +136,6 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
     const updated = [newFolderRecord, ...transmittedFolderList];
     setTransmittedFolderList(updated);
-    try {
-      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify(updated));
-    } catch {}
 
     showToast(`✓ Stored "${file.name}" separately inside Transmitted EPSS to MOH Letters Folder!`);
   };
@@ -217,9 +143,6 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   const handleRemoveFolderLetter = (folderId: string) => {
     const updated = transmittedFolderList.filter(f => f.id !== folderId);
     setTransmittedFolderList(updated);
-    try {
-      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify(updated));
-    } catch {}
     showToast('Folder record removed from archive');
   };
 
@@ -299,13 +222,6 @@ Notes: ${folder.notes || 'N/A'}`;
   // One-click helper to quick-transmit and store from 1.1 if needed
   const handleQuickTransmitCurrentFrom11 = () => {
     let sourceRows: DspRequestTemplateRow[] = [];
-    try {
-      const stored = localStorage.getItem('epss_dsp_request_template_rows');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) sourceRows = parsed;
-      }
-    } catch {}
 
     if (sourceRows.length === 0) {
       sourceRows = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
@@ -349,7 +265,7 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `Transmitted via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP).`
     };
 
-    const activeDspName = localStorage.getItem('epss_dsp_request_dsp_name') || 'DSP 2026 - MCH Equipment Allocation';
+    const activeDspName = 'DSP 2026 - MCH Equipment Allocation';
 
     const newRecord12: DspWorkflowRecord = {
       id: `dsp-moh-received-${Date.now()}`,
@@ -394,9 +310,6 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `Transmitted from EPSS HO and received/endorsed by MOH PMD Directorate. Exact ${sourceRows.length} line items stored.`
     };
 
-    // Store in localStorage
-    localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(sourceRows));
-    localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(newRecord12));
     setReceivedRows(sourceRows);
 
     // Update records state: clear previous default for 1.2
@@ -408,7 +321,6 @@ Notes: ${folder.notes || 'N/A'}`;
         return true;
       });
       const updated = [newRecord11, newRecord12, ...filtered];
-      saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
@@ -425,12 +337,9 @@ Notes: ${folder.notes || 'N/A'}`;
 
   // Clear received records and reset
   const handleClearReceivedData = () => {
-    localStorage.removeItem(storageRowsKey);
-    localStorage.removeItem(is21 ? 'epss_dsp_received_epss_record' : 'epss_dsp_received_moh_record');
     setReceivedRows([]);
     setRecords(prev => {
       const filtered = prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== targetSubStage);
-      saveDspRecordsToIndexedDB(filtered);
       return filtered;
     });
     showToast('✓ Received DSP data cleared');
@@ -441,9 +350,8 @@ Notes: ${folder.notes || 'N/A'}`;
     const updated = receivedRows.filter(r => r.id !== rowId);
     setReceivedRows(updated);
     try {
-      localStorage.setItem(storageRowsKey, JSON.stringify(updated));
       if (receivedRecord) {
-        const updatedRecord = {
+        const updatedRecord: DspWorkflowRecord = {
           ...receivedRecord,
           totalDevices: updated.length,
           totalQuantity: updated.reduce((sum, r) => sum + (r.qty || 0), 0),
@@ -452,21 +360,12 @@ Notes: ${folder.notes || 'N/A'}`;
             material: r.material,
             description: r.materialDescription,
             quantity: r.qty,
-            plant: 'AA01 Central',
-            allocatedFacility: 'Allocation Quota',
-            valuationTypeDesc: r.valuationTypeDesc,
-            wbsElement: r.wbsElement,
-            budgetSource: r.budgetSource,
-            requestDate: r.requestDate,
-            dspRequestTo: r.dspRequestTo,
-            totalAmount: r.totalAmount
+            plant: (r as any).plant || 'HO01'
           }))
         };
         setRecords(prev => {
           const filtered = prev.filter(r => r.id !== receivedRecord.id);
-          const nextRecs = [updatedRecord, ...filtered];
-          saveDspRecordsToIndexedDB(nextRecs);
-          return nextRecs;
+          return [updatedRecord, ...filtered];
         });
       }
     } catch (e) {

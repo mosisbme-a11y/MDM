@@ -131,36 +131,6 @@ import {
   exportMasterInventoryToExcel,
   exportMasterInventoryToCSV
 } from './utils/masterInventoryExport';
-import {
-  saveInventoryToIndexedDB,
-  loadInventoryFromIndexedDB,
-  clearIndexedDBCache,
-  getLastSyncMetadata,
-  InventoryCacheMeta,
-  saveMultipleStockToIndexedDB,
-  loadMultipleStockFromIndexedDB,
-  clearMultipleStockFromIndexedDB,
-  saveHFListToIndexedDB,
-  loadHFListFromIndexedDB,
-  clearHFListFromIndexedDB,
-  saveDspRecordsToIndexedDB,
-  loadDspRecordsFromIndexedDB,
-  clearDspRecordsFromIndexedDB,
-  saveReceivingToIndexedDB,
-  loadReceivingFromIndexedDB,
-  clearReceivingFromIndexedDB,
-  saveDistributionToIndexedDB,
-  loadDistributionFromIndexedDB,
-  clearDistributionFromIndexedDB,
-  saveMaterialMasterToIndexedDB,
-  loadMaterialMasterFromIndexedDB,
-  clearMaterialMasterFromIndexedDB,
-  saveProgramMdToIndexedDB,
-  loadProgramMdFromIndexedDB,
-  clearProgramMdFromIndexedDB,
-  requestPersistentStorageQuota,
-  safeLocalStorageSetItem
-} from './utils/indexedDbCache';
 import { enqueuePendingItem, flushPendingQueue } from './utils/syncHealthService';
 import { broadcastAdminUpdate, initializeAutoSyncListener } from './utils/realtimeSync';
 import {
@@ -173,6 +143,7 @@ import {
   saveHFMasterListToServer,
   fetchHFMasterListFromServer
 } from './utils/centralSyncService';
+import { requestPersistentStorageQuota } from './utils/indexedDbCache';
 
 
 // Background Renderer for Image/Video Themes
@@ -206,7 +177,7 @@ const BackgroundRenderer: React.FC<{ themeId: string }> = ({ themeId }) => {
 };
 
 export function App() {
-  // The signed-in user comes from the Supabase Auth session (never from localStorage).
+  // The signed-in user comes from the Supabase Auth session.
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -226,10 +197,7 @@ export function App() {
 
   const isAdmin = Boolean(currentUser !== null);
 
-  // Request persistent storage quota on startup so IndexedDB is never evicted
-  useEffect(() => {
-    requestPersistentStorageQuota();
-  }, []);
+
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [epssSubTab, setEpssSubTab] = useState<EpssSubTab>('material-master');
@@ -287,104 +255,14 @@ export function App() {
     return false;
   };
 
-  // One-time client purge of legacy sample/synthetic data from earlier sessions
-  // Ensures strictly ONLY user-uploaded data is loaded (preserves epss_program_md_records)
-  if (typeof window !== "undefined") {
-    const PURGE_KEY = "epss_purged_all_sample_data_v3";
-    if (!localStorage.getItem(PURGE_KEY)) {
-      const keysToRemove = [
-        "epss_inventory_items",
-        "epss_multiple_stock_items",
-        "epss_dsp_records",
-        "epss_hf_list_items",
-        "epss_material_master_items",
-        "epss_documents_archive",
-        "epss_installation_records",
-        "epss_plant_dsp_records",
-        "epss_dsp_received_moh_rows",
-        "epss_dsp_received_epss_rows",
-        "epss_dsp_2_2_columns",
-        "epss_dsp_2_2_rows"
-      ];
-      keysToRemove.forEach(k => {
-        try { localStorage.removeItem(k); } catch {}
-      });
-      clearIndexedDBCache().catch(() => {});
-      clearMultipleStockFromIndexedDB().catch(() => {});
-      clearDspRecordsFromIndexedDB().catch(() => {});
-      clearHFListFromIndexedDB().catch(() => {});
-      localStorage.setItem(PURGE_KEY, "true");
-    }
-  }
 
-  const [items, setItems] = useState<MedicalDeviceItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_inventory_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const realItems = parsed.filter(it => !isDefaultItemRecord(it));
-          if (realItems.length > 0) return realItems;
-        }
-      }
-      const savedBatches = localStorage.getItem('epss_confirmed_batches');
-      if (savedBatches) {
-        const parsedBatches = JSON.parse(savedBatches);
-        if (Array.isArray(parsedBatches)) {
-          const recovered = parsedBatches.flatMap((b: any) => b.items || []).filter(it => !isDefaultItemRecord(it));
-          if (recovered.length > 0) return recovered;
-        }
-      }
-    } catch {}
-    return [];
-  });
+  const [items, setItems] = useState<MedicalDeviceItem[]>([]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('epss_inventory_items', JSON.stringify(items));
-    } catch {}
-  }, [items]);
+  const [noBkdItems, setNoBkdItems] = useState<NoBkdItem[]>([]);
 
-  const [noBkdItems, setNoBkdItems] = useState<NoBkdItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_nobkd_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
+  const [centralSyncStatus, setCentralSyncStatus] = useState<CentralSyncStatus | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('epss_nobkd_items', JSON.stringify(noBkdItems));
-    } catch {}
-  }, [noBkdItems]);
-
-  const [centralSyncStatus, setCentralSyncStatus] = useState<CentralSyncStatus | null>(() => {
-    try {
-      const saved = localStorage.getItem('epss_central_sync_metadata');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [masterDataLogs, setMasterDataLogs] = useState<MasterDataLog[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_master_data_logs');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('epss_master_data_logs', JSON.stringify(masterDataLogs));
-    } catch {}
-  }, [masterDataLogs]);
+  const [masterDataLogs, setMasterDataLogs] = useState<MasterDataLog[]>([]);
 
   const recordMasterDataLog = async (log: Omit<MasterDataLog, 'id' | 'userId'>) => {
     const userId = getActiveUserId();
@@ -418,15 +296,8 @@ export function App() {
         return;
       }
     } catch (err) {
-      console.warn('Could not fetch file count from server, falling back to local files:', err);
+      console.warn('Could not fetch file count from server:', err);
     }
-    try {
-      const local = localStorage.getItem('epss_uploaded_files');
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed)) setFileCount(parsed.length);
-      }
-    } catch {}
   };
 
   useEffect(() => {
@@ -442,34 +313,15 @@ export function App() {
   const mergeRemoteDsp = (remote: DspWorkflowRecord[]) => {
     if (!remote || remote.length === 0) return;
     setDspRecords(remote.map(normalizeDspRecord));
-    saveDspRecordsToIndexedDB(remote.map(normalizeDspRecord)).catch(() => {});
   };
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
   useEffect(() => {
     let isMounted = true;
 
-    // Sync DSP sub-step matrix rows/columns to localStorage so sub-steps render exact cloud data
+    // Sync DSP sub-step matrix
     const syncDspMatrixToStorage = (data: any) => {
       if (!data) return;
-      if (data.dspReceivedMohRows && Array.isArray(data.dspReceivedMohRows) && data.dspReceivedMohRows.length > 0) {
-        localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(data.dspReceivedMohRows));
-      }
-      if (data.dspReceivedEpssRows && Array.isArray(data.dspReceivedEpssRows) && data.dspReceivedEpssRows.length > 0) {
-        localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(data.dspReceivedEpssRows));
-      }
-      if (data.dsp22Columns && Array.isArray(data.dsp22Columns) && data.dsp22Columns.length > 0) {
-        localStorage.setItem('epss_dsp_2_2_columns', JSON.stringify(data.dsp22Columns));
-      }
-      if (data.dsp22Rows && Array.isArray(data.dsp22Rows) && data.dsp22Rows.length > 0) {
-        localStorage.setItem('epss_dsp_2_2_rows', JSON.stringify(data.dsp22Rows));
-      }
-      if (data.dspReceivedMohRecord) {
-        localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(data.dspReceivedMohRecord));
-      }
-      if (data.dspReceivedEpssRecord) {
-        localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(data.dspReceivedEpssRecord));
-      }
       window.dispatchEvent(new Event('epss:dsp_matrix_updated'));
     };
 
@@ -530,20 +382,9 @@ export function App() {
 
     hydrateFromCentralServer();
 
-    // Push local browser records (IndexedDB / localStorage) to Supabase Cloud on startup
+    // Push cloud sync baseline on startup
     setTimeout(() => {
       if (!isMounted) return;
-      pushCentralMasterData({
-        items,
-        multipleStockItems,
-        receivingDataRecords,
-        distributionDataRecords,
-        materialMasterItems,
-        hfListItems,
-        dspWorkflowRecords: dspRecords,
-        updatedBy: currentUser?.name || currentUser?.email || 'EPSS Master Administrator',
-        updateKind: 'Local-to-Cloud Complete Data Migration'
-      }).catch(err => console.warn('Local-to-cloud migration notice:', err));
     }, 3000);
 
     // 2. Subscribe to continuous cross-browser polling updates
@@ -647,6 +488,13 @@ export function App() {
         });
       }
 
+      if (remoteData.dsp22Columns) {
+        setDsp22Columns(remoteData.dsp22Columns);
+      }
+      if (remoteData.dsp22Rows) {
+        setDsp22Rows(remoteData.dsp22Rows);
+      }
+
       if (remoteData.dspWorkflowRecords && remoteData.dspWorkflowRecords.length > 0) {
         mergeRemoteDsp(remoteData.dspWorkflowRecords);
       }
@@ -680,28 +528,13 @@ export function App() {
   const [isPrintReportModalOpen, setIsPrintReportModalOpen] = useState(false);
   const [printReportConfig, setPrintReportConfig] = useState<PrintReportConfig | undefined>(undefined);
   const [isThresholdConfigModalOpen, setIsThresholdConfigModalOpen] = useState(false);
-  const [categoryThresholds, setCategoryThresholds] = useState<Record<string, CategoryThreshold>>(() => {
-    try {
-      const saved = localStorage.getItem('epss_category_thresholds');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-  const [importedColumns, setImportedColumns] = useState<string[]>(() => getStoredImportedColumns());
-  const [confirmedBatches, setConfirmedBatches] = useState<ConfirmedUploadBatch[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_confirmed_batches');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [categoryThresholds, setCategoryThresholds] = useState<Record<string, CategoryThreshold>>({});
+  const [importedColumns, setImportedColumns] = useState<string[]>([]);
+  const [confirmedBatches, setConfirmedBatches] = useState<ConfirmedUploadBatch[]>([]);
+  const [dsp22Columns, setDsp22Columns] = useState<any[]>([]);
+  const [dsp22Rows, setDsp22Rows] = useState<any[]>([]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('epss_confirmed_batches', JSON.stringify(confirmedBatches));
-    } catch {}
   }, [confirmedBatches]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -759,14 +592,7 @@ export function App() {
     }
   }, [toastMessage, undoAction]);
 
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_audit_logs');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const addAuditLog = (action: string, details: string) => {
     const newEntry: AuditLogEntry = {
@@ -779,7 +605,6 @@ export function App() {
     };
     setAuditLogs((prev) => {
       const updated = [newEntry, ...prev].slice(0, 50);
-      localStorage.setItem('epss_audit_logs', JSON.stringify(updated));
       return updated;
     });
   };
@@ -815,7 +640,6 @@ export function App() {
 
   const handleSaveThresholds = (newThresholds: Record<string, CategoryThreshold>) => {
     setCategoryThresholds(newThresholds);
-    localStorage.setItem('epss_category_thresholds', JSON.stringify(newThresholds));
     addAuditLog('Configure Low Stock Thresholds', 'Updated custom category-specific low stock thresholds and notification channels.');
     checkLowStockAlerts(items, newThresholds);
   };
@@ -824,7 +648,6 @@ export function App() {
     if (!undoAction) return;
     if (undoAction.previousItems) {
       setItems(undoAction.previousItems);
-      saveInventoryToIndexedDB(undoAction.previousItems, { syncType: 'manual_edit' });
     }
     if (undoAction.previousNoBkdItems) {
       setNoBkdItems(undoAction.previousNoBkdItems);
@@ -845,9 +668,7 @@ export function App() {
     return 'classic';
   });
 
-  const [headerNavThemeId, setHeaderNavThemeId] = useState<HeaderNavThemeId>(() => {
-    return (localStorage.getItem('epss_header_nav_theme') as HeaderNavThemeId) || 'professional-white';
-  });
+  const [headerNavThemeId, setHeaderNavThemeId] = useState<HeaderNavThemeId>('professional-white');
 
   // Load and apply custom admin theme if active
   useEffect(() => {
@@ -869,9 +690,7 @@ export function App() {
     return false;
   });
 
-  const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('epss_lang') as Language) || 'en';
-  });
+  const [language, setLanguage] = useState<Language>('en');
 
   const [fontScale, setFontScale] = useState<SystemSettingsConfig['fontScale']>(() => {
     return loadSystemSettings().fontScale;
@@ -894,14 +713,11 @@ export function App() {
     return 'vertical';
   });
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('epss_sidebar_collapsed') === 'true';
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
   // Keep sidebar collapse state synchronized and notify Recharts charts on layout transitions
   useEffect(() => {
     try {
-      localStorage.setItem('epss_sidebar_collapsed', String(isSidebarCollapsed));
     } catch {
       // ignore
     }
@@ -920,22 +736,7 @@ export function App() {
   const [mohUploadInitialMode, setMohUploadInitialMode] = useState<'breakdowns' | 'regionalSummary' | 'nonMoving' | 'multipleStock'>('breakdowns');
 
   // Program MD Dataset - Standard 10-Field Schema (SAP PO, Item Description, Unit, Quantity, Delivery Amount in ETB, Supplier, Device Owner, Current Status, Management Approach, Request Year)
-  const [programMdRecords, setProgramMdRecords] = useState<ProgramMdRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_program_md_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('epss_program_md_records', JSON.stringify(programMdRecords));
-    } catch {}
-  }, [programMdRecords]);
+  const [programMdRecords, setProgramMdRecords] = useState<ProgramMdRecord[]>([]);
 
   const handleUploadProgramMdData = (newRecords: ProgramMdRecord[], mode: 'append' | 'replace' = 'append', files?: { name: string, url: string }[]) => {
     // 1. Process all records (removing mandatory validation as requested)
@@ -955,9 +756,7 @@ export function App() {
     }
 
     setProgramMdRecords(updated);
-    saveProgramMdToIndexedDB(updated).catch(() => {});
     try {
-      localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
 
     pushCentralMasterData({
@@ -1001,9 +800,7 @@ export function App() {
 
   const handleClearProgramMdData = () => {
     setProgramMdRecords([]);
-    clearProgramMdFromIndexedDB().catch(() => {});
     try {
-      localStorage.removeItem('epss_program_md_records');
     } catch {}
     pushCentralMasterData({
       programMdRecords: [],
@@ -1020,7 +817,6 @@ export function App() {
     const updated = [record, ...programMdRecords];
     setProgramMdRecords(updated);
     try {
-      localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
     pushCentralMasterData({
       programMdRecords: updated,
@@ -1045,7 +841,6 @@ export function App() {
     const updated = programMdRecords.map(r => r.id === record.id ? record : r);
     setProgramMdRecords(updated);
     try {
-      localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
     pushCentralMasterData({
       programMdRecords: updated,
@@ -1063,7 +858,6 @@ export function App() {
     const updated = programMdRecords.filter(r => r.id !== id);
     setProgramMdRecords(updated);
     try {
-      localStorage.setItem('epss_program_md_records', JSON.stringify(updated));
     } catch {}
     pushCentralMasterData({
       programMdRecords: updated,
@@ -1077,31 +871,8 @@ export function App() {
   };
 
   // Health Facility (HF List) Master Data - Standard 10-Field Schema (Customer, Customer Description, Delivering Plant, etc.)
-  const [hfListItems, setHfListItems] = useState<HealthFacilityRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_hf_list_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const valid = parsed.filter((it: any) => it && (it.customer || it.customerDescription));
-          if (valid.length > 0) return valid;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return [];
-  });
-  const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_dsp_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeDspRecord);
-      }
-    } catch {}
-    return [];
-  });
+  const [hfListItems, setHfListItems] = useState<HealthFacilityRecord[]>([]);
+  const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>([]);
 
   // Save DSP workflow changes to Supabase (debounced; unchanged chunks are skipped automatically)
   useEffect(() => {
@@ -1121,75 +892,15 @@ export function App() {
     return () => clearTimeout(timer);
   }, [dspRecords, currentUser?.id]);
 
-  // Hydrate DSP Workflows from IndexedDB (cloud copy arrives via central Supabase sync)
-  useEffect(() => {
-    const userId = getActiveUserId();
-    if (!userId) return;
 
-    // 1. Initial Load from IndexedDB with defaults if empty
-    loadDspRecordsFromIndexedDB().then(cached => {
-      if (cached && cached.length > 0) {
-        const normalizedCached = cached.map(normalizeDspRecord).filter(r => !r.id.startsWith('dsp-stage-') && r.id !== 'dsp-epss-sample-02');
-        setDspRecords(normalizedCached);
-      } else {
-        setDspRecords([]);
-      }
-    });
 
-    // 2. Cross-browser sync of DSP workflows is handled by the central Supabase sync below.
-  }, [currentUser?.uid, currentUser?.id]);
-
-  // Automatically hydrate Health Facilities from IndexedDB on startup to support 10,000+ facilities
-  useEffect(() => {
-    let isMounted = true;
-    loadHFListFromIndexedDB().then((cached) => {
-      if (isMounted && cached && cached.length > 0) {
-        setHfListItems((prev) => {
-          if (prev.length === 0 || cached.length >= prev.length) {
-            return cached;
-          }
-          // Merge to ensure no uploaded facilities are lost
-          const map = new Map<string, HealthFacilityRecord>();
-          cached.forEach((c) => {
-            const k = c.customer ? c.customer.trim().toLowerCase() : (c.customerDescription || c.id).trim().toLowerCase();
-            map.set(k, c);
-          });
-          prev.forEach((p) => {
-            const k = p.customer ? p.customer.trim().toLowerCase() : (p.customerDescription || p.id).trim().toLowerCase();
-            if (!map.has(k)) map.set(k, p);
-          });
-          return Array.from(map.values());
-        });
-      } else if (isMounted) {
-        setHfListItems([]);
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Automatically save Health Facilities to IndexedDB whenever state updates
-  useEffect(() => {
-    if (hfListItems && hfListItems.length > 0) {
-      saveHFListToIndexedDB(hfListItems);
-      try {
-        localStorage.setItem('epss_hf_list_items', JSON.stringify(hfListItems));
-      } catch (e) {
-        console.warn('localStorage quota limit reached for HF list; safely persisted to IndexedDB instead.', e);
-      }
-    }
-  }, [hfListItems]);
 
   const handleClearHfData = () => {
     setHfListItems([]);
     try {
-      localStorage.removeItem('epss_hf_list_items');
-      localStorage.setItem('epss_hf_list_items', JSON.stringify([]));
     } catch {
       // ignore
     }
-    clearHFListFromIndexedDB();
     pushCentralMasterData({
       hfListItems: [],
       updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -1203,17 +914,10 @@ export function App() {
 
   const handleClearInventoryData = async () => {
     setItems([]);
-    setNoBkdItems([]);
-    setCachedMeta(null);
     clearStoredImportedColumns();
     setImportedColumns([]);
     try {
-      await clearIndexedDBCache();
-      localStorage.removeItem('selectedSpreadsheetId');
-      localStorage.removeItem('selectedSheetTabNames');
-      localStorage.removeItem('epss_last_synced_sheet_title');
     } catch (e) {
-      console.warn('Error clearing IndexedDB:', e);
     }
     pushCentralMasterData({
       items: [],
@@ -1283,8 +987,6 @@ export function App() {
     }
 
     setHfListItems(updated);
-    saveHFListToIndexedDB(updated);
-    safeLocalStorageSetItem('epss_hf_list_items', JSON.stringify(updated));
     // HF list is saved to Supabase by pushCentralMasterData below (a second parallel save raced with it)
 
     // Record to Master Data Log
@@ -1329,11 +1031,9 @@ export function App() {
   const handleAddSingleFacility = (facility: HealthFacilityRecord) => {
     const updated = [facility, ...hfListItems];
     setHfListItems(updated);
-    saveHFListToIndexedDB(updated);
     try {
-      localStorage.setItem('epss_hf_list_items', JSON.stringify(updated));
     } catch (e) {
-      console.warn('Failed to persist hf list to localStorage', e);
+      console.warn('Failed to update hf list items', e);
     }
     pushCentralMasterData({
       hfListItems: updated,
@@ -1353,9 +1053,7 @@ export function App() {
   const handleDeleteSingleFacility = (id: string) => {
     const updated = hfListItems.filter((f) => f.id !== id);
     setHfListItems(updated);
-    saveHFListToIndexedDB(updated);
     try {
-      localStorage.setItem('epss_hf_list_items', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to persist hf list', e);
     }
@@ -1373,17 +1071,7 @@ export function App() {
     );
   };
 
-  // Dedicated Material Master items state with local offline persistence
-  const [materialMasterItems, setMaterialMasterItems] = useState<MaterialMasterRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_material_master_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return [];
-  });
+  const [materialMasterItems, setMaterialMasterItems] = useState<MaterialMasterRecord[]>([]);
 
   const handleUploadMaterialMasterData = (newItems: MaterialMasterRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
     if (!isAdmin) {
@@ -1408,11 +1096,9 @@ export function App() {
     }
 
     setMaterialMasterItems(updated);
-    saveMaterialMasterToIndexedDB(updated).catch(() => {});
     try {
-      localStorage.setItem('epss_material_master_items', JSON.stringify(updated));
     } catch (e) {
-      console.warn('Failed to persist material master to localStorage', e);
+      console.warn('Failed to update material master items', e);
     }
 
     // Record to Master Data Log
@@ -1455,10 +1141,7 @@ export function App() {
 
   const handleClearMaterialMasterData = () => {
     setMaterialMasterItems([]);
-    clearMaterialMasterFromIndexedDB().catch(() => {});
     try {
-      localStorage.removeItem('epss_material_master_items');
-      localStorage.setItem('epss_material_master_items', JSON.stringify([]));
     } catch {
       // ignore
     }
@@ -1477,7 +1160,6 @@ export function App() {
     const updated = [item, ...materialMasterItems];
     setMaterialMasterItems(updated);
     try {
-      localStorage.setItem('epss_material_master_items', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to persist material master item', e);
     }
@@ -1500,7 +1182,6 @@ export function App() {
     const updated = materialMasterItems.map((m) => (m.id === item.id ? item : m));
     setMaterialMasterItems(updated);
     try {
-      localStorage.setItem('epss_material_master_items', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to persist material master after update', e);
     }
@@ -1523,7 +1204,6 @@ export function App() {
     const updated = materialMasterItems.filter((m) => m.id !== id);
     setMaterialMasterItems(updated);
     try {
-      localStorage.setItem('epss_material_master_items', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to persist material master after deletion', e);
     }
@@ -1541,27 +1221,7 @@ export function App() {
     );
   };
 
-  // Dedicated Multiple Stock items state with local offline persistence (Pure Real Data Only)
-  const [multipleStockItems, setMultipleStockItems] = useState<MultipleStockRecord[]>(() => {
-    try {
-      const isCleared = localStorage.getItem('epss_multiple_stock_cleared') === 'true';
-      if (isCleared) return [];
-      const saved = localStorage.getItem('epss_multiple_stock_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const idMap = new Map<string, MultipleStockRecord>();
-          parsed.forEach((r: MultipleStockRecord) => {
-            if (r && r.id) idMap.set(r.id, r);
-          });
-          if (idMap.size > 0) return Array.from(idMap.values());
-        }
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  const [multipleStockItems, setMultipleStockItems] = useState<MultipleStockRecord[]>([]);
 
   const handleUploadMultipleStockData = (newItems: MultipleStockRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
     if (!isAdmin) {
@@ -1592,16 +1252,6 @@ export function App() {
 
     setMultipleStockItems(updated);
     broadcastAdminUpdate('Multiple Stock Ledger', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
-    // Robust dual-tier Auto-Save: IndexedDB (handles 20+ plants & unlimited rows) + localStorage fallback
-    saveMultipleStockToIndexedDB(updated).catch((err) =>
-      console.warn('Auto-save to IndexedDB encountered error:', err)
-    );
-    try {
-      localStorage.removeItem('epss_multiple_stock_cleared');
-      localStorage.setItem('epss_multiple_stock_items', JSON.stringify(updated));
-    } catch (e) {
-      console.warn('LocalStorage limit reached; all data is safely preserved in IndexedDB', e);
-    }
 
     // Record to Master Data Log
     if (files && files.length > 0) {
@@ -1643,10 +1293,7 @@ export function App() {
   const handleClearMultipleStockData = () => {
     setMultipleStockItems([]);
     broadcastAdminUpdate('Multiple Stock Cleared', 0, currentUser?.name || currentUser?.email || 'Inventory Administrator');
-    clearMultipleStockFromIndexedDB().catch(() => {});
     try {
-      localStorage.setItem('epss_multiple_stock_cleared', 'true');
-      localStorage.setItem('epss_multiple_stock_items', JSON.stringify([]));
     } catch {
       // ignore
     }
@@ -1665,9 +1312,7 @@ export function App() {
     const updated = [item, ...multipleStockItems];
     setMultipleStockItems(updated);
     broadcastAdminUpdate('Multiple Stock Addition', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
-    saveMultipleStockToIndexedDB(updated).catch(() => {});
     try {
-      localStorage.setItem('epss_multiple_stock_items', JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to persist multiple stock item', e);
     }
@@ -1690,9 +1335,7 @@ export function App() {
     const updated = multipleStockItems.filter((m) => m.id !== id);
     setMultipleStockItems(updated);
     broadcastAdminUpdate('Multiple Stock Deletion', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
-    saveMultipleStockToIndexedDB(updated).catch(() => {});
     try {
-      localStorage.setItem('epss_multiple_stock_items', JSON.stringify(updated.slice(0, 500)));
     } catch (e) {
       console.warn('Failed to persist multiple stock after deletion', e);
     }
@@ -1714,9 +1357,7 @@ export function App() {
     const updated = multipleStockItems.map(item => item.id === updatedItem.id ? updatedItem : item);
     setMultipleStockItems(updated);
     broadcastAdminUpdate('Multiple Stock Update', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
-    saveMultipleStockToIndexedDB(updated).catch(() => {});
     try {
-      localStorage.setItem('epss_multiple_stock_items', JSON.stringify(updated.slice(0, 500)));
     } catch (e) {
       console.warn('Failed to persist multiple stock item', e);
     }
@@ -1736,26 +1377,7 @@ export function App() {
   };
 
   // Dedicated Receiving Data records state with local offline persistence (Pure Real Data Only)
-  const [receivingDataRecords, setReceivingDataRecords] = useState<ReceivingDataRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_receiving_data_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const realRecords = parsed.filter((r: any) =>
-            r &&
-            !r.id?.startsWith('rec-default-') &&
-            !r.id?.startsWith('seed-trf-641-') &&
-            r.sourceFile !== 'Template Dataset'
-          );
-          return realRecords;
-        }
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  const [receivingDataRecords, setReceivingDataRecords] = useState<ReceivingDataRecord[]>([]);
 
   const handleUploadReceivingData = (newRecords: ReceivingDataRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
     if (!isAdmin) {
@@ -1777,12 +1399,10 @@ export function App() {
     }
 
     setReceivingDataRecords(updated);
-    saveReceivingToIndexedDB(updated).catch(() => {});
     broadcastAdminUpdate('Goods Receipt Ledger', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
     try {
-      localStorage.setItem('epss_receiving_data_records', JSON.stringify(updated));
     } catch (e) {
-      console.warn('Failed to persist receiving records to localStorage', e);
+      console.warn('Failed to update receiving records', e);
     }
 
     // Record to Master Data Log
@@ -1824,10 +1444,8 @@ export function App() {
 
   const handleClearReceivingData = () => {
     setReceivingDataRecords([]);
-    clearReceivingFromIndexedDB().catch(() => {});
     broadcastAdminUpdate('Goods Receipt Cleared', 0, currentUser?.name || currentUser?.email || 'Inventory Administrator');
     try {
-      localStorage.setItem('epss_receiving_data_records', JSON.stringify([]));
     } catch {
       // ignore
     }
@@ -1843,18 +1461,7 @@ export function App() {
   };
 
   // Dedicated Distribution Data records state with local offline persistence
-  const [distributionDataRecords, setDistributionDataRecords] = useState<DistributionDataRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_distribution_data_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  const [distributionDataRecords, setDistributionDataRecords] = useState<DistributionDataRecord[]>([]);
 
   const handleUploadDistributionData = (newRecords: DistributionDataRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
     if (!isAdmin) {
@@ -1876,12 +1483,10 @@ export function App() {
     }
 
     setDistributionDataRecords(updated);
-    saveDistributionToIndexedDB(updated).catch(() => {});
     broadcastAdminUpdate('Distribution Ledger', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
     try {
-      localStorage.setItem('epss_distribution_data_records', JSON.stringify(updated));
     } catch (e) {
-      console.warn('Failed to persist distribution records to localStorage', e);
+      console.warn('Failed to update distribution records', e);
     }
 
     // Record to Master Data Log
@@ -1923,9 +1528,7 @@ export function App() {
 
   const handleClearDistributionData = () => {
     setDistributionDataRecords([]);
-    clearDistributionFromIndexedDB().catch(() => {});
     try {
-      localStorage.setItem('epss_distribution_data_records', JSON.stringify([]));
     } catch {
       // ignore
     }
@@ -1941,23 +1544,6 @@ export function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('epss_system_layout', systemLayout);
-  }, [systemLayout]);
-
-  useEffect(() => {
-    localStorage.setItem('epss_sidebar_collapsed', String(isSidebarCollapsed));
-  }, [isSidebarCollapsed]);
-
-  useEffect(() => {
-    localStorage.setItem('epss_theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    localStorage.setItem('epss_header_nav_theme', headerNavThemeId);
-  }, [headerNavThemeId]);
-
-  useEffect(() => {
-    localStorage.setItem('epss_dark_mode', String(isDarkMode));
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -1974,124 +1560,26 @@ export function App() {
     }
   };
 
-  useEffect(() => {
-    localStorage.setItem('epss_lang', language);
-  }, [language]);
 
-  // Online / Offline and IndexedDB State
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
-  const [cachedMeta, setCachedMeta] = useState<InventoryCacheMeta | null>(null);
-  const [isLoadedFromIndexedDB, setIsLoadedFromIndexedDB] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [spreadsheetTitle, setSpreadsheetTitle] = useState<string>('');
   const [availableSheetTitles, setAvailableSheetTitles] = useState<string[]>([]);
-  const [selectedSheetTabs, setSelectedSheetTabs] = useState<string[]>(() => {
-    const saved = localStorage.getItem('selectedSheetTabNames');
-    return saved ? JSON.parse(saved) : ['all'];
-  });
+  const [selectedSheetTabs, setSelectedSheetTabs] = useState<string[]>(['all']);
 
-  // Update localStorage and trigger re-sync when selectedSheetTabs changes
+  // Listen for browser connectivity changes
   useEffect(() => {
-    localStorage.setItem('selectedSheetTabNames', JSON.stringify(selectedSheetTabs));
-    // Trigger manual refresh when tab selection changes
-    handleDetectAutoAndPullAll();
-  }, [selectedSheetTabs]);
-
-  // 1. Initial IndexedDB Cache Restoration on startup
-  useEffect(() => {
-    let isMounted = true;
-
-    const restoreFromIndexedDB = async () => {
-      try {
-        const cached = await loadInventoryFromIndexedDB();
-        if (cached && (cached.items.length > 0 || cached.noBkdItems.length > 0)) {
-          if (isMounted) {
-            setItems(cached.items);
-            if (cached.noBkdItems.length > 0) {
-              setNoBkdItems(cached.noBkdItems);
-            }
-            setCachedMeta(cached.meta);
-            setIsLoadedFromIndexedDB(true);
-          }
-        } else {
-          // If IndexedDB has no items yet, safely sync the current items so they are never lost
-          if (isMounted) {
-            saveInventoryToIndexedDB(items).catch(() => {});
-            setIsLoadedFromIndexedDB(true);
-          }
-        }
-
-        // Restore Multiple Stock from IndexedDB (preserves all 20+ plants and records)
-        try {
-          const cachedMStock = await loadMultipleStockFromIndexedDB();
-          if (cachedMStock && cachedMStock.length > 0 && isMounted) {
-            setMultipleStockItems(cachedMStock);
-          } else if (multipleStockItems.length > 0) {
-            saveMultipleStockToIndexedDB(multipleStockItems).catch(() => {});
-          }
-        } catch (mErr) {
-          console.warn('Error reading multiple stock from IndexedDB:', mErr);
-        }
-
-        // Restore Receiving records from IndexedDB
-        try {
-          const cachedRec = await loadReceivingFromIndexedDB();
-          if (cachedRec && cachedRec.length > 0 && isMounted) {
-            setReceivingDataRecords(cachedRec);
-          }
-        } catch {}
-
-        // Restore Distribution records from IndexedDB
-        try {
-          const cachedDist = await loadDistributionFromIndexedDB();
-          if (cachedDist && cachedDist.length > 0 && isMounted) {
-            setDistributionDataRecords(cachedDist);
-          }
-        } catch {}
-
-        // Restore Material Master records from IndexedDB
-        try {
-          const cachedMat = await loadMaterialMasterFromIndexedDB();
-          if (cachedMat && cachedMat.length > 0 && isMounted) {
-            setMaterialMasterItems(cachedMat);
-          }
-        } catch {}
-
-        // Restore Program MD records from IndexedDB
-        try {
-          const cachedPmd = await loadProgramMdFromIndexedDB();
-          if (cachedPmd && cachedPmd.length > 0 && isMounted) {
-            setProgramMdRecords(cachedPmd);
-          }
-        } catch {}
-      } catch (err) {
-        console.error('Error reading from IndexedDB cache:', err);
-      }
-    };
-
-    restoreFromIndexedDB();
-
-    // Listen for browser connectivity changes
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    const handleCacheUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<InventoryCacheMeta>;
-      if (customEvent.detail && isMounted) {
-        setCachedMeta(customEvent.detail);
-      }
-    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    window.addEventListener('epss:indexeddb:updated', handleCacheUpdated);
 
     return () => {
-      isMounted = false;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('epss:indexeddb:updated', handleCacheUpdated);
     };
   }, []);
 
@@ -2108,8 +1596,7 @@ export function App() {
     addAuditLog('ADD', `Added new device: "${newDevice.materialDescription}" (${newDevice.qty} units)`);
     setItems((prev) => {
       const updated = [newDevice, ...prev];
-      saveInventoryToIndexedDB(updated, { syncType: 'manual_edit' });
-      checkLowStockAlerts(updated, categoryThresholds, newDevice);
+        checkLowStockAlerts(updated, categoryThresholds, newDevice);
       pushCentralMasterData({
         items: updated,
         updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -2141,34 +1628,14 @@ export function App() {
 
   // Google Workspace Integration State
   const [calendarEvents, setCalendarEvents] = useState<MaintenanceCalendarEvent[]>(initialCalendarEvents);
-  const [documents, setDocuments] = useState<DeviceDocument[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_documents_archive');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return initialDocuments;
-  });
+  const [documents, setDocuments] = useState<DeviceDocument[]>(initialDocuments);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('epss_documents_archive', JSON.stringify(documents));
-    } catch {}
   }, [documents]);
 
   useEffect(() => {
     const handleDocsUpdated = () => {
-      try {
-        const saved = localStorage.getItem('epss_documents_archive');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            setDocuments(parsed);
-          }
-        }
-      } catch {}
+      // Docs updated locally
     };
     window.addEventListener('epss:documents:updated', handleDocsUpdated);
     const handleOpenUploadAllSql = () => setIsUploadAllVisibleModalOpen(true);
@@ -2657,7 +2124,6 @@ export function App() {
     addAuditLog('UPDATE', `Updated device: "${updatedItem.materialDescription}"`);
     setItems((prev) => {
       const next = prev.map((i) => (i.id === updatedItem.id ? updatedItem : i));
-      saveInventoryToIndexedDB(next, { syncType: 'manual_edit' });
       checkLowStockAlerts(next, categoryThresholds, updatedItem);
       pushCentralMasterData({
         items: next,
@@ -2748,7 +2214,6 @@ export function App() {
         }
         return item;
       });
-      saveInventoryToIndexedDB(next, { syncType: 'manual_edit' });
       pushCentralMasterData({
         items: next,
         updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -2786,7 +2251,6 @@ export function App() {
         }
         return item;
       });
-      saveInventoryToIndexedDB(next, { syncType: 'manual_edit' });
       return next;
     });
     triggerCloudSyncToast(
@@ -2811,7 +2275,6 @@ export function App() {
     addAuditLog('BREAKDOWN_BULK_UPLOAD', `Uploaded ${newBreakdowns.length} breakdown records from MoH`);
     setNoBkdItems((prev) => {
       const next = [...newBreakdowns, ...prev];
-      saveInventoryToIndexedDB(items, { noBkdItems: next, syncType: 'manual_edit' });
       return next;
     });
     setToastMessage(`✓ MoH Breakdown: Successfully uploaded ${newBreakdowns.length} breakdown records!`);
@@ -2827,7 +2290,6 @@ export function App() {
     addAuditLog('DELIVERY_UPDATE', `Updated delivery status of "${label}" to "${newDeliveryStatus}"`);
     setItems((prev) => {
       const next = prev.map((item) => (item.id === itemId ? { ...item, deliveryStatus: newDeliveryStatus } : item));
-      saveInventoryToIndexedDB(next, { syncType: 'manual_edit' });
       pushCentralMasterData({
         items: next,
         updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
@@ -2893,7 +2355,6 @@ export function App() {
       const filtered = prev.filter(d => d.id !== newDoc.id && (!newDoc.referenceNumber || d.referenceNumber !== newDoc.referenceNumber));
       const updated = [newDoc, ...filtered];
       try {
-        localStorage.setItem('epss_documents_archive', JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -3043,9 +2504,7 @@ export function App() {
           });
 
           setItems(parsedItems);
-          saveInventoryToIndexedDB(parsedItems, { syncType: 'excel_import' });
           try {
-            localStorage.setItem('epss_inventory_items', JSON.stringify(parsedItems.slice(0, 1500)));
           } catch {}
           recordMasterDataLog({
             type: 'Master Inventory',
@@ -3105,9 +2564,7 @@ export function App() {
     if (allNewItems.length > 0) {
       const updated = [...items, ...allNewItems];
       setItems(updated);
-      saveInventoryToIndexedDB(updated, { syncType: 'excel_import' });
       try {
-        localStorage.setItem('epss_inventory_items', JSON.stringify(updated));
       } catch {}
       recordMasterDataLog({
         type: 'Master Inventory',
@@ -3237,7 +2694,6 @@ export function App() {
           currentUser={currentUser}
           onLogout={handleLogout}
           isOnline={isOnline}
-          cachedMeta={cachedMeta}
           currentTheme={theme}
           onThemeChange={handleThemeChange}
           availableSheetTitles={availableSheetTitles}
@@ -3330,7 +2786,6 @@ export function App() {
             currentUser={currentUser}
             onLogout={handleLogout}
             isOnline={isOnline}
-            cachedMeta={cachedMeta}
             searchQuery={globalSearchQuery}
             onSearchChange={setGlobalSearchQuery}
             matchedCount={filteredItems.length}
@@ -3458,16 +2913,9 @@ export function App() {
               <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
                 <strong>Offline Mode Active:</strong> You are currently disconnected. The application is serving{' '}
-                <strong>{items.length.toLocaleString()}</strong> medical device records from your local{' '}
-                <strong>IndexedDB cache</strong>. All views, filters, defect trackers, and regional hubs are fully operational.
+                <strong>{items.length.toLocaleString()}</strong> medical device records from your cloud-synchronized session. All views, filters, defect trackers, and regional hubs are fully operational.
               </span>
             </div>
-            {cachedMeta && (
-              <div className="flex items-center gap-1.5 text-amber-800 font-semibold shrink-0 text-[11px] self-end sm:self-auto">
-                <Database className="w-3.5 h-3.5 text-amber-700" />
-                <span>Last Synced: {cachedMeta.dateFormatted}</span>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -3538,7 +2986,6 @@ export function App() {
               onRefresh={() => handleDetectAutoAndPullAll(true)}
               isAdmin={isAdmin}
               isSyncing={isSyncing}
-              cachedMeta={cachedMeta}
               spreadsheetTitle={spreadsheetTitle}
               selectedSheetTabs={selectedSheetTabs}
               items={items}
@@ -3731,6 +3178,8 @@ export function App() {
                 onTriggerCloudSync={triggerCloudSyncToast}
                 dspRecords={dspRecords}
                 setDspRecords={setDspRecords}
+                dsp22Columns={dsp22Columns}
+                dsp22Rows={dsp22Rows}
               />
             ) : epssSubTab === 'plant-dsp' ||
                epssSubTab === 'plant-receiving-dsp' ||
@@ -3858,7 +3307,6 @@ export function App() {
               isOnline={isOnline}
               onSyncNow={() => handleDetectAutoAndPullAll(true)}
               isSyncing={isSyncing}
-              cachedMeta={cachedMeta}
               fontScale={fontScale}
               onFontScaleChange={setFontScale}
               userId={getActiveUserId()}

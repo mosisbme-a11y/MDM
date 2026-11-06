@@ -92,7 +92,6 @@ import {
     RegionBreakdownRow
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
-import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 
@@ -379,6 +378,8 @@ export interface DspWorkflowViewProps {
   setHfListItems?: React.Dispatch<React.SetStateAction<HealthFacilityRecord[]>>;
   dspRecords?: DspWorkflowRecord[];
   setDspRecords?: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
+  dsp22Columns?: any[];
+  dsp22Rows?: any[];
   onTriggerCloudSync?: (
     successMsg: string,
     mutation: {
@@ -402,6 +403,8 @@ export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
   setHfListItems,
   dspRecords = [],
   setDspRecords,
+  dsp22Columns = [],
+  dsp22Rows = [],
   onTriggerCloudSync
 }) => {
 const ALL_ETHIOPIAN_REGIONS = [
@@ -491,7 +494,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   };
 
   const handleOpenBreakdownWhatsApp = (rec: DspWorkflowRecord) => {
-    const phone = localStorage.getItem('epss_dsp_official_phone') || '+251911234567';
+    const phone = '+251911234567';
     const targetRegs = rec.targetedRegions?.length > 0 ? rec.targetedRegions.join(', ') : 'Regional Health Bureaus';
     const deviceList = rec.itemsIncluded.map((it, idx) => `• ${it.description} (${it.material}): ${it.quantity} Units`).join('\n');
     const message = `*MINISTRY OF HEALTH (MOH) — ETHIOPIA*
@@ -558,7 +561,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
     setRecords(prev => {
       const updated = prev.map(r => r.id === actionTargetRecord.id ? updatedRecord : r);
-      saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
@@ -612,13 +614,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       };
 
       const nextRecs = prev.map(r => r.id === recordId ? updatedRecord : r);
-      saveDspRecordsToIndexedDB(nextRecs);
-      
-      // Also update selectedRecord if it's currently open
-      if (selectedRecord && selectedRecord.id === recordId) {
-        setSelectedRecord(updatedRecord);
-      }
-
       return nextRecs;
     });
     
@@ -1082,7 +1077,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
           setRecords(prev => {
             const updated = [newRecord, ...prev];
-            saveDspRecordsToIndexedDB(updated); // Persist to IndexedDB
             return updated;
           });
 
@@ -1164,7 +1158,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           };
           setRecords(prev => {
             const updated = [...prev, draftRecord];
-            saveDspRecordsToIndexedDB(updated);
             return updated;
           });
           setActionFeedbackToast(`✓ Draft saved as ${refNum}!`);
@@ -1201,7 +1194,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
             setRecords(prev => {
               const updated = [newRecord, ...prev];
-              saveDspRecordsToIndexedDB(updated);
               return updated;
             });
 
@@ -1256,7 +1248,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
             setRecords(prev => {
               const updated = [newRecord, ...prev];
-              saveDspRecordsToIndexedDB(updated);
               return updated;
             });
 
@@ -1280,7 +1271,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         onSubmit={(newRecord) => {
           setRecords(prev => {
             const updated = [newRecord, ...prev];
-            saveDspRecordsToIndexedDB(updated);
             return updated;
           });
 
@@ -1368,7 +1358,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 subCount = programHpStockCount;
               } else if (sub.id === '1.2') {
                 try {
-                  const stored = localStorage.getItem('epss_dsp_received_moh_rows');
+                  const stored = null;
                   if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
@@ -1380,7 +1370,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 }
               } else if (sub.id === '2.2') {
                 try {
-                  const stored = localStorage.getItem('epss_dsp_2_2_rows');
+                  const stored = null;
                   if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
@@ -1700,7 +1690,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 };
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
-                saveDspRecordsToIndexedDB(copy);
                 return copy;
               }
               return prev;
@@ -1748,7 +1737,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 };
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
-                saveDspRecordsToIndexedDB(copy);
                 return copy;
               }
               return prev;
@@ -1805,6 +1793,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           records={records}
           setRecords={setRecords}
           multipleStockItems={multipleStockItems}
+          initialColumns={dsp22Columns}
+          initialRows={dsp22Rows}
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
@@ -1847,7 +1837,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 };
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
-                saveDspRecordsToIndexedDB(copy);
                 return copy;
               }
               return prev;
@@ -1892,7 +1881,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 };
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
-                saveDspRecordsToIndexedDB(copy);
                 return copy;
               }
               return prev;
@@ -3111,14 +3099,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         onUpdateRecord={(updatedRecord) => {
           setRecords(prev => {
             const updated = prev.map(r => r.id === updatedRecord.id ? updatedRecord : r);
-            saveDspRecordsToIndexedDB(updated);
             return updated;
           });
         }}
         onDeleteRecord={(id) => {
           setRecords(prev => {
             const updated = prev.filter(r => r.id !== id);
-            saveDspRecordsToIndexedDB(updated);
             return updated;
           });
         }}
@@ -3130,7 +3116,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           };
           setRecords(prev => {
             const updated = [submittedRecord, ...prev.filter(r => r.id !== draftRecord.id)];
-            saveDspRecordsToIndexedDB(updated);
             return updated;
           });
         }}

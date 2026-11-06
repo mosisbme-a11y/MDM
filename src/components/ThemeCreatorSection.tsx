@@ -204,7 +204,7 @@ export const ThemeCreatorSection: React.FC<ThemeCreatorSectionProps> = ({
             <p className="text-xs text-slate-400 mt-0.5">
               {language === 'am'
                 ? 'የመጀመሪያ እና የሁለተኛ ደረጃ ቀለሞችን በከለር መራጭ ያዘጋጁ እና ለመላው መተግበሪያ በቋሚነት ያስቀምጡ'
-                : 'Define custom primary and secondary color palettes using color pickers and save them to localStorage for the entire app'}
+                : 'Define custom primary and secondary color palettes using color pickers for the entire app session'}
             </p>
           </div>
         </div>

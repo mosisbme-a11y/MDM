@@ -63,9 +63,7 @@ export const DistributionRateAndSohView: React.FC<DistributionRateAndSohViewProp
   const [selectedMaterialType, setSelectedMaterialType] = useState('all');
 
   // Strong Access Request Security State
-  const [accessStatus, setAccessStatus] = useState<'granted' | 'pending' | 'locked'>(() => {
-    return (localStorage.getItem('epss_distribution_access') as any) || 'locked';
-  });
+  const [accessStatus, setAccessStatus] = useState<'granted' | 'pending' | 'locked'>('locked');
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [requestForm, setRequestForm] = useState({
     name: 'Dr. Samuel Kebede',
@@ -85,17 +83,13 @@ export const DistributionRateAndSohView: React.FC<DistributionRateAndSohViewProp
     setRequestSubmittedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     setShowAccessModal(false);
   };
-
   const handleGrantAccess = () => {
     setAccessStatus('granted');
-    localStorage.setItem('epss_distribution_access', 'granted');
   };
 
   const handleRevokeAccess = () => {
     setAccessStatus('locked');
-    localStorage.removeItem('epss_distribution_access');
   };
-
   const activeMode: 'delivery-rate' | 'remain-soh' = useMemo(() => {
     if (currentSubTab === 'distribution-remain-soh') return 'remain-soh';
     return 'delivery-rate';

@@ -6,11 +6,10 @@ export const DEFAULT_SUPABASE_URL = 'https://oyfhffheomcrrcmerodx.supabase.co';
 export const DEFAULT_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZmhmZmhlb21jcnJjbWVyb2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2OTI4NjcsImV4cCI6MjEwOTI2ODg2N30.gwvhTrx8yHn8Lw9zKFsDf2XkwgjKSiCVQldHTSyQ05Q';
 
-// Safe environment loading with LocalStorage override and fallback
+// Safe environment loading with fallback
 const metaEnv = (import.meta as any).env || {};
 let rawClientUrl = (
   metaEnv.VITE_SUPABASE_URL ||
-  (typeof window !== 'undefined' ? localStorage.getItem('epss_supabase_url') : null) ||
   DEFAULT_SUPABASE_URL
 ).trim();
 if (rawClientUrl && !rawClientUrl.startsWith('http://') && !rawClientUrl.startsWith('https://')) {
@@ -20,7 +19,6 @@ export const supabaseUrl = rawClientUrl;
 
 export const supabaseAnonKey =
   metaEnv.VITE_SUPABASE_ANON_KEY ||
-  (typeof window !== 'undefined' ? localStorage.getItem('epss_supabase_anon_key') : null) ||
   DEFAULT_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(

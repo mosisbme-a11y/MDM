@@ -92,14 +92,7 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
   console.log('MultipleStockView rendering, items count:', items.length);
   // Mode: Auto-Replace Immediate vs Review & Confirm
   const [multipleStockViewMode, setMultipleStockViewMode] = useState<'combined' | 'table' | 'analytics'>('combined');
-  const [autoReplaceImmediate, setAutoReplaceImmediate] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('epss_multiple_stock_auto_replace');
-      return saved !== null ? saved === 'true' : false; // Defaults to FALSE to prevent automatic previous data clearance
-    } catch {
-      return false;
-    }
-  });
+  const [autoReplaceImmediate, setAutoReplaceImmediate] = useState<boolean>(false);
 
   // Staged Batch State (Review mode)
   const [pendingBatch, setPendingBatch] = useState<PendingStagedBatch | null>(null);
@@ -174,11 +167,6 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
   const toggleAutoReplace = () => {
     const next = !autoReplaceImmediate;
     setAutoReplaceImmediate(next);
-    try {
-      localStorage.setItem('epss_multiple_stock_auto_replace', String(next));
-    } catch {
-      // ignore
-    }
     setUploadToast({
       type: 'info',
       message: next

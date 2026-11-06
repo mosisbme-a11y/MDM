@@ -11,18 +11,16 @@ const SCOPES = [
 const TOKEN_STORAGE_KEY = 'epss_google_oauth_access_token';
 const EXPIRY_STORAGE_KEY = 'epss_google_oauth_access_token_exp';
 
+let cachedAccessToken: string | null = null;
+let cachedExpiry: number = 0;
 let isSigningIn = false;
 
 const readStored = (): string | null => {
-  try {
-    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const exp = Number(localStorage.getItem(EXPIRY_STORAGE_KEY) || 0);
-    if (token && exp > Date.now()) return token;
-  } catch {}
+  if (cachedAccessToken && cachedExpiry > Date.now()) {
+    return cachedAccessToken;
+  }
   return null;
 };
-
-let cachedAccessToken: string | null = readStored();
 
 function loadGis(): Promise<any> {
   const w = window as any;
@@ -63,10 +61,7 @@ export const googleSignIn = async (): Promise<{ accessToken: string } | null> =>
             return;
           }
           cachedAccessToken = resp.access_token;
-          try {
-            localStorage.setItem(TOKEN_STORAGE_KEY, resp.access_token);
-            localStorage.setItem(EXPIRY_STORAGE_KEY, String(Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60_000));
-          } catch {}
+          cachedExpiry = Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60_000;
           resolve({ accessToken: resp.access_token });
         },
         error_callback: (err: any) => {
@@ -83,16 +78,12 @@ export const googleSignIn = async (): Promise<{ accessToken: string } | null> =>
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  cachedAccessToken = readStored();
-  return cachedAccessToken;
+  return readStored();
 };
 
 export const clearCachedAccessToken = () => {
   cachedAccessToken = null;
-  try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(EXPIRY_STORAGE_KEY);
-  } catch {}
+  cachedExpiry = 0;
 };
 
 export const logout = async () => {

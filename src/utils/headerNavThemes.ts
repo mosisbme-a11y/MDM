@@ -193,52 +193,15 @@ export const HEADER_NAV_THEMES: HeaderNavThemeOption[] = [
   }
 ];
 
-// Helper to retrieve custom admin theme from localStorage
+let memoryCustomTheme: HeaderNavThemeOption | null = null;
+
+// Helper to retrieve custom admin theme from memory
 export const getActiveCustomThemeOption = (): HeaderNavThemeOption | null => {
-  try {
-    const raw = localStorage.getItem('epss_custom_theme_config');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const isDark = parsed.mode === 'dark' || (parsed.sidebarBgColor && parsed.sidebarBgColor.startsWith('#') && parseInt(parsed.sidebarBgColor.slice(1, 3), 16) < 100);
-      return {
-        id: 'custom-admin',
-        name: parsed.name || 'Custom Admin Theme',
-        category: isDark ? 'dark' : 'light',
-        description: `Custom ${parsed.primaryColor} on ${parsed.secondaryColor}`,
-        headerBg: isDark ? 'bg-slate-900' : 'bg-white',
-        headerBorder: isDark ? 'border-slate-800' : 'border-slate-200',
-        sidebarBg: isDark ? 'bg-slate-900' : 'bg-slate-50',
-        sidebarBorder: isDark ? 'border-slate-800' : 'border-slate-200',
-        sidebarHeaderBg: isDark ? 'bg-slate-950' : 'bg-slate-100',
-        navActiveBg: 'shadow-md font-bold',
-        navInactiveHover: isDark ? 'hover:bg-slate-800/60 text-slate-400 hover:text-white' : 'hover:bg-slate-200/80 text-slate-600 hover:text-slate-950',
-        accentColor: `text-[${parsed.accentColor || parsed.primaryColor}]`,
-        textColor: isDark ? 'text-slate-100' : 'text-slate-900',
-        subtextColor: isDark ? 'text-slate-400' : 'text-slate-600',
-        badgeActiveBg: 'border font-bold',
-        searchBg: isDark ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-300',
-        previewGradient: `from-[${parsed.primaryColor}] to-[${parsed.secondaryColor}]`,
-        isCustom: true,
-        customStyles: {
-          headerBgColor: parsed.headerBgColor || parsed.secondaryColor,
-          headerBorderColor: isDark ? '#334155' : '#cbd5e1',
-          sidebarBgColor: parsed.sidebarBgColor || parsed.secondaryColor,
-          sidebarBorderColor: isDark ? '#334155' : '#cbd5e1',
-          sidebarHeaderBgColor: parsed.headerBgColor || parsed.secondaryColor,
-          navActiveBgColor: parsed.primaryColor,
-          navActiveTextColor: '#ffffff',
-          accentColor: parsed.accentColor || parsed.primaryColor,
-          textColor: isDark ? '#f8fafc' : '#0f172a',
-          subtextColor: isDark ? '#94a3b8' : '#64748b',
-          badgeBgColor: parsed.primaryColor + '33',
-          badgeTextColor: parsed.primaryColor
-        }
-      };
-    }
-  } catch {
-    // fallback
-  }
-  return null;
+  return memoryCustomTheme;
+};
+
+export const setMemoryCustomTheme = (theme: HeaderNavThemeOption | null) => {
+  memoryCustomTheme = theme;
 };
 
 export const getMergedHeaderNavThemes = (): HeaderNavThemeOption[] => {
@@ -256,10 +219,4 @@ export const getHeaderNavThemeById = (id: string): HeaderNavThemeOption => {
   }
   return HEADER_NAV_THEMES.find(t => t.id === id) || HEADER_NAV_THEMES[0];
 };
-
-// Initial check to populate custom theme if already in localStorage
-const initialCustom = getActiveCustomThemeOption();
-if (initialCustom && !HEADER_NAV_THEMES.some(t => t.id === 'custom-admin')) {
-  HEADER_NAV_THEMES.unshift(initialCustom);
-}
 

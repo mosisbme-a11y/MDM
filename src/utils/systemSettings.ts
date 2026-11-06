@@ -93,35 +93,22 @@ export const applyFontScaleToDOM = (scale?: SystemSettingsConfig['fontScale']): 
 };
 
 export const loadSystemSettings = (): SystemSettingsConfig => {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const merged = { ...DEFAULT_SYSTEM_SETTINGS, ...parsed };
-      return merged;
-    }
-  } catch (err) {
-    console.warn('Could not parse stored system settings, using defaults', err);
-  }
   return { ...DEFAULT_SYSTEM_SETTINGS };
 };
 
 export const saveSystemSettings = (settings: SystemSettingsConfig): void => {
   try {
     const updated = { ...settings, lastUpdated: new Date().toISOString() };
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
     applyFontScaleToDOM(updated.fontScale);
     window.dispatchEvent(new CustomEvent('epss_settings_updated', { detail: updated }));
   } catch (err) {
-    console.error('Failed to save system settings to localStorage:', err);
+    console.error('Failed to apply system settings:', err);
   }
 };
 
 export const resetSystemSettingsToDefaults = (): SystemSettingsConfig => {
   try {
-    localStorage.removeItem(SETTINGS_STORAGE_KEY);
     const defaults = { ...DEFAULT_SYSTEM_SETTINGS, lastUpdated: new Date().toISOString() };
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(defaults));
     applyFontScaleToDOM(defaults.fontScale);
     window.dispatchEvent(new CustomEvent('epss_settings_updated', { detail: defaults }));
     return defaults;
@@ -253,28 +240,12 @@ export const runLiveSystemDiagnostics = async (): Promise<DiagnosticReport> => {
   });
 
   // 2. Storage Quota & LocalStorage Usage
-  let totalStoredBytes = 0;
-  let totalKeys = 0;
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        totalKeys++;
-        const val = localStorage.getItem(key) || '';
-        totalStoredBytes += key.length + val.length;
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  const kbUsed = (totalStoredBytes / 1024).toFixed(1);
   items.push({
     id: 'storage',
-    name: 'LocalStorage Cache Usage',
-    status: totalStoredBytes < 4 * 1024 * 1024 ? 'optimal' : 'warning',
-    details: `${totalKeys} stored system keys across EPSS modules`,
-    value: `${kbUsed} KB`
+    name: 'Cloud Storage Mode',
+    status: 'optimal',
+    details: `All business data is strictly persisted in Supabase Cloud.`,
+    value: `Cloud Native`
   });
 
   // 3. StorageManager API Quota Check (IndexedDB / Cache)

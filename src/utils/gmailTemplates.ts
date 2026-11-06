@@ -30,18 +30,15 @@ export interface GmailTemplateVars {
   hasLetter?: boolean;
 }
 
-export const loadGmailTemplates = () => {
-  const customSubject = localStorage.getItem(GMAIL_SUBJECT_TEMPLATE_KEY) || DEFAULT_GMAIL_SUBJECT_TEMPLATE;
-  const customBody = localStorage.getItem(GMAIL_BODY_TEMPLATE_KEY) || DEFAULT_GMAIL_BODY_TEMPLATE;
-  const officialEmail = localStorage.getItem(GMAIL_OFFICIAL_EMAIL_KEY) || 'mosisbme@gmail.com';
-  const ccEmail = localStorage.getItem(GMAIL_CC_EMAIL_KEY) || '';
+let memoryTemplates = {
+  customSubject: DEFAULT_GMAIL_SUBJECT_TEMPLATE,
+  customBody: DEFAULT_GMAIL_BODY_TEMPLATE,
+  officialEmail: 'mosisbme@gmail.com',
+  ccEmail: ''
+};
 
-  return {
-    customSubject,
-    customBody,
-    officialEmail,
-    ccEmail
-  };
+export const loadGmailTemplates = () => {
+  return { ...memoryTemplates };
 };
 
 export const saveGmailTemplates = (
@@ -50,22 +47,20 @@ export const saveGmailTemplates = (
   officialEmail?: string,
   ccEmail?: string
 ) => {
-  localStorage.setItem(GMAIL_SUBJECT_TEMPLATE_KEY, subject);
-  localStorage.setItem(GMAIL_BODY_TEMPLATE_KEY, body);
-  if (officialEmail !== undefined) {
-    localStorage.setItem(GMAIL_OFFICIAL_EMAIL_KEY, officialEmail);
-  }
-  if (ccEmail !== undefined) {
-    localStorage.setItem(GMAIL_CC_EMAIL_KEY, ccEmail);
-  }
+  memoryTemplates.customSubject = subject;
+  memoryTemplates.customBody = body;
+  if (officialEmail !== undefined) memoryTemplates.officialEmail = officialEmail;
+  if (ccEmail !== undefined) memoryTemplates.ccEmail = ccEmail;
+
   window.dispatchEvent(new CustomEvent('epss_gmail_templates_updated', {
     detail: { subject, body, officialEmail, ccEmail }
   }));
 };
 
 export const resetGmailTemplatesToDefaults = () => {
-  localStorage.removeItem(GMAIL_SUBJECT_TEMPLATE_KEY);
-  localStorage.removeItem(GMAIL_BODY_TEMPLATE_KEY);
+  memoryTemplates.customSubject = DEFAULT_GMAIL_SUBJECT_TEMPLATE;
+  memoryTemplates.customBody = DEFAULT_GMAIL_BODY_TEMPLATE;
+  
   window.dispatchEvent(new CustomEvent('epss_gmail_templates_updated', {
     detail: {
       subject: DEFAULT_GMAIL_SUBJECT_TEMPLATE,

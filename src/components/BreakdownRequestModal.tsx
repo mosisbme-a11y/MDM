@@ -399,7 +399,7 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
       const loaded = loadGmailTemplates();
       if (loaded.officialEmail) setOfficialEmail(loaded.officialEmail);
       if (loaded.ccEmail) setCcEmail(loaded.ccEmail);
-      const savedPhone = localStorage.getItem('epss_dsp_official_phone');
+      const savedPhone = null; // localStorage removal
       if (savedPhone) setOfficialPhone(savedPhone || '+251911234567');
     } else {
       setDispatchReceipt(null);

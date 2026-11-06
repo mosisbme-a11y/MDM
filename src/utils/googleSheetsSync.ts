@@ -19,45 +19,30 @@ interface CachedTitles {
 
 const titlesMemoryCache = new Map<string, CachedTitles>();
 
+let memoryQuotaCooldownUntil = 0;
+
 /**
  * Returns seconds remaining in quota cooldown, or 0 if active/clear.
  */
 export function getQuotaCooldownRemaining(): number {
-  try {
-    const raw = localStorage.getItem(QUOTA_COOLDOWN_KEY);
-    if (!raw) return 0;
-    const until = Number(raw);
-    if (isNaN(until) || until <= Date.now()) {
-      localStorage.removeItem(QUOTA_COOLDOWN_KEY);
-      return 0;
-    }
-    return Math.ceil((until - Date.now()) / 1000);
-  } catch {
+  if (memoryQuotaCooldownUntil <= Date.now()) {
     return 0;
   }
+  return Math.ceil((memoryQuotaCooldownUntil - Date.now()) / 1000);
 }
 
 /**
  * Sets a quota cooldown period (defaults to 65 seconds to allow Google's 60s per-minute quota window to fully reset).
  */
 export function setQuotaCooldown(seconds: number = 65): void {
-  try {
-    const until = Date.now() + seconds * 1000;
-    localStorage.setItem(QUOTA_COOLDOWN_KEY, String(until));
-  } catch {
-    // ignore
-  }
+  memoryQuotaCooldownUntil = Date.now() + seconds * 1000;
 }
 
 /**
  * Clears any active quota cooldown.
  */
 export function clearQuotaCooldown(): void {
-  try {
-    localStorage.removeItem(QUOTA_COOLDOWN_KEY);
-  } catch {
-    // ignore
-  }
+  memoryQuotaCooldownUntil = 0;
 }
 
 /**
@@ -87,22 +72,6 @@ export async function fetchSpreadsheetTabTitles(
   const cached = titlesMemoryCache.get(spreadsheetId);
   if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
     return { titles: cached.titles, spreadsheetTitle: cached.spreadsheetTitle };
-  }
-
-  // Check localStorage cache
-  if (!forceRefresh) {
-    try {
-      const localCachedRaw = localStorage.getItem(`epss_tab_titles_${spreadsheetId}`);
-      if (localCachedRaw) {
-        const localCached: CachedTitles = JSON.parse(localCachedRaw);
-        if (localCached.expiresAt > Date.now() && Array.isArray(localCached.titles) && localCached.titles.length > 0) {
-          titlesMemoryCache.set(spreadsheetId, localCached);
-          return { titles: localCached.titles, spreadsheetTitle: localCached.spreadsheetTitle || 'Google Spreadsheet' };
-        }
-      }
-    } catch {
-      // ignore
-    }
   }
 
   // Check quota cooldown
@@ -137,18 +106,13 @@ export async function fetchSpreadsheetTabTitles(
 
   const finalTitles = titles.length > 0 ? titles : ['Sheet1'];
 
-  // Update memory & localStorage cache
+  // Update memory cache
   const cacheObj: CachedTitles = {
     titles: finalTitles,
     spreadsheetTitle,
     expiresAt: Date.now() + CACHE_TTL_MS
   };
   titlesMemoryCache.set(spreadsheetId, cacheObj);
-  try {
-    localStorage.setItem(`epss_tab_titles_${spreadsheetId}`, JSON.stringify(cacheObj));
-  } catch {
-    // ignore
-  }
 
   return { titles: finalTitles, spreadsheetTitle };
 }

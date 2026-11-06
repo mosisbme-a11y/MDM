@@ -32,111 +32,47 @@ export interface SyncHealthSnapshot {
   activeSheetTitle: string;
 }
 
-const STORAGE_LATENCY_KEY = 'epss_last_sync_latency_ms';
-const STORAGE_TIMESTAMP_KEY = 'epss_last_sync_timestamp';
-const STORAGE_QUEUE_KEY = 'epss_sync_pending_queue';
 const EVENT_NAME = 'epss:sync_health_updated';
+
+let memoryLatency = 248;
+let memoryTimestamp = Date.now();
+let memoryQueue: PendingQueueItem[] = [];
+let memoryRegionalSync: Record<string, number> = {};
+let memorySheetTitle = 'Master Inventory SOH';
+let memoryQuotaCooldownUntil = 0;
 
 /**
  * Returns the last recorded latency in ms, or a realistic baseline if not yet recorded.
  */
 export function getLastSyncLatency(): number {
-  if (typeof window === 'undefined') return 248;
-  try {
-    const saved = localStorage.getItem(STORAGE_LATENCY_KEY);
-    if (saved) {
-      const parsed = Number(saved);
-      if (!isNaN(parsed) && parsed > 0) return parsed;
-    }
-  } catch {
-    // ignore
-  }
-  return 248; // Default initial realistic baseline latency
+  return memoryLatency;
 }
 
 /**
  * Records a measured sync roundtrip latency in ms
  */
 export function recordSyncLatency(latencyMs: number, sheetTitle?: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const validLatency = Math.max(12, Math.round(latencyMs));
-    localStorage.setItem(STORAGE_LATENCY_KEY, String(validLatency));
-    localStorage.setItem(STORAGE_TIMESTAMP_KEY, String(Date.now()));
-    if (sheetTitle) {
-      localStorage.setItem('epss_last_synced_sheet_title', sheetTitle);
-    }
-    notifyHealthSubscribers();
-  } catch (err) {
-    console.error('Failed to record sync latency:', err);
+  memoryLatency = Math.max(12, Math.round(latencyMs));
+  memoryTimestamp = Date.now();
+  if (sheetTitle) {
+    memorySheetTitle = sheetTitle;
   }
+  notifyHealthSubscribers();
 }
 
 /**
  * Retrieves the list of pending items currently waiting in the sync queue
  */
 export function getPendingQueue(): PendingQueueItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const saved = localStorage.getItem(STORAGE_QUEUE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {
-    // ignore
-  }
-  return [];
+  return memoryQueue;
 }
 
 /**
- * Sanitizes queue items to ensure heavy payload arrays do not exceed localStorage limits
- */
-function sanitizeQueueForStorage(queue: PendingQueueItem[]): PendingQueueItem[] {
-  return queue.slice(0, 20).map((item) => {
-    let safePayload = item.payload;
-    if (safePayload) {
-      if (Array.isArray(safePayload)) {
-        safePayload = { count: safePayload.length, type: 'array_summary' };
-      } else if (typeof safePayload === 'object') {
-        try {
-          const str = JSON.stringify(safePayload);
-          if (str.length > 2000) {
-            safePayload = { summary: 'Large payload truncated', size: str.length };
-          }
-        } catch {
-          safePayload = { summary: 'Object summary' };
-        }
-      }
-    }
-    return {
-      ...item,
-      payload: safePayload
-    };
-  });
-}
-
-/**
- * Saves the pending queue to localStorage and notifies subscribers
+ * Saves the pending queue to memory and notifies subscribers
  */
 function savePendingQueue(queue: PendingQueueItem[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const sanitized = sanitizeQueueForStorage(queue);
-    localStorage.setItem(STORAGE_QUEUE_KEY, JSON.stringify(sanitized));
-    notifyHealthSubscribers();
-  } catch (err) {
-    console.warn('Failed to save pending sync queue to localStorage, attempting emergency slim format:', err);
-    try {
-      const slim = queue.slice(0, 5).map(({ payload, ...rest }) => rest);
-      localStorage.setItem(STORAGE_QUEUE_KEY, JSON.stringify(slim));
-      notifyHealthSubscribers();
-    } catch {
-      try {
-        localStorage.removeItem(STORAGE_QUEUE_KEY);
-      } catch {}
-    }
-  }
+  memoryQueue = queue.slice(0, 50); // limit in-memory queue size
+  notifyHealthSubscribers();
 }
 
 /**
@@ -163,8 +99,8 @@ export function enqueuePendingItem(item: {
     status: 'pending'
   };
 
-  const current = getPendingQueue();
-  savePendingQueue([newItem, ...current]);
+  memoryQueue = [newItem, ...memoryQueue];
+  notifyHealthSubscribers();
   return newItem;
 }
 
@@ -172,16 +108,16 @@ export function enqueuePendingItem(item: {
  * Dequeues / removes a single item from the pending queue
  */
 export function dequeuePendingItem(id: string): void {
-  const current = getPendingQueue();
-  const next = current.filter((i) => i.id !== id);
-  savePendingQueue(next);
+  memoryQueue = memoryQueue.filter((i) => i.id !== id);
+  notifyHealthSubscribers();
 }
 
 /**
  * Clears all items in the pending queue
  */
 export function clearPendingQueue(): void {
-  savePendingQueue([]);
+  memoryQueue = [];
+  notifyHealthSubscribers();
 }
 
 /**
@@ -192,15 +128,14 @@ export async function flushPendingQueue(): Promise<{
   processedCount: number;
   newLatencyMs: number;
 }> {
-  const current = getPendingQueue();
-  const count = current.length;
+  const count = memoryQueue.length;
   if (count === 0) {
-    return { success: true, processedCount: 0, newLatencyMs: getLastSyncLatency() };
+    return { success: true, processedCount: 0, newLatencyMs: memoryLatency };
   }
 
   // Mark all as syncing
-  const syncingQueue = current.map((item) => ({ ...item, status: 'syncing' as const }));
-  savePendingQueue(syncingQueue);
+  memoryQueue = memoryQueue.map((item) => ({ ...item, status: 'syncing' as const }));
+  notifyHealthSubscribers();
 
   // Measure roundtrip latency
   const startTime = performance.now();
@@ -208,7 +143,7 @@ export async function flushPendingQueue(): Promise<{
   const latency = Math.round(performance.now() - startTime);
 
   // Clear queue and record new latency
-  savePendingQueue([]);
+  memoryQueue = [];
   recordSyncLatency(latency);
 
   return {
@@ -246,54 +181,26 @@ function notifyHealthSubscribers(): void {
  * Returns current snapshot of all sync health metrics
  */
 export function getSyncHealthSnapshot(): SyncHealthSnapshot {
-  const latency = getLastSyncLatency();
-  const queue = getPendingQueue();
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-
   let cooldownSec = 0;
-  try {
-    const raw = localStorage.getItem('epss_google_quota_cooldown_until');
-    if (raw) {
-      const until = Number(raw);
-      if (!isNaN(until) && until > Date.now()) {
-        cooldownSec = Math.ceil((until - Date.now()) / 1000);
-      }
-    }
-  } catch {
-    // ignore
+  if (memoryQuotaCooldownUntil > Date.now()) {
+    cooldownSec = Math.ceil((memoryQuotaCooldownUntil - Date.now()) / 1000);
   }
-
-  let timestamp = Date.now();
-  try {
-    const savedTs = localStorage.getItem(STORAGE_TIMESTAMP_KEY);
-    if (savedTs) {
-      const parsed = Number(savedTs);
-      if (!isNaN(parsed) && parsed > 0) timestamp = parsed;
-    }
-  } catch {
-    // ignore
-  }
-
-  const activeSheetTitle =
-    (typeof localStorage !== 'undefined' &&
-      (localStorage.getItem('epss_last_synced_sheet_title') ||
-        localStorage.getItem('selectedSheetTabName'))) ||
-    'Master Inventory SOH';
 
   return {
-    lastSyncLatencyMs: latency,
-    lastSyncTimestamp: timestamp,
-    lastSyncFormatted: new Date(timestamp).toLocaleTimeString([], {
+    lastSyncLatencyMs: memoryLatency,
+    lastSyncTimestamp: memoryTimestamp,
+    lastSyncFormatted: new Date(memoryTimestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     }),
-    pendingQueue: queue,
-    pendingCount: queue.length,
-    healthRating: computeHealthRating(latency, isOnline, cooldownSec),
+    pendingQueue: memoryQueue,
+    pendingCount: memoryQueue.length,
+    healthRating: computeHealthRating(memoryLatency, isOnline, cooldownSec),
     isOnline,
     quotaCooldownSeconds: cooldownSec,
-    activeSheetTitle
+    activeSheetTitle: memorySheetTitle
   };
 }
 
@@ -304,11 +211,7 @@ export interface RegionSyncState {
   hoursSinceLastSync: number;
 }
 
-const REGIONAL_SYNC_KEY = 'epss_regional_sync_timestamps';
-
 export function getRegionalSyncStates(): RegionSyncState[] {
-  if (typeof window === 'undefined') return [];
-  
   const regions = [
     'Addis Ababa',
     'Oromia',
@@ -322,51 +225,28 @@ export function getRegionalSyncStates(): RegionSyncState[] {
     'Southern Ethiopia'
   ];
 
-  let saved: Record<string, number> = {};
-  try {
-    const raw = localStorage.getItem(REGIONAL_SYNC_KEY);
-    if (raw) {
-      saved = JSON.parse(raw);
-    }
-  } catch {
-    // ignore
-  }
-
   const now = Date.now();
   const MS_IN_HOUR = 60 * 60 * 1000;
   
-  // Default values to simulate some stale regions (Tigray synced 52 hours ago, Afar synced 124 hours ago)
+  // Default values to simulate some stale regions
   const defaultOffsets: Record<string, number> = {
     'Addis Ababa': 2 * MS_IN_HOUR,
     'Oromia': 12 * MS_IN_HOUR,
     'Amhara': 20 * MS_IN_HOUR,
-    'Tigray': 52 * MS_IN_HOUR, // STALE! > 48h
+    'Tigray': 52 * MS_IN_HOUR, 
     'Somali': 1.5 * MS_IN_HOUR,
     'Sidama': 30 * MS_IN_HOUR,
-    'Afar': 124 * MS_IN_HOUR, // STALE! > 48h
+    'Afar': 124 * MS_IN_HOUR, 
     'Gambela': 3 * MS_IN_HOUR,
     'Benishangul-Gumuz': 4 * MS_IN_HOUR,
     'Southern Ethiopia': 18 * MS_IN_HOUR
   };
 
-  let updated = false;
-  regions.forEach(r => {
-    if (saved[r] === undefined) {
-      saved[r] = now - (defaultOffsets[r] || 2 * MS_IN_HOUR);
-      updated = true;
-    }
-  });
-
-  if (updated) {
-    try {
-      localStorage.setItem(REGIONAL_SYNC_KEY, JSON.stringify(saved));
-    } catch {
-      // ignore
-    }
-  }
-
   return regions.map(r => {
-    const lastSync = saved[r] || (now - 2 * MS_IN_HOUR);
+    if (memoryRegionalSync[r] === undefined) {
+      memoryRegionalSync[r] = now - (defaultOffsets[r] || 2 * MS_IN_HOUR);
+    }
+    const lastSync = memoryRegionalSync[r];
     const diffMs = now - lastSync;
     const hours = Math.round((diffMs / MS_IN_HOUR) * 10) / 10;
     
@@ -380,19 +260,7 @@ export function getRegionalSyncStates(): RegionSyncState[] {
 }
 
 export function syncRegionNow(region: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = localStorage.getItem(REGIONAL_SYNC_KEY);
-    const saved = raw ? JSON.parse(raw) : {};
-    saved[region] = Date.now();
-    localStorage.setItem(REGIONAL_SYNC_KEY, JSON.stringify(saved));
-    
-    // Notify health subscribers to update indicators
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('epss:sync_health_updated'));
-    }
-  } catch (err) {
-    console.error('Failed to sync region:', err);
-  }
+  memoryRegionalSync[region] = Date.now();
+  notifyHealthSubscribers();
 }
 

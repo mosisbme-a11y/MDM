@@ -54,7 +54,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InventorySummary, RegionDistribution, MedicalDeviceItem, AuditLogEntry, DeviceDocument, ConfirmedUploadBatch, MultipleStockRecord, ReceivingDataRecord, MaterialMasterRecord, MedicalDeviceAgreement, UploadedAgreementBatch, ProgramMdRecord } from '../types';
 import { DEFAULT_MEDICAL_DEVICE_AGREEMENTS } from '../data/defaultAgreements';
-import { InventoryCacheMeta } from '../utils/indexedDbCache';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { TotalDeliveryAgreementSection } from './TotalDeliveryAgreementSection';
 import { InstallationTaskModal } from './InstallationTaskModal';
@@ -85,7 +84,6 @@ interface DashboardViewProps {
   onOpenAddDevice?: () => void;
   isAdmin?: boolean;
   isSyncing?: boolean;
-  cachedMeta?: InventoryCacheMeta | null;
   spreadsheetTitle?: string;
   selectedSheetTabs: string[];
   items?: MedicalDeviceItem[];
@@ -130,7 +128,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAddDevice,
   isAdmin = false,
   isSyncing,
-  cachedMeta,
   items = [],
   multipleStockItems = [],
   onUploadMultipleStockData,
@@ -171,19 +168,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setDashboardStreamFilter?.(val);
   };
   const [activeLayoutTab, setActiveLayoutTab] = useState<'analytics' | 'alerts' | 'audit' | 'agreements'>('analytics');
-  const [dashboardAnalyticsMode, setDashboardAnalyticsMode] = useState<'all' | 'multiple-stock' | 'master'>(() => {
-    try {
-      const saved = localStorage.getItem('epss_dashboard_analytics_mode');
-      if (saved === 'all' || saved === 'multiple-stock' || saved === 'master') return saved;
-    } catch {}
-    return 'all';
-  });
+  const [dashboardAnalyticsMode, setDashboardAnalyticsMode] = useState<'all' | 'multiple-stock' | 'master'>('all');
 
   const handleSelectDashboardMode = (mode: 'all' | 'multiple-stock' | 'master') => {
     setDashboardAnalyticsMode(mode);
-    try {
-      localStorage.setItem('epss_dashboard_analytics_mode', mode);
-    } catch {}
   };
   const [isVerticalLayout, setIsVerticalLayout] = useState<boolean>(true);
   const [showAllPrograms, setShowAllPrograms] = useState(false);
@@ -608,24 +596,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [items, lowStockThreshold]);
 
   // Load agreements from localStorage or fallback to defaults
-  const [agreements] = useState<MedicalDeviceAgreement[]>(() => {
-    try {
-      localStorage.removeItem('epss_medical_device_agreements');
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  const [agreements] = useState<MedicalDeviceAgreement[]>([]);
 
   // Uploaded Multi-Data Batches State (saved in localStorage)
-  const [uploadedBatches] = useState<UploadedAgreementBatch[]>(() => {
-    try {
-      localStorage.removeItem('epss_medical_device_uploaded_batches');
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  const [uploadedBatches] = useState<UploadedAgreementBatch[]>([]);
 
   // Aggregate active agreements plus uploaded batches
   const allActiveAgreements = useMemo(() => {
@@ -665,18 +639,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [allActiveAgreements, items]);
 
-  // Effective Program MD records (either passed as props or read from localStorage)
   const effectiveProgramMdRecords = useMemo(() => {
     if (programMdRecords && programMdRecords.length > 0) {
       return programMdRecords;
     }
-    try {
-      const saved = localStorage.getItem('epss_program_md_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
     return [];
   }, [programMdRecords]);
 
@@ -800,12 +766,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       .sort((a, b) => Number(a.year) - Number(b.year));
   }, [effectiveProgramMdRecords, programMdRecords, uploadedBatches]);
 
-  // Handler to navigate directly to exact uploaded source data for MD agreement
   const handleNavigateToAgreementSource = (year?: string | number) => {
-    const yearVal = (year !== undefined && year !== null && String(year).trim() !== '' && String(year) !== 'undefined') ? String(year).trim() : 'all';
-    localStorage.setItem('epss_agreement_filter_year', yearVal);
-    localStorage.setItem('epss_agreement_filter_view', 'uploaded-10col');
-    window.dispatchEvent(new CustomEvent('epss:navigate_agreement_source', { detail: { year: yearVal } }));
     onNavigateTab('agreements');
   };
 

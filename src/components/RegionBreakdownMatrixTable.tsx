@@ -30,7 +30,6 @@ import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
-import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 
 export interface RegionBreakdownColumn {
   id: string;
@@ -289,18 +288,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     });
   }, [rows, searchQuery, selectedRegionFilter, selectedZone, selectedPackage]);
 
-  // Effective Master HF list items (prop -> localStorage -> default sample records)
+  // Effective Master HF list items (prop -> empty list)
   const masterHfItems = useMemo<HealthFacilityRecord[]>(() => {
     if (hfListItems && hfListItems.length > 0) return hfListItems;
-    try {
-      const saved = localStorage.getItem('epss_hf_list_items');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
     return [];
   }, [hfListItems]);
 
@@ -1646,15 +1636,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     };
 
                     try {
-                      localStorage.setItem('epss_dsp_3_2_rows', JSON.stringify(filteredRows));
-                      const existingRecordsRaw = localStorage.getItem('epss_dsp_indexeddb_records');
-                      const existingRecords: DspWorkflowRecord[] = existingRecordsRaw ? JSON.parse(existingRecordsRaw) : [];
-                      const updatedRecords = [rhbRecord, ...existingRecords.filter(r => r.id !== rhbRecord.id)];
-                      saveDspRecordsToIndexedDB(updatedRecords);
-
                       pushCentralMasterData({
                         dspReceivedMohRows: filteredRows,
-                        dspWorkflowRecords: updatedRecords,
                         updatedBy: 'RHB Regional Logistics',
                         updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
                       });

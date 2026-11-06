@@ -45,7 +45,6 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import React, { useRef, useEffect, useState } from 'react';
 import { AuthUser, MedicalDeviceItem, ConfirmedUploadBatch, HeaderNavThemeId, EpssSubTab, DashboardFilterState } from '../types';
-import { InventoryCacheMeta } from '../utils/indexedDbCache';
 import { Language, translations } from '../utils/localization';
 
 import { ThemeSelector } from './ThemeSelector';
@@ -64,7 +63,6 @@ interface HeaderProps {
   currentUser?: AuthUser | null;
   onLogout?: () => void;
   isOnline?: boolean;
-  cachedMeta?: InventoryCacheMeta | null;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   matchedCount?: number;
@@ -128,7 +126,6 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onLogout,
   isOnline = true,
-  cachedMeta,
   searchQuery = '',
   onSearchChange,
   matchedCount,

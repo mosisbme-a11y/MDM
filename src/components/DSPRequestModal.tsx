@@ -138,13 +138,11 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
     const loaded = loadGmailTemplates();
     if (loaded.officialEmail) setOfficialEmail(loaded.officialEmail);
     if (loaded.ccEmail) setCcEmail(loaded.ccEmail);
-    const savedPhone = localStorage.getItem('epss_dsp_official_phone');
-    if (savedPhone) setOfficialPhone(savedPhone);
+    // localStorage removal for official phone
   }, [isOpen]);
 
   useEffect(() => {
-    if (officialEmail) localStorage.setItem('epss_dsp_official_email', officialEmail);
-    if (officialPhone) localStorage.setItem('epss_dsp_official_phone', officialPhone);
+    // Local persistence removed
   }, [officialEmail, officialPhone]);
 
   const currentDate = new Date().toISOString().split('T')[0];

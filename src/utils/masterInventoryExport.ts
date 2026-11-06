@@ -38,51 +38,31 @@ export const STANDARD_EPSS_MASTER_COLUMNS: string[] = [
   'WBS Element'
 ];
 
+let memoryImportedColumns: string[] = [];
+
 /**
- * Retrieve saved imported column names from localStorage
+ * Retrieve saved imported column names from memory
  */
 export function getStoredImportedColumns(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_IMPORTED_COLUMNS);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
-          .filter((c) => typeof c === 'string' && c.trim().length > 0 && !c.startsWith('__EMPTY'))
-          .map((c) => c.trim());
-      }
-    }
-  } catch (e) {
-    console.warn('Could not read stored imported columns:', e);
-  }
-  return [];
+  return [...memoryImportedColumns];
 }
 
 /**
- * Save detected imported columns into localStorage
+ * Save detected imported columns into memory
  */
 export function saveStoredImportedColumns(columns: string[]): void {
-  try {
-    if (columns && Array.isArray(columns) && columns.length > 0) {
-      const cleaned = columns
-        .filter((c) => typeof c === 'string' && c.trim().length > 0 && !c.startsWith('__EMPTY'))
-        .map((c) => c.trim());
-      localStorage.setItem(STORAGE_KEY_IMPORTED_COLUMNS, JSON.stringify(cleaned));
-    }
-  } catch (e) {
-    console.warn('Could not save imported columns:', e);
+  if (columns && Array.isArray(columns) && columns.length > 0) {
+    memoryImportedColumns = columns
+      .filter((c) => typeof c === 'string' && c.trim().length > 0 && !c.startsWith('__EMPTY'))
+      .map((c) => c.trim());
   }
 }
 
 /**
- * Clear stored imported columns
+ * Clear stored imported columns from memory
  */
 export function clearStoredImportedColumns(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY_IMPORTED_COLUMNS);
-  } catch (e) {
-    // ignore
-  }
+  memoryImportedColumns = [];
 }
 
 /**

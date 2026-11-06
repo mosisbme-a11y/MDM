@@ -102,11 +102,7 @@ export const HFListView: React.FC<HFListViewProps> = ({
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const [processingStatusText, setProcessingStatusText] = useState('');
 
-  // Auto-record immediately toggle setting (default: true for instant recording)
-  const [autoRecordImmediate, setAutoRecordImmediate] = useState<boolean>(() => {
-    const saved = localStorage.getItem('epss_hf_auto_record');
-    return saved === null ? true : saved === 'true';
-  });
+  const [autoRecordImmediate, setAutoRecordImmediate] = useState<boolean>(true);
 
   // Pending multiple upload batch confirmation state (for review before save)
   const [pendingBatch, setPendingBatch] = useState<{
@@ -272,7 +268,6 @@ export const HFListView: React.FC<HFListViewProps> = ({
   const toggleAutoRecord = () => {
     const next = !autoRecordImmediate;
     setAutoRecordImmediate(next);
-    localStorage.setItem('epss_hf_auto_record', String(next));
     setUploadToast({
       type: 'info',
       message: next

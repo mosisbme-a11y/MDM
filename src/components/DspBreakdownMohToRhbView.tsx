@@ -1,3 +1,4 @@
+import { saveDspRecordsToIndexedDB } from "../utils/indexedDbCache";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   FileSpreadsheet, 
@@ -37,7 +38,6 @@ import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
-import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 import { getAccessToken } from '../utils/googleWorkspace';
 
 const TODAY_ISO_DATE = new Date().toISOString().split('T')[0];
@@ -80,6 +80,10 @@ interface Props {
   setRecords: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   multipleStockItems?: MultipleStockRecord[];
   onSelectSubTab?: (tab: EpssSubTab) => void;
+  initialColumns?: any[];
+  initialRows?: any[];
+  dspReceivedEpssRows?: any[];
+  dspReceivedMohRows?: any[];
   onTriggerCloudSync?: (
     successMsg: string,
     mutation: {
@@ -95,40 +99,37 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   setRecords,
   multipleStockItems = [],
   onSelectSubTab,
+  initialColumns = [],
+  initialRows = [],
+  dspReceivedEpssRows,
+  dspReceivedMohRows,
   onTriggerCloudSync
 }) => {
   // 1. Columns (Materials)
   const [columns, setColumns] = useState<MatrixColumn[]>(() => {
-    try {
-      const stored = localStorage.getItem('epss_dsp_2_2_columns');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      // Auto-extract exact equipment items from transmitted DSP payload
-      const storedRec = localStorage.getItem('epss_dsp_received_epss_rows') || localStorage.getItem('epss_dsp_received_moh_rows') || localStorage.getItem('epss_dsp_request_template_rows');
-      if (storedRec) {
-        const parsedRec = JSON.parse(storedRec);
-        if (Array.isArray(parsedRec) && parsedRec.length > 0) {
-          const extracted: MatrixColumn[] = [];
-          const seen = new Set<string>();
-          parsedRec.forEach((item: any, idx: number) => {
-            const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
-            const desc = item.materialDescription || item.description || item.deviceName || 'Medical Equipment Unit';
-            const key = `${code}|${desc}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              extracted.push({
-                id: `mat-rec-${idx}-${code}`,
-                materialCode: code,
-                description: desc
-              });
-            }
+    if (initialColumns && initialColumns.length > 0) return initialColumns;
+    
+    // Auto-extract from transmitted DSP payload if provided
+    const sourceRows = dspReceivedEpssRows || dspReceivedMohRows;
+    if (sourceRows && sourceRows.length > 0) {
+      const extracted: MatrixColumn[] = [];
+      const seen = new Set<string>();
+      sourceRows.forEach((item: any, idx: number) => {
+        const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
+        const desc = item.materialDescription || item.description || item.deviceName || 'Medical Equipment Unit';
+        const key = `${code}|${desc}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          extracted.push({
+            id: `mat-rec-${idx}-${code}`,
+            materialCode: code,
+            description: desc
           });
-          if (extracted.length > 0) return extracted;
         }
-      }
-    } catch {}
+      });
+      if (extracted.length > 0) return extracted;
+    }
+
     return [
       { id: 'mat-1', materialCode: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon' },
       { id: 'mat-2', materialCode: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult' },
@@ -141,13 +142,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
 
   // 2. Rows (Regions)
   const [rows, setRows] = useState<MatrixRow[]>(() => {
-    try {
-      const stored = localStorage.getItem('epss_dsp_2_2_rows');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
+    if (initialRows && initialRows.length > 0) return initialRows;
     return [
       { 
         id: 'row-1', 
@@ -216,9 +211,6 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    localStorage.setItem('epss_dsp_2_2_columns', JSON.stringify(columns));
-    localStorage.setItem('epss_dsp_2_2_rows', JSON.stringify(rows));
-
     const timer = setTimeout(() => {
       pushCentralMasterData({
         dsp22Columns: columns,

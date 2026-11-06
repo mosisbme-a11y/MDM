@@ -48,7 +48,6 @@ import {
 } from '../data/defaultDspRequestTemplateData';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { EpssSubTab } from '../types';
-import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 import { getAccessToken, googleSignIn } from '../utils/googleWorkspace';
 import { loadGmailTemplates, formatGmailSubject, formatGmailBody } from '../utils/gmailTemplates';
 
@@ -84,30 +83,10 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   }, [multipleStockItems]);
 
   // Track if live linked to Multiple Stock
-  const [isLinkedToStock, setIsLinkedToStock] = useState<boolean>(() => {
-    const stored = localStorage.getItem('epss_dsp_request_is_linked_stock');
-    return stored !== null ? stored === 'true' : true;
-  });
+  const [isLinkedToStock, setIsLinkedToStock] = useState<boolean>(true);
 
   // Load saved template rows from localStorage or generate from Program HP stock
   const [templateRows, setTemplateRows] = useState<DspRequestTemplateRow[]>(() => {
-    try {
-      const stored = localStorage.getItem('epss_dsp_request_template_rows');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure auto-filled today date and MOH target
-          return parsed.map((r, i) => ({
-            ...r,
-            srNo: i + 1,
-            requestDate: r.requestDate || TODAY_ISO_DATE,
-            dspRequestTo: r.dspRequestTo || 'MOH'
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Error loading template rows:', e);
-    }
     return buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
   });
 
@@ -153,9 +132,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // DSP Name State - Mandatory and written by EPSS Team
-  const [dspName, setDspName] = useState<string>(() => {
-    return localStorage.getItem('epss_dsp_request_name') || '';
-  });
+  const [dspName, setDspName] = useState<string>('');
 
   // Row Selection State for sending specific items to MOH
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -196,12 +173,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
 
   // Save to localStorage whenever rows change
   useEffect(() => {
-    try {
-      localStorage.setItem('epss_dsp_request_template_rows', JSON.stringify(templateRows));
-      localStorage.setItem('epss_dsp_request_is_linked_stock', String(isLinkedToStock));
-    } catch (e) {
-      console.error('Error saving template rows:', e);
-    }
+    // Local persistence removed as per cloud-only policy
   }, [templateRows, isLinkedToStock]);
 
   const showToast = (msg: string) => {
@@ -806,20 +778,10 @@ Authorized Directorate Desk`;
         receivedRecord21,
         ...filtered
       ];
-      saveDspRecordsToIndexedDB(updated);
       return updated;
     });
 
-    // 5. Save exact rows & records to localStorage for view rendering in 1.2 and 2.1
     try {
-      // For 1.2
-      localStorage.setItem('epss_dsp_received_moh_rows', JSON.stringify(itemsToSend));
-      localStorage.setItem('epss_dsp_received_moh_record', JSON.stringify(sentRecord12));
-      
-      // For 2.1
-      localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
-      localStorage.setItem('epss_dsp_received_epss_record', JSON.stringify(receivedRecord21));
-
       // Push to Supabase Cloud so all users and devices immediately receive exact transmittal data
       pushCentralMasterData({
         dspReceivedMohRows: itemsToSend,
@@ -829,28 +791,8 @@ Authorized Directorate Desk`;
         updatedBy: 'EPSS HO Transmittal',
         updateKind: `Transmit DSP Request to MOH (${itemsToSend.length} Items)`
       });
-
-      const folderEntry = {
-        id: `folder-transmitted-${Date.now()}`,
-        dspRefNumber: refNum,
-        officialLetterRef: officialLetterRef,
-        dateTransmitted: TODAY_ISO_DATE,
-        senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-        recipientOrg: 'Ministry of Health (PMD Directorate)',
-        signatory: 'Mosisa (Authorized User)',
-        signatoryRole: 'Directorate Technical Lead',
-        subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${itemsToSend.length} Materials)`,
-        totalDevices: itemsToSend.length,
-        totalQuantity: sentTotals.totalQty,
-        totalValuationETB: sentTotals.totalValuation,
-        letterFileName: uploadedLetterFile?.name || `Official_Covering_Letter_${officialLetterRef.replace(/[\/\s]/g, '_')}.pdf`,
-        letterFileSize: uploadedLetterFile ? `${(uploadedLetterFile.size / 1024).toFixed(1)} KB` : '142.5 KB',
-        notes: `Official Request Covering Letter stored separately inside Transmitted EPSS to MOH Letters Folder.`
-      };
-      const existingFolder = JSON.parse(localStorage.getItem('epss_dsp_transmitted_letters_folder') || '[]');
-      localStorage.setItem('epss_dsp_transmitted_letters_folder', JSON.stringify([folderEntry, ...existingFolder]));
     } catch (e) {
-      console.warn('Failed to save to localStorage:', e);
+      console.warn('Failed to push to cloud:', e);
     }
 
     // 6. Remove transmitted items from active table (templateRows) in Sub-step 1.1
@@ -1024,7 +966,6 @@ Authorized Directorate Desk`;
                     const updated = templateRows.filter(r => !selectedRowIds.includes(r.id));
                     setTemplateRows(updated);
                     setSelectedRowIds([]);
-                    localStorage.setItem('epss_dsp_request_template_rows', JSON.stringify(updated));
                     showToast(`✓ Removed ${selectedRowIds.length} items from the request table.`);
                   }
                 }}
@@ -1730,7 +1671,6 @@ Authorized Directorate Desk`;
                 value={dspName}
                 onChange={(e) => {
                   setDspName(e.target.value);
-                  localStorage.setItem('epss_dsp_request_name', e.target.value);
                 }}
                 className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-amber-900/30"
               />

@@ -22,7 +22,6 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MedicalDeviceItem } from '../types';
-import { InventoryCacheMeta } from '../utils/indexedDbCache';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { EquipmentReliabilityTrends } from './EquipmentReliabilityTrends';
 import { SyncHealthIndicator } from './SyncHealthIndicator';
@@ -35,7 +34,6 @@ interface DefectiveAndSpareViewProps {
   onSendAlert: (item: MedicalDeviceItem) => void;
   language?: Language;
   isSyncing?: boolean;
-  cachedMeta?: InventoryCacheMeta | null;
   onRefresh?: () => void;
   onPrintReport?: () => void;
   onOpenUploadModal?: () => void;
@@ -50,7 +48,6 @@ export const DefectiveAndSpareView: React.FC<DefectiveAndSpareViewProps> = ({
   onSendAlert,
   language = 'en',
   isSyncing = false,
-  cachedMeta,
   onRefresh,
   onPrintReport,
   onOpenUploadModal,
@@ -162,12 +159,6 @@ export const DefectiveAndSpareView: React.FC<DefectiveAndSpareViewProps> = ({
               <div className={`w-1.5 h-1.5 rounded-full ${isSyncing ? 'bg-amber-500' : 'bg-emerald-500'}`} />
               {isSyncing ? 'Linking & Syncing...' : 'Live Link Active'}
             </div>
-            {cachedMeta?.dateFormatted && (
-              <span className="text-[11px] text-slate-400">
-                Last Auto-Update: <span className="text-slate-500 font-medium">{cachedMeta.dateFormatted}</span>
-              </span>
-            )}
-            <span className="text-slate-300 hidden sm:inline">|</span>
             <SyncHealthIndicator isSyncing={isSyncing} onRefresh={onRefresh} />
           </div>
         </div>

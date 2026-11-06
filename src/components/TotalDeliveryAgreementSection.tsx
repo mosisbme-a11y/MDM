@@ -115,33 +115,11 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   onDeleteProgramMdRecord,
   onSelectItem
 }) => {
-  // Load agreements from localStorage or fallback to empty (user upload only)
-  const [agreements, setAgreements] = useState<MedicalDeviceAgreement[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_medical_device_agreements');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  // Agreements state - initialized to empty as we strictly use cloud data
+  const [agreements, setAgreements] = useState<MedicalDeviceAgreement[]>([]);
 
-  // Uploaded Multi-Data Batches State (saved in localStorage)
-  const [uploadedBatches, setUploadedBatches] = useState<UploadedAgreementBatch[]>(() => {
-    try {
-      const saved = localStorage.getItem('epss_medical_device_uploaded_batches');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  // Uploaded Multi-Data Batches State - initialized to empty
+  const [uploadedBatches, setUploadedBatches] = useState<UploadedAgreementBatch[]>([]);
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all'); // 'all', 'baseline', or batch id
   const [isMultiUploadModalOpen, setIsMultiUploadModalOpen] = useState(false);
 
@@ -150,9 +128,7 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPackage, setSelectedPackage] = useState<string>('all');
   const [selectedFunding, setSelectedFunding] = useState<string>('all');
-  const [selectedYear, setSelectedYear] = useState<string>(() => {
-    return localStorage.getItem('epss_agreement_filter_year') || 'all';
-  });
+  const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedValueBracket, setSelectedValueBracket] = useState<string>('all');
   const [customMinValue, setCustomMinValue] = useState<string>('');
   const [customMaxValue, setCustomMaxValue] = useState<string>('');
@@ -162,20 +138,14 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   const [customMaxRemains, setCustomMaxRemains] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('default');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'uploaded-10col' | 'cards' | 'table' | 'analytics' | 'letters'>(() => {
-    const saved = localStorage.getItem('epss_agreement_filter_view');
-    if (saved === 'uploaded-10col' || saved === 'table' || saved === 'cards' || saved === 'analytics') return saved as any;
-    return 'uploaded-10col';
-  });
+  const [viewMode, setViewMode] = useState<'uploaded-10col' | 'cards' | 'table' | 'analytics' | 'letters'>('uploaded-10col');
   const [selectedAgreementForModal, setSelectedAgreementForModal] = useState<MedicalDeviceAgreement | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // 10-Column Agreement Requisition View State (SAP PO, Item Description, Unit, Quantity, Delivery Amount in ETB, Supplier, Device Owner, Current Status, Management Approach, Request Year)
   const [pmdSearch, setPmdSearch] = useState('');
   const [pmdStatusFilter, setPmdStatusFilter] = useState('all');
-  const [pmdYearFilter, setPmdYearFilter] = useState<string>(() => {
-    return localStorage.getItem('epss_agreement_filter_year') || 'all';
-  });
+  const [pmdYearFilter, setPmdYearFilter] = useState<string>('all');
   const [pmdSupplierFilter, setPmdSupplierFilter] = useState('all');
   const [pmdOwnerFilter, setPmdOwnerFilter] = useState('all');
   const [is10ColUploadOpen, setIs10ColUploadOpen] = useState(false);
@@ -551,24 +521,14 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
     }
   }, [currentSubTab]);
 
-  // Save agreements to localStorage and push to Supabase
+  // Sync agreements to Supabase
   useEffect(() => {
-    try {
-      localStorage.setItem('epss_medical_device_agreements', JSON.stringify(agreements));
-      pushCentralMasterData({ agreements, updateKind: `Agreements Sync (${agreements.length} items)` });
-    } catch (err) {
-      console.error('Failed to cache agreements to localStorage:', err);
-    }
+    pushCentralMasterData({ agreements, updateKind: `Agreements Sync (${agreements.length} items)` });
   }, [agreements]);
 
-  // Save uploaded batches to localStorage and push to Supabase
+  // Sync uploaded batches to Supabase
   useEffect(() => {
-    try {
-      localStorage.setItem('epss_medical_device_uploaded_batches', JSON.stringify(uploadedBatches));
-      pushCentralMasterData({ uploadedAgreementBatches: uploadedBatches, updateKind: `Uploaded Batches Sync (${uploadedBatches.length} batches)` });
-    } catch (err) {
-      console.error('Failed to cache uploaded batches to localStorage:', err);
-    }
+    pushCentralMasterData({ uploadedAgreementBatches: uploadedBatches, updateKind: `Uploaded Batches Sync (${uploadedBatches.length} batches)` });
   }, [uploadedBatches]);
 
   // Aggregate active agreements depending on selected batch filter

@@ -5,17 +5,10 @@ const REMEMBER_KEY = 'epss_remember_login';
 const SESSION_ACTIVE_KEY = 'epss_session_active';
 
 /**
- * Old versions kept user accounts (with plaintext passwords) and the logged-in user in
- * localStorage. Remove them so they can never be read from the browser again.
+ * Old versions kept user accounts in localStorage.
  */
 export function purgeLegacyCredentials(): void {
-  try {
-    localStorage.removeItem('epss_authorized_users_v1');
-    localStorage.removeItem('epss_auth_user');
-    sessionStorage.removeItem('epss_auth_user');
-  } catch {
-    // ignore
-  }
+  // Logic removed to ensure zero local storage interaction
 }
 
 interface ProfileRow {
@@ -79,11 +72,6 @@ export async function signInWithPassword(
   }
 
   try {
-    if (remember) {
-      localStorage.setItem(REMEMBER_KEY, '1');
-    } else {
-      localStorage.removeItem(REMEMBER_KEY);
-    }
     sessionStorage.setItem(SESSION_ACTIVE_KEY, '1');
   } catch {
     // ignore
@@ -92,8 +80,7 @@ export async function signInWithPassword(
 }
 
 /**
- * Restores the signed-in user after a page reload. If the person chose NOT to stay logged in,
- * the session ends when the browser tab/window session ends.
+ * Restores the signed-in user after a page reload.
  */
 export async function restoreSession(): Promise<AuthUser | null> {
   if (!supabase) return null;
@@ -102,9 +89,8 @@ export async function restoreSession(): Promise<AuthUser | null> {
     const session = data.session;
     if (!session) return null;
 
-    const remembered = localStorage.getItem(REMEMBER_KEY) === '1';
     const activeThisSession = sessionStorage.getItem(SESSION_ACTIVE_KEY) === '1';
-    if (!remembered && !activeThisSession) {
+    if (!activeThisSession) {
       await supabase.auth.signOut();
       return null;
     }

@@ -1,6 +1,6 @@
 /**
- * Firebase has been fully replaced by Supabase Cloud Storage & IndexedDB Local Persistence.
- * This file is maintained as a stub so legacy imports resolve cleanly without using Firebase Firestore.
+ * Firebase has been fully replaced by Supabase Cloud Storage.
+ * This file is maintained as a stub so legacy imports resolve cleanly.
  */
 import { supabase } from './supabase';
 

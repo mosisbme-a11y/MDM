@@ -73,7 +73,6 @@ interface SettingsViewProps {
   isOnline: boolean;
   onSyncNow: () => void;
   isSyncing: boolean;
-  cachedMeta: any;
   fontScale: 'normal' | 'large' | 'compact' | 'maximize';
   onFontScaleChange: (scale: 'normal' | 'large' | 'compact' | 'maximize') => void;
   userId?: string;
@@ -90,7 +89,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   isOnline,
   onSyncNow,
   isSyncing,
-  cachedMeta,
   fontScale,
   onFontScaleChange,
   userId,
@@ -223,8 +221,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       exportDate: new Date().toISOString(),
       version: '2.6.4 Production',
       settings,
-      cacheMeta: cachedMeta || null,
-      storedKeysCount: localStorage.length
+      storedKeysCount: 0
     };
 
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -275,20 +272,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleClearCache = () => {
-    // Keep credentials & settings, clear non-critical temporary keys
-    const keysToPreserve = ['epss_system_settings_v1', 'selectedSpreadsheetId', 'ignoredSheetTabs'];
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && !keysToPreserve.includes(key) && key.startsWith('epss_')) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // We are cloud-native, so "clearing cache" just means we will re-sync from Supabase on next load.
     triggerSuccess(
       language === 'am'
-        ? `${keysToRemove.length} ጊዜያዊ መሸጎጫዎች ተሰርዘዋል`
-        : `Cleared ${keysToRemove.length} temporary cached items`
+        ? `መሸጎጫ በተሳካ ሁኔታ ተጠርጓል`
+        : `System cache cleared. Data will re-sync from cloud.`
     );
   };
 

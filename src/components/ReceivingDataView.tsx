@@ -89,24 +89,11 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
   const [inspectingRecord, setInspectingRecord] = useState<ReceivingDataRecord | null>(null);
 
   // Automated Stock Holding Alert System State (default 90 days threshold)
-  const [alertThresholdDays, setAlertThresholdDays] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('epss_stock_holding_threshold');
-      return saved ? parseInt(saved, 10) || 90 : 90;
-    } catch {
-      return 90;
-    }
-  });
+  const [alertThresholdDays, setAlertThresholdDays] = useState<number>(90);
   const [isAlertBannerDismissed, setIsAlertBannerDismissed] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(false);
-  const [isDesktopNotifyEnabled, setIsDesktopNotifyEnabled] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('epss_stock_holding_desktop_notify') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isDesktopNotifyEnabled, setIsDesktopNotifyEnabled] = useState<boolean>(false);
   const [copiedMemoSuccess, setCopiedMemoSuccess] = useState(false);
   const [desktopNotifyStatus, setDesktopNotifyStatus] = useState<string | null>(null);
 
@@ -289,11 +276,6 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
   const handleUpdateThreshold = (days: number) => {
     setAlertThresholdDays(days);
     setIsAlertBannerDismissed(false);
-    try {
-      localStorage.setItem('epss_stock_holding_threshold', days.toString());
-    } catch {
-      // ignore
-    }
   };
 
   const alertRecords = useMemo(() => {
@@ -385,7 +367,6 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
       if (Notification.permission === 'granted') {
         const nextState = !isDesktopNotifyEnabled;
         setIsDesktopNotifyEnabled(nextState);
-        localStorage.setItem('epss_stock_holding_desktop_notify', String(nextState));
         if (nextState) {
           new Notification('🚨 EPSS Stock Holding Alerts Active', {
             body: `${alertCount} consignments currently exceed ${alertThresholdDays}-day limit.`,
@@ -399,7 +380,6 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
           setIsDesktopNotifyEnabled(true);
-          localStorage.setItem('epss_stock_holding_desktop_notify', 'true');
           new Notification('✓ EPSS Stock Holding Alerts Enabled', {
             body: `You will receive automated desktop notifications when receiving consignments exceed ${alertThresholdDays} days in stock.`,
             icon: '/favicon.ico'

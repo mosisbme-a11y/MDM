@@ -67,14 +67,8 @@ export interface CentralSyncStatus {
   counts: CentralMasterDataCounts;
 }
 
-const LOCAL_STORAGE_LAST_SEEN_VERSION = 'epss_central_sync_seen_version';
-const LOCAL_STORAGE_LAST_SYNC_METADATA = 'epss_central_sync_metadata';
-
 let localKnownVersion = 0;
-try {
-  const savedV = localStorage.getItem(LOCAL_STORAGE_LAST_SEEN_VERSION);
-  if (savedV) localKnownVersion = parseInt(savedV, 10) || 0;
-} catch {}
+let lastSyncMetadata: CentralSyncStatus | null = null;
 
 /**
  * Returns current locally known version.
@@ -88,30 +82,20 @@ export function getLocalKnownVersion(): number {
  */
 export function setLocalKnownVersion(v: number): void {
   localKnownVersion = v;
-  try {
-    localStorage.setItem(LOCAL_STORAGE_LAST_SEEN_VERSION, String(v));
-  } catch {}
 }
 
 /**
  * Retrieves the cached central sync metadata.
  */
 export function getLastSyncMetadata(): CentralSyncStatus | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_LAST_SYNC_METADATA);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return lastSyncMetadata;
 }
 
 /**
  * Saves central sync metadata.
  */
 export function saveLastSyncMetadata(meta: CentralSyncStatus): void {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_LAST_SYNC_METADATA, JSON.stringify(meta));
-  } catch {}
+  lastSyncMetadata = meta;
 }
 
 // ------------------------------------------------------------------------------

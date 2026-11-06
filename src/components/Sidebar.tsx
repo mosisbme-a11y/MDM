@@ -64,7 +64,6 @@ import { AuthUser, MedicalDeviceItem, ConfirmedUploadBatch, HeaderNavThemeId, Ep
 import * as XLSX from 'xlsx';
 import { parseMultipleStockRows, parseMultipleStockWorkbook } from './MultipleStockUploadModal';
 import { Logo } from './Logo';
-import { InventoryCacheMeta } from '../utils/indexedDbCache';
 import { Language, translations } from '../utils/localization';
 import { ThemeSelector } from './ThemeSelector';
 import { HeaderNavThemeSelector } from './HeaderNavThemeSelector';
@@ -82,7 +81,6 @@ export interface SidebarProps {
   currentUser?: AuthUser | null;
   onLogout?: () => void;
   isOnline?: boolean;
-  cachedMeta?: InventoryCacheMeta | null;
   currentTheme: string;
   onThemeChange: (themeId: string) => void;
   availableSheetTitles: string[];
@@ -132,7 +130,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout,
   isOnline = true,
-  cachedMeta,
   currentTheme,
   onThemeChange,
   availableSheetTitles,

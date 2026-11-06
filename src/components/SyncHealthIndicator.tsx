@@ -103,7 +103,7 @@ export const SyncHealthIndicator: React.FC<SyncHealthIndicatorProps> = ({
         badgeBg: 'bg-slate-100 text-slate-700 border-slate-200',
         latencyColor: 'text-slate-600',
         label: 'Offline',
-        description: 'Using IndexedDB offline store'
+        description: 'Syncing paused until connection restored'
       };
     }
     if (snapshot.quotaCooldownSeconds > 0) {
@@ -381,7 +381,7 @@ export const SyncHealthIndicator: React.FC<SyncHealthIndicatorProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <Database className="w-3 h-3 text-emerald-600" />
-              <span className="font-medium text-slate-600">IndexedDB Synced</span>
+              <span className="font-medium text-slate-600">Always Live Sync</span>
             </div>
           </div>
 
