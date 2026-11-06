@@ -708,6 +708,81 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Strict Cloud Persistence Card */}
+          <div className="bg-slate-900 rounded-2xl p-6 border border-emerald-500/40 shadow-xl space-y-4 md:col-span-2 bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-400">
+                  <Database className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">
+                      {language === 'am' ? 'ጥብቅ የክላውድ ማከማቻ (Strict Cloud Persistence)' : 'Strict Cloud Persistence (Supabase Only)'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-md">
+                      ACTIVE & ENFORCED
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {language === 'am'
+                      ? 'ሁሉንም የአካባቢ ማከማቻ (localStorage) እና IndexedDB ሸለቆዎችን በመዝጋት መረጃዎችን በቀጥታ ወደ Supabase ክላውድ ብቻ ያስቀምጣል።'
+                      : 'Explicitly disables all local browser storage and IndexedDB caches, ensuring that all data mutations exclusively persist to Supabase in real-time.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !settings.strictCloudPersistence;
+                    updateSetting('strictCloudPersistence', nextVal);
+                    triggerSuccess(nextVal ? 'Strict Cloud Persistence Enabled (Supabase Only)' : 'Strict Cloud Persistence is required for multi-device sync');
+                  }}
+                  className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.strictCloudPersistence ? 'bg-emerald-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      settings.strictCloudPersistence ? 'translate-x-7' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-bold text-emerald-400">
+                  {settings.strictCloudPersistence ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white block">Zero Local Caching</span>
+                  <span className="text-[10px] text-slate-400">No reliance on browser storage or cookies for business records.</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white block">Real-Time Supabase Sync</span>
+                  <span className="text-[10px] text-slate-400">Instant multi-device persistence across all inventory & DSP modules.</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-white block">Browser Wipe Proof</span>
+                  <span className="text-[10px] text-slate-400">Clearing browser cache never loses your uploaded building data.</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

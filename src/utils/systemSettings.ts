@@ -27,6 +27,9 @@ export interface SystemSettingsConfig {
   autoSyncIntervalMinutes: number; // 0 = manual, 5, 15, 30, 60
   toastDurationSeconds: number;    // 3, 5, 8
 
+  // Strict Cloud Persistence
+  strictCloudPersistence: boolean;
+
   // Last Modified
   lastUpdated: string;
 }
@@ -66,6 +69,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingsConfig = {
   browserNotificationsEnabled: false,
   autoSyncIntervalMinutes: 15,
   toastDurationSeconds: 4,
+  strictCloudPersistence: true,
   lastUpdated: new Date().toISOString()
 };
 
