@@ -611,7 +611,7 @@ export function App() {
     const newEntry: AuditLogEntry = {
       id: Math.random().toString(36).substring(2, 9),
       timestamp: new Date().toISOString(),
-      userName: currentUser?.name || 'mosisbme@gmail.com',
+      userName: currentUser?.name || currentUser?.email || 'Unknown user',
       userRole: currentUser?.role || 'Inventory Specialist',
       action,
       details,
@@ -2601,7 +2601,7 @@ export function App() {
         id: `CONF-BATCH-${Date.now().toString(36).toUpperCase()}`,
         batchName: batches.map((b) => b.batchName).join(', ') || `Multiple Upload Datasets (${new Date().toLocaleDateString()})`,
         confirmedAt: new Date().toISOString(),
-        confirmedBy: currentUser?.name || 'mosisbme@gmail.com',
+        confirmedBy: currentUser?.name || currentUser?.email || 'Unknown user',
         sourceFileNames: batches.map((b) => b.fileName || 'Data_Ingestion.xlsx'),
         totalRecords: allNewItems.length,
         totalQuantity: allNewItems.reduce((acc, i) => acc + (Number(i.qty) || 1), 0),
