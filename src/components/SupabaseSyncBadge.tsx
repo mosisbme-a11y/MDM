@@ -49,7 +49,9 @@ export const SupabaseSyncBadge: React.FC = () => {
           ))}
         </div>
         <span>
-          Syncing to Supabase...{status.pending > 1 ? ` (${status.pending} uploads)` : ''}
+          Syncing to Supabase...
+          {status.progress && status.progress.total > 0 ? ` ${status.progress.done}/${status.progress.total} chunks` : ''}
+          {status.pending > 1 ? ` (${status.pending} uploads)` : ''}
         </span>
       </div>
     );
