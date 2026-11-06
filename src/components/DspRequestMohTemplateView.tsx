@@ -181,12 +181,45 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // View Format Mode: List vs Plant x Material Matrix Format (matching screenshot)
+  const [viewFormatMode, setViewFormatMode] = useState<'list' | 'matrix'>('list');
+
+  const matrixData = useMemo(() => {
+    const plantMap = new Map<string, Record<string, number>>();
+    const materialSet = new Set<string>();
+
+    const sourceList = multipleStockItems && multipleStockItems.length > 0 ? multipleStockItems : [];
+    sourceList.forEach(item => {
+      if (!isProgramHpStockItem(item)) return;
+      const plant = item.plant || 'HO01';
+      const mat = item.material || item.materialDescription || 'Material';
+      const qty = Number(item.unrestrictedStock || (item as any).qty || 0);
+
+      materialSet.add(mat);
+      if (!plantMap.has(plant)) {
+        plantMap.set(plant, {});
+      }
+      const pRow = plantMap.get(plant)!;
+      pRow[mat] = (pRow[mat] || 0) + qty;
+    });
+
+    const columns = Array.from(materialSet).sort();
+    const rows = Array.from(plantMap.entries()).map(([plant, matMap], idx) => ({
+      sn: idx + 1,
+      plant,
+      quantities: matMap
+    })).sort((a, b) => a.plant.localeCompare(b.plant));
+
+    return { columns, rows };
+  }, [multipleStockItems]);
+
   // Synchronize with Multiple Stock (Program HP items only)
   const handleSyncWithMultipleStock = () => {
     const updated = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
     setTemplateRows(updated);
     setIsLinkedToStock(true);
-    showToast(`✓ Linked & updated with ${updated.length} Program (HP) items from Multiple Stock`);
+    setViewFormatMode('matrix');
+    showToast(`✓ Synced & displayed ${updated.length} Program (HP) items in Plant x Material Matrix format`);
   };
 
   // Unique budget sources for filter
@@ -945,6 +978,28 @@ Authorized Directorate Desk`;
               <RefreshCw className="w-3 h-3 text-cyan-600" />
               <span className="uppercase">Sync HP Stock ({programHpStockItems.length})</span>
             </button>
+
+            {/* View Mode Toggle: List vs Plant Matrix */}
+            <div className="flex items-center bg-slate-200 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setViewFormatMode('list')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  viewFormatMode === 'list' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                List View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewFormatMode('matrix')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  viewFormatMode === 'matrix' ? 'bg-[#FFA500] text-black shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Plant Matrix View
+              </button>
+            </div>
 
             {/* Download Template Excel */}
             <button
