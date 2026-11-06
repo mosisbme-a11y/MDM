@@ -82,8 +82,8 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
   const [selectedMvtType, setSelectedMvtType] = useState('all');
   const [selectedStorageLoc, setSelectedStorageLoc] = useState('all');
   const [selectedHoldingFilter, setSelectedHoldingFilter] = useState<'all' | 'alertExceeded' | 'fresh' | 'active' | 'watch' | 'aging'>('all');
-  const [sortField, setSortField] = useState<'default' | 'holdingDays' | 'postingDate' | 'quantity' | 'amt'>('default');
-  const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const [sortField, setSortField] = useState<'default' | 'holdingDays' | 'postingDate' | 'quantity' | 'amt' | 'material' | 'materialDescription' | 'purchaseOrder' | 'plant' | 'storageLocation' | 'wbsElement'>('default');
+  const [sortAsc, setSortAsc] = useState<boolean>(true);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [inspectingRecord, setInspectingRecord] = useState<ReceivingDataRecord | null>(null);
@@ -191,6 +191,36 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
       if (sortField === 'amt') {
         return sortAsc ? (a.amtInLocCur || 0) - (b.amtInLocCur || 0) : (b.amtInLocCur || 0) - (a.amtInLocCur || 0);
       }
+      if (sortField === 'material') {
+        const va = String(a.material || '');
+        const vb = String(b.material || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      if (sortField === 'materialDescription') {
+        const va = String(a.materialDescription || '');
+        const vb = String(b.materialDescription || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      if (sortField === 'purchaseOrder') {
+        const va = String(a.purchaseOrder || '');
+        const vb = String(b.purchaseOrder || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      if (sortField === 'plant') {
+        const va = String(a.plant || '');
+        const vb = String(b.plant || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      if (sortField === 'storageLocation') {
+        const va = String(a.storageLocation || '');
+        const vb = String(b.storageLocation || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      if (sortField === 'wbsElement') {
+        const va = String(a.wbsElement || '');
+        const vb = String(b.wbsElement || '');
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
       return 0;
     });
   }, [filteredRecords, sortField, sortAsc]);
@@ -232,12 +262,12 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
     };
   }, [filteredRecords]);
 
-  const handleToggleSort = (field: 'default' | 'holdingDays' | 'postingDate' | 'quantity' | 'amt') => {
+  const handleToggleSort = (field: 'default' | 'holdingDays' | 'postingDate' | 'quantity' | 'amt' | 'material' | 'materialDescription' | 'purchaseOrder' | 'plant' | 'storageLocation' | 'wbsElement') => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
-      setSortAsc(false); // default descending
+      setSortAsc(true); // default ascending for alphabetical columns
     }
   };
 
@@ -941,10 +971,37 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                 <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 text-center">#</th>
-                <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">Purchase order</th>
+                <th 
+                  className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('purchaseOrder')}
+                  title="Click to sort Purchase Order A-Z / Z-A"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Purchase order</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
                 <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">Reference</th>
-                <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">Material</th>
-                <th className="py-3 px-3.5 min-w-[220px] border-x border-slate-200">Material Description</th>
+                <th 
+                  className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('material')}
+                  title="Click to sort Material Code A-Z / Z-A"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Material</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
+                <th 
+                  className="py-3 px-3.5 min-w-[220px] border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('materialDescription')}
+                  title="Click to sort Material Description A-Z / Z-A"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Material Description</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
                 <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">Batch</th>
                 <th 
                   className="py-3 px-3.5 text-center whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
@@ -956,7 +1013,16 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </div>
                 </th>
-                <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">Storage Location</th>
+                <th 
+                  className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('storageLocation')}
+                  title="Click to sort Storage Location A-Z / Z-A"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Storage Location</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
                 <th 
                   className="py-3 px-3.5 text-right whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
                   onClick={() => handleToggleSort('amt')}
@@ -969,8 +1035,26 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
                 </th>
                 <th className="py-3 px-3.5 text-center whitespace-nowrap border-x border-slate-200">Movement Type</th>
                 <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 text-center">Special Stock</th>
-                <th className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200">WBS Element</th>
-                <th className="py-3 px-3.5 text-center whitespace-nowrap border-x border-slate-200">Plant</th>
+                <th 
+                  className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('wbsElement')}
+                  title="Click to sort WBS Element A-Z / Z-A"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>WBS Element</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
+                <th 
+                  className="py-3 px-3.5 text-center whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleToggleSort('plant')}
+                  title="Click to sort Plant A-Z / Z-A"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Plant</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  </div>
+                </th>
                 <th 
                   className="py-3 px-3.5 whitespace-nowrap border-x border-slate-200 cursor-pointer hover:bg-slate-100 transition"
                   onClick={() => handleToggleSort('postingDate')}
