@@ -288,6 +288,9 @@ export interface SupabaseSyncEventDetail {
   kind?: string;
   version?: number;
   message?: string;
+  /** Set on 'error' events: true while an automatic retry is scheduled. */
+  willRetry?: boolean;
+  attempt?: number;
 }
 export const SUPABASE_SYNC_EVENT = 'epss_supabase_sync';
 
@@ -302,14 +305,19 @@ function emitSyncEvent(detail: SupabaseSyncEventDetail): void {
  * Pushes updates to the central server so all other browsers and devices
  * immediately reflect the same dataset.
  */
-export async function pushCentralMasterData(
-  updates: Partial<CentralMasterData> & {
-    updatedBy?: string;
-    updateKind?: string;
-  }
-): Promise<CentralSyncStatus | null> {
+type PushUpdates = Partial<CentralMasterData> & {
+  updatedBy?: string;
+  updateKind?: string;
+};
+
+// Details of the most recent failed attempt (read by the retry wrapper below).
+let lastPushFailure: { message: string; status?: number } | null = null;
+
+async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSyncStatus | null> {
   let resultStatus: CentralSyncStatus | null = null;
   let errorMessage = '';
+  let errorStatus: number | undefined;
+  lastPushFailure = null;
 
   pendingPushes += 1;
   emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind });
@@ -402,7 +410,9 @@ export async function pushCentralMasterData(
       if (!res.ok) {
         let msg = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
         try { msg = (await res.json())?.error || msg; } catch {}
-        throw new Error(msg);
+        const e: any = new Error(msg);
+        e.status = res.status;
+        throw e;
       }
       chunkCache.set(u.key, { hash: u.hash, payload: u.payload });
     });
@@ -455,6 +465,7 @@ export async function pushCentralMasterData(
       }
     } else {
       console.error('[CentralSyncService] Commit failed, res:', res.status, res.statusText);
+      errorStatus = res.status;
       try {
         const body = await res.json();
         errorMessage = body?.error || `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
@@ -465,9 +476,11 @@ export async function pushCentralMasterData(
   } catch (err: any) {
     console.error('[CentralSyncService] Failed to sync with central server API:', err);
     errorMessage = err?.message || 'Network error';
+    errorStatus = typeof err?.status === 'number' ? err.status : undefined;
   }
 
   pendingPushes = Math.max(0, pendingPushes - 1);
+  if (!resultStatus) lastPushFailure = { message: errorMessage || 'Sync failed', status: errorStatus };
   if (resultStatus) {
     // Only announce "synced" once every outstanding upload has finished
     emitSyncEvent(
@@ -475,11 +488,42 @@ export async function pushCentralMasterData(
         ? { state: 'syncing', pending: pendingPushes }
         : { state: 'synced', pending: 0, kind: resultStatus.updateKind, version: resultStatus.version }
     );
-  } else {
+  } else if (!quiet) {
     emitSyncEvent({ state: 'error', pending: pendingPushes, message: errorMessage || 'Sync failed' });
   }
 
   return resultStatus;
+}
+
+const MAX_PUSH_ATTEMPTS = 5;
+const isRetryableFailure = (f: { status?: number }) =>
+  f.status === undefined || f.status === 408 || f.status === 429 || f.status >= 500;
+
+/**
+ * Pushes updates to the central server. Retries network errors, timeouts, 429 and 5xx
+ * with exponential backoff + jitter. 4xx errors (bad request, auth, forbidden) are NOT retried.
+ * Chunks that already uploaded are skipped on retry (content-hash comparison), so retries are cheap.
+ */
+export async function pushCentralMasterData(updates: PushUpdates): Promise<CentralSyncStatus | null> {
+  for (let attempt = 1; attempt <= MAX_PUSH_ATTEMPTS; attempt++) {
+    const result = await pushOnce(updates, true);
+    if (result) return result;
+
+    const failure = lastPushFailure || { message: 'Sync failed' };
+    const canRetry = isRetryableFailure(failure) && attempt < MAX_PUSH_ATTEMPTS;
+    emitSyncEvent({
+      state: 'error',
+      pending: pendingPushes,
+      message: failure.message,
+      willRetry: canRetry,
+      attempt
+    });
+    if (!canRetry) return null;
+
+    const delay = Math.min(30_000, 1000 * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  return null;
 }
 
 /**
