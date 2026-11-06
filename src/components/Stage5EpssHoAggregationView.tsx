@@ -201,19 +201,15 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     defaultQty: 2
   });
 
-  // Exact Equipment Columns matching user attachment
+  // Exact Equipment Columns matching user uploaded dossier
   const equipmentColumns: Stage5Column[] = useMemo(() => {
     if (currentDossier?.hubAggregationData?.columns && currentDossier.hubAggregationData.columns.length > 0) {
       return currentDossier.hubAggregationData.columns;
     }
-    return [
-      { id: 'col-anesthesia', name: 'Anesthesia machine', code: '403-XRRD-0101' },
-      { id: 'col-bed', name: 'Bed - Patient, Fowler,', code: '403-XRRD-0101' },
-      { id: 'col-bowel', name: 'Bowel - With Stand, Stainles', code: '403-XRRB-0101N' },
-      { id: 'col-coldbox', name: 'Cold box', code: '403-XRRD-0101-001' },
-      { id: 'col-delivery', name: 'Couch - Delivery', code: '401-WICU-0101N' },
-      { id: 'col-exam', name: 'Couch - Examination', code: '401-WICU-0101N' },
-    ];
+    if (currentDossier?.stage4MatrixData?.columns && currentDossier.stage4MatrixData.columns.length > 0) {
+      return currentDossier.stage4MatrixData.columns;
+    }
+    return [];
   }, [currentDossier]);
 
   // Allocations list

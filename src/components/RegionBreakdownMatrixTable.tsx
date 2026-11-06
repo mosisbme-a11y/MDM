@@ -29,7 +29,6 @@ import {
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
-import { DEFAULT_SAMPLE_RECORDS } from './HFListUploadModal';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { saveDspRecordsToIndexedDB } from '../utils/indexedDbCache';
 
@@ -78,107 +77,9 @@ export const ALL_ETHIOPIAN_REGIONS = [
   'Tigray'
 ];
 
-export const DEFAULT_STAGE_3_COLUMNS: RegionBreakdownColumn[] = [
-  { id: 'col-anesthesia', name: 'Anesthesia machine - with Patient mon', code: '403-XRRD-0101' },
-  { id: 'col-bed', name: 'Bed - Patient, Fowler, Adult', code: '403-XRRD-0101' },
-  { id: 'col-bowel', name: 'Bowel - With Stand, Stainless Steel.', code: '403-XRRB-0101N' },
-  { id: 'col-coldbox', name: 'Cold box', code: '403-XRRD-0101-001' },
-  { id: 'col-delivery', name: 'Couch - Delivery', code: '401-WICU-0101N' },
-  { id: 'col-exam', name: 'Couch - Examination', code: '401-WICU-0101N' },
-];
+export const DEFAULT_STAGE_3_COLUMNS: RegionBreakdownColumn[] = [];
 
-export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [
-  {
-    id: 'row-1',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '1',
-    hub: 'General Regional Hub',
-    healthFacility: '100012',
-    customerDescription: 'Abeshige Woreda Health Office',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 3,
-      'col-bowel': 3,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 'row-2',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '1',
-    hub: 'General Regional Hub',
-    healthFacility: '100015',
-    customerDescription: 'Addis Hiwot Health Center',
-    packages: 'OR',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 3,
-      'col-bowel': 3,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 'row-3',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '1',
-    hub: 'General Regional Hub',
-    healthFacility: '100019',
-    customerDescription: 'Adama Health Center',
-    packages: 'ICU',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 1,
-      'col-bowel': 1,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 'row-4',
-    region: 'Oromia',
-    zone: 'kirkose',
-    woreda: '3',
-    hub: 'General Regional Hub',
-    healthFacility: '100015',
-    customerDescription: 'Addis Hiwot Health Center',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 0,
-      'col-bowel': 0,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 'row-5',
-    region: 'Oromia',
-    zone: 'kirkose',
-    woreda: '3',
-    hub: 'General Regional Hub',
-    healthFacility: '100022',
-    customerDescription: 'Abala Primary Hospital',
-    packages: 'OR',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 3,
-      'col-bowel': 3,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  }
-];
+export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [];
 
 interface RegionBreakdownMatrixTableProps {
   data?: RegionBreakdownMatrixData;
@@ -400,7 +301,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     } catch {
       // ignore
     }
-    return DEFAULT_SAMPLE_RECORDS as unknown as HealthFacilityRecord[];
+    return [];
   }, [hfListItems]);
 
   // Robust region normalization and matcher (handles variations like "Oromia", "Oromiya", "Addis Ababa", etc.)

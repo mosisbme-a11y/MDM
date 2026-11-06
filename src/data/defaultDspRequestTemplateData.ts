@@ -29,74 +29,8 @@ export const DSP_REQUEST_TEMPLATE_COLUMNS = [
 
 export const TODAY_ISO_DATE = new Date().toISOString().slice(0, 10);
 
-// Exactly 5 Program (HP) items matching user screenshot counter (5) and template
-export const DEFAULT_DSP_REQUEST_TEMPLATE_ROWS: DspRequestTemplateRow[] = [
-  {
-    id: 'dsp-req-row-01',
-    srNo: 1,
-    material: '403-XRRD-0101',
-    materialDescription: 'Anesthesia machine - with Patient mon',
-    qty: 3,
-    totalAmount: 16568693.19,
-    valuationTypeDesc: 'Siemens Healthineers',
-    wbsElement: 'SDG-ME-23-001-011',
-    budgetSource: 'WB',
-    requestDate: TODAY_ISO_DATE,
-    dspRequestTo: 'MOH'
-  },
-  {
-    id: 'dsp-req-row-02',
-    srNo: 2,
-    material: 'MAT-100235',
-    materialDescription: 'ICU Mechanical Ventilator, Adult/Pediatric Invasive & Non-Invasive',
-    qty: 28,
-    totalAmount: 16800000.00,
-    valuationTypeDesc: 'Standard Price (S)',
-    wbsElement: 'WBS-EPSS-ICU-02',
-    budgetSource: 'WB',
-    requestDate: TODAY_ISO_DATE,
-    dspRequestTo: 'MOH'
-  },
-  {
-    id: 'dsp-req-row-03',
-    srNo: 3,
-    material: 'MAT-100239',
-    materialDescription: 'Infant Radiant Warmer with Phototherapy Unit & Microprocessor Temp Control',
-    qty: 35,
-    totalAmount: 4200000.00,
-    valuationTypeDesc: 'Standard Price (S)',
-    wbsElement: 'WBS-EPSS-NEO-06',
-    budgetSource: 'Global Fund',
-    requestDate: TODAY_ISO_DATE,
-    dspRequestTo: 'MOH'
-  },
-  {
-    id: 'dsp-req-row-04',
-    srNo: 4,
-    material: 'MAT-100240',
-    materialDescription: 'Automated External Defibrillator (AED) Biphasic with Adult/Pedi Pads',
-    qty: 50,
-    totalAmount: 5500000.00,
-    valuationTypeDesc: 'Moving Average (V)',
-    wbsElement: 'WBS-EPSS-EMERG-07',
-    budgetSource: 'MOH',
-    requestDate: TODAY_ISO_DATE,
-    dspRequestTo: 'MOH'
-  },
-  {
-    id: 'dsp-req-row-05',
-    srNo: 5,
-    material: 'MAT-100242',
-    materialDescription: 'Fresenius 4008S Hemodialysis Machine with Endotoxin Filter',
-    qty: 20,
-    totalAmount: 18500000.00,
-    valuationTypeDesc: 'Standard Price (S)',
-    wbsElement: 'WBS-EPSS-DIAL-09',
-    budgetSource: 'Treasury',
-    requestDate: TODAY_ISO_DATE,
-    dspRequestTo: 'MOH'
-  }
-];
+// Strictly pure user uploaded records only (No default/sample data)
+export const DEFAULT_DSP_REQUEST_TEMPLATE_ROWS: DspRequestTemplateRow[] = [];
 
 /**
  * Checks whether a Multiple Stock record belongs strictly to Program (HP) items
@@ -126,11 +60,7 @@ export function buildDspTemplateRowsFromStock(stockItems: any[], todayStr?: stri
   const hpItems = (stockItems || []).filter(isProgramHpStockItem);
 
   if (hpItems.length === 0) {
-    return DEFAULT_DSP_REQUEST_TEMPLATE_ROWS.map(r => ({
-      ...r,
-      requestDate: dateVal,
-      dspRequestTo: 'MOH'
-    }));
+    return [];
   }
 
   return hpItems.map((s, idx) => {

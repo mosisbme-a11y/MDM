@@ -11,20 +11,19 @@ import {
   ClipboardPaste,
   FileText,
   Trash2,
-  Sparkles,
   Info,
   Check,
   Building2,
   Layers,
   ArrowRight,
-  Copy
+  Copy,
+  Sparkles
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DistributionDataRecord } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import {
   DISTRIBUTION_DATA_COLUMNS,
-  DEFAULT_DISTRIBUTION_DATA_RECORDS,
   parseDistributionDataRows,
   downloadDistributionDataTemplateCSV,
   downloadDistributionDataTemplateExcel,
@@ -44,7 +43,7 @@ export const DistributionDataUploadModal: React.FC<DistributionDataUploadModalPr
   onUploadDistributionData,
   initialRecordsCount = 0
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'demo'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -158,15 +157,6 @@ export const DistributionDataUploadModal: React.FC<DistributionDataUploadModalPr
     }
   };
 
-  const handleLoadDemo = () => {
-    const demo: DistributionDataRecord[] = DEFAULT_DISTRIBUTION_DATA_RECORDS.map((r, i) => ({
-      ...r,
-      id: `demo-dist-${i}-${Date.now()}`
-    }));
-    setParsedRecords(demo);
-    setDetectedColumns([...DISTRIBUTION_DATA_COLUMNS]);
-    setErrorMsg(null);
-  };
 
   const handleConfirmUpload = () => {
     if (parsedRecords.length === 0) return;
@@ -225,20 +215,6 @@ export const DistributionDataUploadModal: React.FC<DistributionDataUploadModalPr
           >
             <ClipboardPaste className="w-4 h-4" />
             <span>Paste Tabular Data</span>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('demo');
-              handleLoadDemo();
-            }}
-            className={`flex items-center space-x-2 pb-3 px-3 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === 'demo'
-                ? 'border-emerald-600 text-emerald-700 bg-white rounded-t-lg shadow-sm'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Load Sample Demo Data</span>
           </button>
         </div>
 
@@ -331,15 +307,6 @@ export const DistributionDataUploadModal: React.FC<DistributionDataUploadModalPr
             </div>
           )}
 
-          {/* Tab 3: Demo Data Info */}
-          {activeTab === 'demo' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center space-x-3 text-amber-900 text-xs">
-              <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
-              <div>
-                <span className="font-bold">Sample Demo Dataset Loaded!</span> Preview the parsed records below and click confirm to import them into your Distribution Data view.
-              </div>
-            </div>
-          )}
 
           {/* Error Message */}
           {errorMsg && (

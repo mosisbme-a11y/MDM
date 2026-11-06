@@ -88,97 +88,9 @@ export function lookupHubFromHfMasterData(
   return 'AA01';
 }
 
-export const DEFAULT_STAGE_4_COLUMNS: Stage4Column[] = [
-  { id: 'col-anesthesia', name: 'Anesthesia machine', code: '403-XRRD-0101' },
-  { id: 'col-bed', name: 'Bed - Patient, Fowler,', code: '403-XRRD-0101' },
-  { id: 'col-bowel', name: 'Bowel - With Stand, Stainles', code: '403-XRRB-0101N' },
-  { id: 'col-coldbox', name: 'Cold box', code: '403-XRRD-0101-001' },
-  { id: 'col-delivery', name: 'Couch - Delivery', code: '401-WICU-0101N' },
-  { id: 'col-exam', name: 'Couch - Examination', code: '401-WICU-0101N' },
-];
+export const DEFAULT_STAGE_4_COLUMNS: Stage4Column[] = [];
 
-export const DEFAULT_STAGE_4_ROWS: Stage4Row[] = [
-  {
-    id: 's4-row-1',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '01',
-    healthFacility: 'Abeshige Health Center',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 2,
-      'col-bowel': 2,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 's4-row-2',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '01',
-    healthFacility: 'Addis Hiwot Health Center',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 2,
-      'col-bowel': 2,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 's4-row-3',
-    region: 'Oromia',
-    zone: 'Addis ketema',
-    woreda: '02',
-    healthFacility: 'Adama Health Center',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 2,
-      'col-bowel': 2,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 's4-row-4',
-    region: 'Oromia',
-    zone: 'kirkose',
-    woreda: '03',
-    healthFacility: 'Bole 17 Health Center',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 2,
-      'col-bowel': 2,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  },
-  {
-    id: 's4-row-5',
-    region: 'Oromia',
-    zone: 'kirkose',
-    woreda: '03',
-    healthFacility: 'Abala Primary Hospital',
-    packages: 'MCH',
-    quantities: {
-      'col-anesthesia': 2,
-      'col-bed': 2,
-      'col-bowel': 2,
-      'col-coldbox': 2,
-      'col-delivery': 2,
-      'col-exam': 2,
-    }
-  }
-];
+export const DEFAULT_STAGE_4_ROWS: Stage4Row[] = [];
 
 interface Stage4MohSubmittedMatrixTableProps {
   data?: Stage4MatrixData;

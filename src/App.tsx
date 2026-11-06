@@ -49,7 +49,7 @@ import { UploadAllVisibleSqlModal } from './components/UploadAllVisibleSqlModal'
 import { ActiveServerDataModal } from './components/ActiveServerDataModal';
 import { ConfirmedDataNavBanner } from './components/ConfirmedDataNavBanner';
 import { HFListView } from './components/HFListView';
-import { ETHIOPIAN_HEALTH_FACILITIES_7500 } from './data/ethiopianHealthFacilities7500';
+// purged synthetic health facilities
 import { MaterialMasterView } from './components/MaterialMasterView';
 import { MultipleStockView } from './components/MultipleStockView';
 import { parseMultipleStockWorkbook } from './components/MultipleStockUploadModal';
@@ -68,14 +68,7 @@ import { DistributionRateAndSohView } from './components/DistributionRateAndSohV
 import { InstallationManagementView } from './components/InstallationManagementView';
 import { ContractManagementView } from './components/ContractManagementView';
 import { MappingBreakdownView } from './components/MappingBreakdownView';
-import { 
-  INITIAL_DSP_RECORDS,
-  DEFAULT_STAGE_1_DOSSIERS,
-  DEFAULT_STAGE_2_DOSSIERS,
-  DEFAULT_STAGE_3_DOSSIERS,
-  DEFAULT_STAGE_4_DOSSIERS,
-  normalizeDspRecord
-} from './data/defaultDspWorkflows';
+import { normalizeDspRecord } from './data/defaultDspWorkflows';
 
 import { MdCdssManagementView } from './components/MdCdssManagementView';
 import { TotalDeliveryAgreementSection } from './components/TotalDeliveryAgreementSection';
@@ -92,7 +85,7 @@ import { LoginView } from './components/LoginView';
 import { SupabaseSyncBadge } from './components/SupabaseSyncBadge';
 import { restoreSession, signOut as supabaseSignOut, onSignedOut } from './utils/authService';
 import { inventoryData } from './data/inventoryData';
-import { DEFAULT_MASTER_STOCK_RECORDS, DEFAULT_MASTER_MEDICAL_DEVICES } from './data/defaultInventoryItems';
+// purged default stock and medical device constants
 import {
   initialCalendarEvents,
   initialDocuments,
@@ -294,6 +287,36 @@ export function App() {
     return false;
   };
 
+  // One-time client purge of legacy sample/synthetic data from earlier sessions
+  // Ensures strictly ONLY user-uploaded data is loaded (preserves epss_program_md_records)
+  if (typeof window !== "undefined") {
+    const PURGE_KEY = "epss_purged_all_sample_data_v3";
+    if (!localStorage.getItem(PURGE_KEY)) {
+      const keysToRemove = [
+        "epss_inventory_items",
+        "epss_multiple_stock_items",
+        "epss_dsp_records",
+        "epss_hf_list_items",
+        "epss_material_master_items",
+        "epss_documents_archive",
+        "epss_installation_records",
+        "epss_plant_dsp_records",
+        "epss_dsp_received_moh_rows",
+        "epss_dsp_received_epss_rows",
+        "epss_dsp_2_2_columns",
+        "epss_dsp_2_2_rows"
+      ];
+      keysToRemove.forEach(k => {
+        try { localStorage.removeItem(k); } catch {}
+      });
+      clearIndexedDBCache().catch(() => {});
+      clearMultipleStockFromIndexedDB().catch(() => {});
+      clearDspRecordsFromIndexedDB().catch(() => {});
+      clearHFListFromIndexedDB().catch(() => {});
+      localStorage.setItem(PURGE_KEY, "true");
+    }
+  }
+
   const [items, setItems] = useState<MedicalDeviceItem[]>(() => {
     try {
       const saved = localStorage.getItem('epss_inventory_items');
@@ -313,7 +336,7 @@ export function App() {
         }
       }
     } catch {}
-    return DEFAULT_MASTER_MEDICAL_DEVICES;
+    return [];
   });
 
   useEffect(() => {
@@ -1067,7 +1090,7 @@ export function App() {
     } catch {
       // ignore
     }
-    return ETHIOPIAN_HEALTH_FACILITIES_7500;
+    return [];
   });
   const [dspRecords, setDspRecords] = useState<DspWorkflowRecord[]>(() => {
     try {
@@ -1077,7 +1100,7 @@ export function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeDspRecord);
       }
     } catch {}
-    return INITIAL_DSP_RECORDS.filter(r => r.id !== 'dsp-epss-sample-02');
+    return [];
   });
 
   // Save DSP workflow changes to Supabase (debounced; unchanged chunks are skipped automatically)
@@ -1106,22 +1129,10 @@ export function App() {
     // 1. Initial Load from IndexedDB with defaults if empty
     loadDspRecordsFromIndexedDB().then(cached => {
       if (cached && cached.length > 0) {
-        const normalizedCached = cached.map(normalizeDspRecord);
-        const hasStage1 = normalizedCached.some(r => r.stage === 'head-office-dsp');
-        const hasStage2 = normalizedCached.some(r => r.stage === 'moh-osp-management');
-        const hasStage3 = normalizedCached.some(r => r.stage === 'rhb-breakdown-management');
-        const hasStage4 = normalizedCached.some(r => r.stage === 'branches-dsp-management');
-
-        let merged = [...normalizedCached].filter(r => r.id !== 'dsp-epss-sample-02' && !r.subject.includes('Diagnostic Imaging & ICU Ventilator'));
-        if (!hasStage1) merged = [...DEFAULT_STAGE_1_DOSSIERS, ...merged];
-        if (!hasStage2) merged = [...DEFAULT_STAGE_2_DOSSIERS, ...merged];
-        if (!hasStage3) merged = [...merged, ...DEFAULT_STAGE_3_DOSSIERS];
-        if (!hasStage4) merged = [...merged, ...DEFAULT_STAGE_4_DOSSIERS];
-
-        const finalNormalized = merged.map(normalizeDspRecord);
-        setDspRecords(finalNormalized);
+        const normalizedCached = cached.map(normalizeDspRecord).filter(r => !r.id.startsWith('dsp-stage-') && r.id !== 'dsp-epss-sample-02');
+        setDspRecords(normalizedCached);
       } else {
-        setDspRecords(INITIAL_DSP_RECORDS.filter(r => r.id !== 'dsp-epss-sample-02'));
+        setDspRecords([]);
       }
     });
 
@@ -1150,7 +1161,7 @@ export function App() {
           return Array.from(map.values());
         });
       } else if (isMounted) {
-        setHfListItems(ETHIOPIAN_HEALTH_FACILITIES_7500);
+        setHfListItems([]);
       }
     });
     return () => {
@@ -1371,18 +1382,7 @@ export function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return DEFAULT_MASTER_STOCK_RECORDS.map((s, idx) => ({
-      id: `mm-rec-${idx + 1}`,
-      material: s.material,
-      materialDescription: s.materialDescription,
-      materialGroupName: s.materialGroupName,
-      materialType: 'ZMED',
-      valuationType: s.inventoryValuationType,
-      baseUom: 'EA',
-      price: s.unrestrictedStock > 0 ? Math.round(s.currentValueOfUnrestrictedStock / s.unrestrictedStock) : 65000,
-      manufacturer: 'Siemens / Mindray / Certified Supplier',
-      uploadedAt: s.uploadedAt || new Date().toISOString()
-    }));
+    return [];
   });
 
   const handleUploadMaterialMasterData = (newItems: MaterialMasterRecord[], mode: 'replace' | 'append' = 'replace', files?: { name: string, url: string }[]) => {
@@ -1557,9 +1557,9 @@ export function App() {
           if (idMap.size > 0) return Array.from(idMap.values());
         }
       }
-      return DEFAULT_MASTER_STOCK_RECORDS;
+      return [];
     } catch {
-      return DEFAULT_MASTER_STOCK_RECORDS;
+      return [];
     }
   });
 

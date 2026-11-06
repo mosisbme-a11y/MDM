@@ -419,15 +419,6 @@ export const DistributionDataView: React.FC<DistributionDataViewProps> = ({
     downloadCSV(`EPSS_MD_Transfer_To_Plant_641_Matched_Ledger_${new Date().toISOString().split('T')[0]}.csv`, data);
   };
 
-  const handleLoadDemo641Transfers = () => {
-    if (onUploadReceivingData) {
-      const demo641 = SAMPLE_MD_TRANSFER_641_RECORDS.map((r, i) => ({
-        ...r,
-        id: `demo-641-trf-${i}-${Date.now()}`
-      }));
-      onUploadReceivingData(demo641, 'append');
-    }
-  };
 
   // =========================================================================
   // SECTION 2: MD DELIVER TO HF & REGIONAL CUSTOMER DELIVERIES STATE & DATA
@@ -844,15 +835,6 @@ interface DeliveryFocusItem {
     downloadCSV(`EPSS_Distribution_Data_Export_${new Date().toISOString().split('T')[0]}.csv`, data);
   };
 
-  const handleLoadDemoDataset = () => {
-    if (onUploadDistributionData) {
-      const demoItems: DistributionDataRecord[] = DEFAULT_DISTRIBUTION_DATA_RECORDS.map((r, i) => ({
-        ...r,
-        id: `demo-${i}-${Date.now()}`
-      }));
-      onUploadDistributionData(demoItems, 'replace');
-    }
-  };
 
   const hasActiveCustomUpload = distributionRecords && distributionRecords.length > 0;
 
@@ -1002,17 +984,6 @@ interface DeliveryFocusItem {
                 </div>
               </div>
 
-              {/* Quick 641 Demo Persistence Button */}
-              {all641Records === SAMPLE_MD_TRANSFER_641_RECORDS && (
-                <button
-                  type="button"
-                  onClick={handleLoadDemo641Transfers}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs self-start md:self-auto"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Persist Demo 641 Records</span>
-                </button>
-              )}
             </div>
 
             {/* Quick 641 Notice Card */}
@@ -2007,15 +1978,6 @@ interface DeliveryFocusItem {
             </div>
 
             <div className="flex items-center gap-2">
-              {!hasActiveCustomUpload && (
-                <button
-                  onClick={handleLoadDemoDataset}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 rounded-xl text-xs font-semibold border border-amber-500/30 transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Load Demo Deliveries</span>
-                </button>
-              )}
 
               {hasActiveCustomUpload && onClearDistributionData && (
                 <button

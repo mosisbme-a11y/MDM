@@ -93,7 +93,6 @@ import {
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { saveDspRecordsToIndexedDB, loadDspRecordsFromIndexedDB, clearDspRecordsFromIndexedDB } from '../utils/indexedDbCache';
-import { DEFAULT_MASTER_STOCK_RECORDS } from '../data/defaultInventoryItems';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 
@@ -1127,7 +1126,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       <BreakdownRequestModal
         isOpen={isBreakdownModalOpen}
         onClose={() => setIsBreakdownModalOpen(false)}
-        items={multipleStockItems && multipleStockItems.length > 0 ? multipleStockItems : DEFAULT_MASTER_STOCK_RECORDS}
+        items={multipleStockItems || []}
         epssToMohRecords={records.filter(r => r.stage === 'moh-to-epss')}
         onSaveDraft={(data) => {
           const refNum = `DRAFT-BRK-${Date.now().toString().slice(-6)}`;

@@ -332,136 +332,7 @@ export function parseMultipleStockWorkbook(wb: XLSX.WorkBook, sourceName: string
   return allRecords;
 }
 
-export const DEFAULT_SAMPLE_RECORDS: Omit<MultipleStockRecord, 'id'>[] = [
-  {
-    material: 'MAT-100234',
-    materialDescription: 'Ultrasound Machine, Doppler Color 4D with Convex & Linear Probes',
-    plant: 'AA01',
-    storageLocation: 'Central Store A1',
-    specialStockType: '', // Blank in Excel = Revolving Drug Fund (RDF)
-    unrestrictedStock: 45,
-    stockInQualityInspection: 5,
-    blockedStock: 2,
-    currentValueOfUnrestrictedStock: 13500000,
-    inventoryValuationType: 'Moving Average (V)',
-    materialGroupName: 'Diagnostic Imaging',
-    valueOfBlockedStock: 600000,
-    valueOfStockInQualityInspection: 1500000,
-    wbsElement: 'WBS-EPSS-IMAG-01'
-  },
-  {
-    material: 'MAT-100235',
-    materialDescription: 'ICU Mechanical Ventilator, Adult/Pediatric Invasive & Non-Invasive',
-    plant: 'HO01',
-    storageLocation: 'Central Warehouse Main',
-    specialStockType: 'Q', // Q in Excel = Health Program (HP)
-    unrestrictedStock: 28,
-    stockInQualityInspection: 2,
-    blockedStock: 0,
-    currentValueOfUnrestrictedStock: 16800000,
-    inventoryValuationType: 'Standard Price (S)',
-    materialGroupName: 'Critical Care & ICU',
-    valueOfBlockedStock: 0,
-    valueOfStockInQualityInspection: 1200000,
-    wbsElement: 'WBS-EPSS-ICU-02'
-  },
-  {
-    material: 'MAT-100236',
-    materialDescription: 'Digital X-Ray System, Ceiling-Suspended High Frequency 50kW',
-    plant: 'HW01',
-    storageLocation: 'Hawassa Hub Store',
-    specialStockType: '', // Blank in Excel = Revolving Drug Fund (RDF)
-    unrestrictedStock: 14,
-    stockInQualityInspection: 1,
-    blockedStock: 1,
-    currentValueOfUnrestrictedStock: 21000000,
-    inventoryValuationType: 'Moving Average (V)',
-    materialGroupName: 'Diagnostic Imaging',
-    valueOfBlockedStock: 1500000,
-    valueOfStockInQualityInspection: 1500000,
-    wbsElement: 'WBS-EPSS-XRAY-03'
-  },
-  {
-    material: 'MAT-100237',
-    materialDescription: 'Automated Clinical Chemistry Analyzer, 400 Tests/Hour',
-    plant: 'BD01',
-    storageLocation: 'Bahir Dar Regional Hub',
-    specialStockType: '', // Blank in Excel = Revolving Drug Fund (RDF)
-    unrestrictedStock: 32,
-    stockInQualityInspection: 4,
-    blockedStock: 1,
-    currentValueOfUnrestrictedStock: 9600000,
-    inventoryValuationType: 'Standard Price (S)',
-    materialGroupName: 'Clinical Chemistry',
-    valueOfBlockedStock: 300000,
-    valueOfStockInQualityInspection: 1200000,
-    wbsElement: 'WBS-EPSS-LAB-04'
-  },
-  {
-    material: 'MAT-100238',
-    materialDescription: 'Multiparameter Patient Monitor 12.1 Inch (ECG, SpO2, NIBP, Temp, Resp)',
-    plant: 'MK01',
-    storageLocation: 'Mekelle Central Hub',
-    specialStockType: '', // Blank in Excel = Revolving Drug Fund (RDF)
-    unrestrictedStock: 60,
-    stockInQualityInspection: 6,
-    blockedStock: 0,
-    currentValueOfUnrestrictedStock: 7200000,
-    inventoryValuationType: 'Moving Average (V)',
-    materialGroupName: 'Monitoring & Life Support',
-    valueOfBlockedStock: 0,
-    valueOfStockInQualityInspection: 720000,
-    wbsElement: 'WBS-EPSS-MON-05'
-  },
-  {
-    material: 'MAT-100239',
-    materialDescription: 'Infant Radiant Warmer with Phototherapy Unit & Microprocessor Temp Control',
-    plant: 'DD01',
-    storageLocation: 'Dire Dawa Hub Depo',
-    specialStockType: 'Q', // Q in Excel = Health Program (HP)
-    unrestrictedStock: 35,
-    stockInQualityInspection: 3,
-    blockedStock: 1,
-    currentValueOfUnrestrictedStock: 4200000,
-    inventoryValuationType: 'Standard Price (S)',
-    materialGroupName: 'Neonatal & Maternal Health',
-    valueOfBlockedStock: 120000,
-    valueOfStockInQualityInspection: 360000,
-    wbsElement: 'WBS-EPSS-NEO-06'
-  },
-  {
-    material: 'MAT-100240',
-    materialDescription: 'Automated External Defibrillator (AED) Biphasic with Adult/Pedi Pads',
-    plant: 'AD01',
-    storageLocation: 'Adama Distribution Center',
-    specialStockType: 'Q', // Q in Excel = Health Program (HP)
-    unrestrictedStock: 50,
-    stockInQualityInspection: 5,
-    blockedStock: 0,
-    currentValueOfUnrestrictedStock: 5500000,
-    inventoryValuationType: 'Moving Average (V)',
-    materialGroupName: 'Emergency & Resuscitation',
-    valueOfBlockedStock: 0,
-    valueOfStockInQualityInspection: 550000,
-    wbsElement: 'WBS-EPSS-EMERG-07'
-  },
-  {
-    material: 'MAT-100241',
-    materialDescription: 'Steam Autoclave Sterilizer Horizontal 350L Heavy Duty Hospital Grade',
-    plant: 'JW01',
-    storageLocation: 'Jimma Regional Depo',
-    specialStockType: '', // Blank in Excel = Revolving Drug Fund (RDF)
-    unrestrictedStock: 18,
-    stockInQualityInspection: 2,
-    blockedStock: 1,
-    currentValueOfUnrestrictedStock: 10800000,
-    inventoryValuationType: 'Standard Price (S)',
-    materialGroupName: 'Sterilization & Infection Control',
-    valueOfBlockedStock: 600000,
-    valueOfStockInQualityInspection: 1200000,
-    wbsElement: 'WBS-EPSS-STERIL-08'
-  }
-];
+export const DEFAULT_SAMPLE_RECORDS: Omit<MultipleStockRecord, 'id'>[] = [];
 
 export const MultipleStockUploadModal: React.FC<MultipleStockUploadModalProps> = ({
   isOpen,
@@ -570,23 +441,23 @@ export const MultipleStockUploadModal: React.FC<MultipleStockUploadModalProps> =
   };
 
   const handleDownloadTemplate = () => {
-    const templateData = DEFAULT_SAMPLE_RECORDS.map((r, i) => ({
-      'Material': r.material,
-      'Material Description': r.materialDescription,
-      'Plant': r.plant,
-      'Storage Location': r.storageLocation,
-      'Special Stock Type': r.specialStockType,
-      'Unrestricted Stock': r.unrestrictedStock,
-      'Stock in Quality Inspection': r.stockInQualityInspection,
-      'Blocked Stock': r.blockedStock,
-      'Current Value of Unrestricted Stock': r.currentValueOfUnrestrictedStock,
-      'Inventory Valuation Type': r.inventoryValuationType,
-      'Material Group Name': r.materialGroupName,
-      'Value of Blocked Stock': r.valueOfBlockedStock,
-      'Value of Stock in Quality Inspection': r.valueOfStockInQualityInspection,
-      'WBS Element': r.wbsElement
-    }));
-    downloadCSV(`EPSS_Multiple_Stock_Template_${new Date().toISOString().split('T')[0]}.csv`, templateData);
+    const templateData = [{
+      "Material": "e.g. MAT-100234",
+      "Material Description": "e.g. Ultrasound Machine, Doppler Color 4D",
+      "Plant": "AA01",
+      "Storage Location": "Central Store A1",
+      "Special Stock Type": "Q",
+      "Unrestricted Stock": 10,
+      "Stock in Quality Inspection": 0,
+      "Blocked Stock": 0,
+      "Current Value of Unrestricted Stock": 500000,
+      "Inventory Valuation Type": "Moving Average (V)",
+      "Material Group Name": "Diagnostic Imaging",
+      "Value of Blocked Stock": 0,
+      "Value of Stock in Quality Inspection": 0,
+      "WBS Element": "WBS-EPSS-IMAG-01"
+    }];
+    downloadCSV(`EPSS_Multiple_Stock_Template_${new Date().toISOString().split("T")[0]}.csv`, templateData);
   };
 
   const handleConfirmUpload = () => {

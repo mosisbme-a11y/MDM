@@ -346,17 +346,11 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     showToast('✓ New Program (HP) material added to DSP Request');
   };
 
-  // Reset to default Program HP items
-  const handleResetToDefaultTemplate = () => {
-    if (window.confirm('Reset DSP Request table to original 5 Program (HP) items?')) {
-      const resetRows = DEFAULT_DSP_REQUEST_TEMPLATE_ROWS.map(r => ({
-        ...r,
-        requestDate: TODAY_ISO_DATE,
-        dspRequestTo: 'MOH'
-      }));
-      setTemplateRows(resetRows);
-      setIsLinkedToStock(true);
-      showToast('✓ Restored to default 5 Program (HP) items');
+  // Clear all items
+  const handleClearTable = () => {
+    if (window.confirm('Clear all items from this DSP Request table?')) {
+      setTemplateRows([]);
+      showToast('✓ Cleared table');
     }
   };
 
@@ -1118,11 +1112,11 @@ Authorized Directorate Desk`;
             </div>
             <button
               type="button"
-              onClick={handleResetToDefaultTemplate}
-              className="text-[10px] font-bold text-slate-400 hover:text-slate-700 underline cursor-pointer"
-              title="Reset table to 5 standard Program (HP) items"
+              onClick={handleClearTable}
+              className="text-[10px] font-bold text-slate-400 hover:text-rose-600 underline cursor-pointer"
+              title="Clear all rows from this table"
             >
-              Reset 5
+              Clear Table
             </button>
           </div>
         </div>

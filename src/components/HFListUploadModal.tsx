@@ -316,138 +316,7 @@ export function parseHealthFacilityWorkbook(wb: XLSX.WorkBook, sourceName: strin
   return allRecords;
 }
 
-export const DEFAULT_SAMPLE_RECORDS: Omit<HealthFacilityRecord, 'id'>[] = [
-  {
-    customer: '1000214',
-    customerDescription: 'Tikur Anbessa Specialized Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'HO01',
-    ownershipCode: 'GOV',
-    ownershipDescription: 'Public / Federal Referral',
-    region: 'Addis Ababa',
-    zoneCode: 'Z-LID',
-    zoneDescription: 'Lideta Sub-City',
-    woreda: 'W-08',
-    woredaDescription: 'Lideta Woreda 08'
-  },
-  {
-    customer: '1000352',
-    customerDescription: 'St. Paul Hospital Millennium Medical College',
-    facilityType: 'Hospital',
-    deliveringPlant: 'HO01',
-    ownershipCode: 'GOV',
-    ownershipDescription: 'Public / Federal Referral',
-    region: 'Addis Ababa',
-    zoneCode: 'Z-GUL',
-    zoneDescription: 'Gullele Sub-City',
-    woreda: 'W-02',
-    woredaDescription: 'Gullele Woreda 02'
-  },
-  {
-    customer: '1000845',
-    customerDescription: 'Adama General Hospital & Medical College',
-    facilityType: 'Hospital',
-    deliveringPlant: 'AD01',
-    ownershipCode: 'PUB',
-    ownershipDescription: 'Regional Referral',
-    region: 'Oromia',
-    zoneCode: 'Z-ESH',
-    zoneDescription: 'East Shewa',
-    woreda: 'W-ADA',
-    woredaDescription: 'Adama Woreda'
-  },
-  {
-    customer: '1000912',
-    customerDescription: 'Bishoftu General Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'AD01',
-    ownershipCode: 'PUB',
-    ownershipDescription: 'General Hospital',
-    region: 'Oromia',
-    zoneCode: 'Z-ESH',
-    zoneDescription: 'East Shewa',
-    woreda: 'W-BSH',
-    woredaDescription: 'Bishoftu Town'
-  },
-  {
-    customer: '1001120',
-    customerDescription: 'Felege Hiwot Comprehensive Specialized Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'BD01',
-    ownershipCode: 'PUB',
-    ownershipDescription: 'Comprehensive Specialized',
-    region: 'Amhara',
-    zoneCode: 'Z-WGO',
-    zoneDescription: 'West Gojjam',
-    woreda: 'W-BDR',
-    woredaDescription: 'Bahir Dar City'
-  },
-  {
-    customer: '1001340',
-    customerDescription: 'University of Gondar Comprehensive Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'GD01',
-    ownershipCode: 'GOV',
-    ownershipDescription: 'University Teaching Hospital',
-    region: 'Amhara',
-    zoneCode: 'Z-CGO',
-    zoneDescription: 'Central Gondar',
-    woreda: 'W-GDR',
-    woredaDescription: 'Gondar City'
-  },
-  {
-    customer: '1001560',
-    customerDescription: 'Ayder Comprehensive Specialized Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'MK01',
-    ownershipCode: 'PUB',
-    ownershipDescription: 'Specialized Hospital',
-    region: 'Tigray',
-    zoneCode: 'Z-SE',
-    zoneDescription: 'South Eastern',
-    woreda: 'W-MKL',
-    woredaDescription: 'Mekelle City'
-  },
-  {
-    customer: '1001780',
-    customerDescription: 'Hawassa University Comprehensive Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'HW01',
-    ownershipCode: 'GOV',
-    ownershipDescription: 'University Referral',
-    region: 'Sidama',
-    zoneCode: 'Z-HWS',
-    zoneDescription: 'Hawassa City Administration',
-    woreda: 'W-MEN',
-    woredaDescription: 'Meneharia Sub-City'
-  },
-  {
-    customer: '1001920',
-    customerDescription: 'Karamara General Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'JJ01',
-    ownershipCode: 'PUB',
-    ownershipDescription: 'General Hospital',
-    region: 'Somali',
-    zoneCode: 'Z-JJG',
-    zoneDescription: 'Fafan Zone',
-    woreda: 'W-JJG',
-    woredaDescription: 'Jijiga Woreda'
-  },
-  {
-    customer: '1002040',
-    customerDescription: 'Hiwot Fana Comprehensive Specialized Hospital',
-    facilityType: 'Hospital',
-    deliveringPlant: 'HR01',
-    ownershipCode: 'GOV',
-    ownershipDescription: 'University Referral',
-    region: 'Harari',
-    zoneCode: 'Z-HRR',
-    zoneDescription: 'Harari Urban',
-    woreda: 'W-ABO',
-    woredaDescription: 'Aboker Woreda'
-  }
-];
+export const DEFAULT_SAMPLE_RECORDS: Omit<HealthFacilityRecord, 'id'>[] = [];
 
 export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
   isOpen,
@@ -864,26 +733,25 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
   };
 
   const handleDownloadSampleTemplate = () => {
-    const sampleData = DEFAULT_SAMPLE_RECORDS.map((r) => ({
-      'Customer': r.customer,
-      'Customer Description': r.customerDescription,
-      'Facility Type': r.facilityType,
-      'Delivering Plant': r.deliveringPlant,
-      'Ownership Code': r.ownershipCode,
-      'Ownership Description': r.ownershipDescription,
-      'Region': r.region,
-      'Zone Code': r.zoneCode,
-      'Zone Description': r.zoneDescription,
-      'Woreda': r.woreda,
-      'Woreda Description': r.woredaDescription
-    }));
-
-    downloadCSV(`EPSS_HF_List_Template_${new Date().toISOString().split('T')[0]}.csv`, sampleData);
+    const templateData = [{
+      "Customer": "e.g. 1000214",
+      "Customer Description": "e.g. Tikur Anbessa Specialized Hospital",
+      "Facility Type": "Hospital",
+      "Delivering Plant": "HO01",
+      "Ownership Code": "GOV",
+      "Ownership Description": "Public / Federal Referral",
+      "Region": "Addis Ababa",
+      "Zone Code": "Z-LID",
+      "Zone Description": "Lideta Sub-City",
+      "Woreda": "W-08",
+      "Woreda Description": "Lideta Woreda 08"
+    }];
+    downloadCSV(`EPSS_HF_List_Template_${new Date().toISOString().split("T")[0]}.csv`, templateData);
   };
 
   const handleConfirmUpload = () => {
     if (parsedItems.length === 0) {
-      setError('Please upload an Excel/CSV file or click "Load Sample Records" before applying.');
+      setError('Please upload an Excel/CSV file or paste your official data before applying.');
       return;
     }
     onUploadHFData(parsedItems, uploadMode, uploadedFiles);
@@ -1077,21 +945,7 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
                 <label className="block text-xs font-bold text-slate-700">
                   Paste Tabular Data from Excel or Google Sheets
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sampleText = DEFAULT_SAMPLE_RECORDS.map(
-                      (r) =>
-                        `${r.customer}\t${r.customerDescription}\t${r.deliveringPlant}\t${r.ownershipCode}\t${r.ownershipDescription}\t${r.region}\t${r.zoneCode}\t${r.zoneDescription}\t${r.woreda}\t${r.woredaDescription}`
-                    ).join('\n');
-                    setPasteText(
-                      `Customer\tCustomer Description\tDelivering Plant\tOwnership Code\tOwnership Description\tRegion\tZone Code\tZone Description\tWoreda\tWoreda Description\n${sampleText}`
-                    );
-                  }}
-                  className="text-[11px] font-bold text-cyan-700 hover:underline cursor-pointer"
-                >
-                  Insert Sample Table Text
-                </button>
+                
               </div>
 
               <textarea
@@ -1267,7 +1121,7 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
 
             {parsedItems.length === 0 && (
               <span className="text-[11px] text-slate-500 italic hidden sm:inline">
-                Select a file or click &quot;Quick Load Sample Records&quot; above to activate
+                Select a valid user file or paste health facility records to activate
               </span>
             )}
           </div>
