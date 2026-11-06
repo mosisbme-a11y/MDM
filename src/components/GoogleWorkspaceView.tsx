@@ -133,7 +133,7 @@ export const GoogleWorkspaceView: React.FC<GoogleWorkspaceViewProps> = () => {
   const renderedBody = formatGmailBody(bodyTemplate, sampleVars);
 
   const handleOpenTestGmail = () => {
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(officialEmail || 'mosisbme@gmail.com')}&cc=${encodeURIComponent(ccEmail)}&su=${encodeURIComponent(renderedSubject)}&body=${encodeURIComponent(renderedBody)}`;
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(officialEmail || '')}&cc=${encodeURIComponent(ccEmail)}&su=${encodeURIComponent(renderedSubject)}&body=${encodeURIComponent(renderedBody)}`;
     window.open(gmailUrl, '_blank');
   };
 
@@ -412,7 +412,7 @@ export const GoogleWorkspaceView: React.FC<GoogleWorkspaceViewProps> = () => {
               <div className="p-3.5 space-y-2 border-b border-slate-800/80 bg-slate-900/40 font-mono text-[11px]">
                 <div className="flex">
                   <span className="text-slate-500 w-16 shrink-0">To:</span>
-                  <span className="text-slate-200 truncate">{officialEmail || 'mosisbme@gmail.com'}</span>
+                  <span className="text-slate-200 truncate">{officialEmail || '—'}</span>
                 </div>
                 {ccEmail && (
                   <div className="flex">
