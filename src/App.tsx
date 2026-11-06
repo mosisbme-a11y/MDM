@@ -135,10 +135,13 @@ import { enqueuePendingItem, flushPendingQueue } from './utils/syncHealthService
 import { broadcastAdminUpdate, initializeAutoSyncListener } from './utils/realtimeSync';
 import {
   fetchCentralMasterData,
+  loadCachedCentralMasterData,
+  clearCentralSyncCache,
   pushCentralMasterData,
   checkCentralSyncStatus,
   subscribeCentralSync,
   CentralSyncStatus,
+  CentralMasterData,
   getLastSyncMetadata as getLastCentralSyncMeta,
   saveHFMasterListToServer,
   fetchHFMasterListFromServer
@@ -188,7 +191,7 @@ export function App() {
       setCurrentUser(user);
       setAuthReady(true);
     });
-    const stopListening = onSignedOut(() => setCurrentUser(null));
+    const stopListening = onSignedOut(() => { void clearCentralSyncCache(); setCurrentUser(null); });
     return () => {
       cancelled = true;
       stopListening();
@@ -310,9 +313,20 @@ export function App() {
   // DSP workflows are shared through the central Supabase store. Remote copy wins;
   // dspSyncReadyRef stays false until the first cloud load finished so a fresh browser can never overwrite the cloud copy.
   const dspSyncReadyRef = useRef(false);
+  // Signature of the DSP data the server already has. Data that came FROM the server must never be
+  // pushed back TO it (that caused a pointless "Synced to Supabase" flash after every refresh/poll).
+  const lastSyncedDspSigRef = useRef<string>('');
+  const cleanDspForSync = (records: DspWorkflowRecord[]) =>
+    records.map(rec => {
+      const c: any = { ...rec };
+      ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
+      return c;
+    });
   const mergeRemoteDsp = (remote: DspWorkflowRecord[]) => {
     if (!remote || remote.length === 0) return;
-    setDspRecords(remote.map(normalizeDspRecord));
+    const normalized = remote.map(normalizeDspRecord);
+    try { lastSyncedDspSigRef.current = JSON.stringify(cleanDspForSync(normalized)); } catch { lastSyncedDspSigRef.current = ''; }
+    setDspRecords(normalized);
   };
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
@@ -325,54 +339,60 @@ export function App() {
       window.dispatchEvent(new Event('epss:dsp_matrix_updated'));
     };
 
-    // 1. Initial hydration from Central Server (Supabase)
+    // Never talk to the API before the user is signed in: the requests would carry no token and fail with 401.
+    if (!authReady || !currentUser) {
+      return () => { isMounted = false; };
+    }
+
+    // Puts a full dataset (from the on-device cache or from the server) on screen.
+    const applyFullData = (centralData: CentralMasterData) => {
+      syncDspMatrixToStorage(centralData);
+
+      if (centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) {
+        mergeRemoteDsp(centralData.dspWorkflowRecords);
+      }
+
+      if (centralData.items !== undefined) setItems(centralData.items);
+      if (centralData.multipleStockItems !== undefined) setMultipleStockItems(centralData.multipleStockItems);
+      if (centralData.receivingDataRecords !== undefined) setReceivingDataRecords(centralData.receivingDataRecords);
+      if (centralData.distributionDataRecords !== undefined) setDistributionDataRecords(centralData.distributionDataRecords);
+      if (centralData.materialMasterItems !== undefined) setMaterialMasterItems(centralData.materialMasterItems);
+      if (centralData.hfListItems !== undefined) setHfListItems(centralData.hfListItems);
+      if (centralData.noBkdItems !== undefined) setNoBkdItems(centralData.noBkdItems);
+      if (centralData.confirmedBatches !== undefined) setConfirmedBatches(centralData.confirmedBatches);
+      if (centralData.categoryThresholds !== undefined) setCategoryThresholds(centralData.categoryThresholds);
+      if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
+
+      if (centralData.counts) {
+        setCentralSyncStatus({
+          version: centralData.version,
+          lastUpdated: centralData.lastUpdated,
+          lastUpdatedBy: centralData.lastUpdatedBy,
+          updateKind: centralData.updateKind,
+          serverTime: centralData.serverTime || new Date().toISOString(),
+          counts: centralData.counts
+        });
+      }
+    };
+
+    // 1. Initial hydration: show the last known data from this device immediately (no network),
+    //    then ask the server for what changed. Only changed chunks are downloaded.
     const hydrateFromCentralServer = async () => {
       try {
+        const cached = await loadCachedCentralMasterData();
+        if (isMounted && cached) applyFullData(cached);
+
         const centralData = await fetchCentralMasterData();
         if (!isMounted || !centralData) return;
-        
-        syncDspMatrixToStorage(centralData);
-
-        if (centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) {
-          mergeRemoteDsp(centralData.dspWorkflowRecords);
-        }
+        applyFullData(centralData);
         dspSyncReadyRef.current = true;
-
-        if (centralData.items !== undefined) setItems(centralData.items);
-        if (centralData.multipleStockItems !== undefined) setMultipleStockItems(centralData.multipleStockItems);
-        if (centralData.receivingDataRecords !== undefined) setReceivingDataRecords(centralData.receivingDataRecords);
-        if (centralData.distributionDataRecords !== undefined) setDistributionDataRecords(centralData.distributionDataRecords);
-        if (centralData.materialMasterItems !== undefined) setMaterialMasterItems(centralData.materialMasterItems);
-        if (centralData.hfListItems !== undefined) setHfListItems(centralData.hfListItems);
-        if (centralData.noBkdItems !== undefined) setNoBkdItems(centralData.noBkdItems);
-        if (centralData.confirmedBatches !== undefined) setConfirmedBatches(centralData.confirmedBatches);
-        if (centralData.categoryThresholds !== undefined) setCategoryThresholds(centralData.categoryThresholds);
-        if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
-
-        if (centralData.counts) {
-          setCentralSyncStatus({
-            version: centralData.version,
-            lastUpdated: centralData.lastUpdated,
-            lastUpdatedBy: centralData.lastUpdatedBy,
-            updateKind: centralData.updateKind,
-            serverTime: centralData.serverTime || new Date().toISOString(),
-            counts: centralData.counts
-          });
-        }
       } catch (err) {
         console.warn('Initial central hydration notice:', err);
       }
     };
 
-    hydrateFromCentralServer();
-
-    // Push cloud sync baseline on startup
-    setTimeout(() => {
-      if (!isMounted) return;
-    }, 3000);
-
     // 2. Subscribe to continuous cross-browser polling updates
-    const unsubscribePolling = subscribeCentralSync((remoteData) => {
+    const onRemoteDataUpdate = (remoteData: CentralMasterData) => {
       if (!isMounted) return;
 
       syncDspMatrixToStorage(remoteData);
@@ -493,7 +513,15 @@ export function App() {
           counts: remoteData.counts
         });
       }
-    }, 10000); // Supabase Realtime pushes changes instantly; this is only a safety-net poll
+    };
+
+    // Start listening only after the first load finished, so the first status check does not trigger a second full download.
+    // Supabase Realtime pushes changes instantly; the 10s poll is only a safety net.
+    let unsubscribePolling: () => void = () => {};
+    hydrateFromCentralServer().finally(() => {
+      if (!isMounted) return;
+      unsubscribePolling = subscribeCentralSync(onRemoteDataUpdate, 10000);
+    });
 
     // 3. Fallback broadcast listener for same-browser multi-tab events (silent)
     const cleanupBroadcast = initializeAutoSyncListener((updateInfo) => {
@@ -505,7 +533,7 @@ export function App() {
       unsubscribePolling();
       cleanupBroadcast();
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, authReady]);
   const [selectedDevice, setSelectedDevice] = useState<MedicalDeviceItem | null>(null);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isPrintConfirmModalOpen, setIsPrintConfirmModalOpen] = useState(false);
@@ -862,11 +890,12 @@ export function App() {
   useEffect(() => {
     if (!currentUser || !dspSyncReadyRef.current || dspRecords.length === 0) return;
     const timer = setTimeout(() => {
-      const clean = dspRecords.map(rec => {
-        const c: any = { ...rec };
-        ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
-        return c;
-      });
+      const clean = cleanDspForSync(dspRecords);
+      // Identical to what the server already has (e.g. just downloaded) -> nothing to save
+      let sig = '';
+      try { sig = JSON.stringify(clean); } catch {}
+      if (sig && sig === lastSyncedDspSigRef.current) return;
+      lastSyncedDspSigRef.current = sig;
       pushCentralMasterData({
         dspWorkflowRecords: clean,
         updatedBy: currentUser.name || currentUser.email,
@@ -1649,6 +1678,7 @@ export function App() {
 
   const handleLogout = async () => {
     await supabaseSignOut();
+    void clearCentralSyncCache();
     setCurrentUser(null);
   };
 
