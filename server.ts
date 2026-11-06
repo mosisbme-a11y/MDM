@@ -64,7 +64,15 @@ async function requireAuth(req, res, next) {
   }
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data || !data.user) return res.status(401).json({ error: 'Session expired or invalid. Please sign in again.' });
+    if (error || !data || !data.user) {
+      const msg = String((error && error.message) || 'no user returned');
+      console.error(`[AUTH] getUser failed: status=${(error as any)?.status} message=${msg}`);
+      // A wrong/mismatched service key or project URL on the SERVER is not the user's fault. Report it as such.
+      if (/invalid api key|apikey|jwt secret|fetch failed|ENOTFOUND/i.test(msg) || (error as any)?.status === 500) {
+        return res.status(503).json({ error: `Server cannot verify logins (server Supabase config problem: ${msg}). Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.` });
+      }
+      return res.status(401).json({ error: 'Session expired or invalid. Please sign in again.' });
+    }
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('uid,email,full_name,username,role,hub,is_admin,is_active')
