@@ -45,7 +45,7 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 // public.users must exist and be active.
 // ------------------------------------------------------------------------------
 // Verified sessions are cached briefly so the 5-second sync polling does not cost two Supabase round-trips each time.
-const AUTH_CACHE_MS = 30_000;
+const AUTH_CACHE_MS = 120_000;
 const authCache = new Map(); // token -> { user, expires }
 
 async function requireAuth(req, res, next) {
