@@ -373,23 +373,9 @@ async function doSave(updates) {
  * exists, copy it into Supabase so nothing is lost when switching over.
  */
 export async function importLegacyDiskStoreIfNeeded() {
-  try {
-    if (!supabaseAdmin || !fs.existsSync(LEGACY_STORE_FILE)) return;
-    const meta = await readMeta();
-    if (meta.version > 0) return; // Supabase already has data
-    const raw = fs.readFileSync(LEGACY_STORE_FILE, 'utf-8');
-    if (!raw || !raw.trim()) return;
-    const legacy = JSON.parse(raw);
-    const { users, version, lastUpdated, ...datasets } = legacy; // never import legacy plaintext users
-    await saveMasterData({
-      ...datasets,
-      updatedBy: legacy.lastUpdatedBy || 'Legacy import',
-      updateKind: 'Imported from previous server disk store'
-    });
-    console.log('[Supabase Store] Imported legacy disk store into Supabase.');
-  } catch (err) {
-    console.warn('[Supabase Store] Legacy import skipped:', err.message);
-  }
+  // Disabled on purpose: no hard-coded file (server_data/epss_master_store.json) is ever loaded into Supabase.
+  // Data comes only from what administrators upload.
+  return;
 }
 
 
