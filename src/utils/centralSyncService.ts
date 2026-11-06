@@ -291,6 +291,8 @@ export interface SupabaseSyncEventDetail {
   /** Set on 'error' events: true while an automatic retry is scheduled. */
   willRetry?: boolean;
   attempt?: number;
+  /** Chunk upload progress for the current push. */
+  progress?: { done: number; total: number };
 }
 export const SUPABASE_SYNC_EVENT = 'epss_supabase_sync';
 
@@ -404,7 +406,11 @@ async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSy
     }
 
     // Upload only the chunks that differ from what the server already has
-    await runPool(uploads, 4, async (u) => {
+    let uploadedChunks = 0;
+    if (!quiet || uploads.length > 0) {
+      emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind, progress: { done: 0, total: uploads.length } });
+    }
+    await runPool(uploads, 6, async (u) => {
       const { body, headers } = await jsonBody({ field: u.field, index: u.index, payload: u.payload });
       const res = await fetch('/api/system-master-data/chunk', { method: 'PUT', headers, body });
       if (!res.ok) {
@@ -415,6 +421,8 @@ async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSy
         throw e;
       }
       chunkCache.set(u.key, { hash: u.hash, payload: u.payload });
+      uploadedChunks += 1;
+      emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind, progress: { done: uploadedChunks, total: uploads.length } });
     });
 
     // Nothing differs from the server -> nothing to commit
