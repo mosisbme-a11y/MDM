@@ -121,7 +121,7 @@ export const PrintLandscapeConfirmModal: React.FC<PrintLandscapeConfirmModalProp
                 Active Dataset Scope & Dimensions
               </span>
               <span className="text-[11px] font-semibold text-slate-500 font-mono">
-                {currentUser?.name || 'mosisbme@gmail.com'}
+                {currentUser?.name || currentUser?.email || '—'}
               </span>
             </div>
 
