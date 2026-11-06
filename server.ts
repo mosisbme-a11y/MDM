@@ -51,6 +51,9 @@ const authCache = new Map(); // token -> { user, expires }
 async function requireAuth(req, res, next) {
   // No Supabase configured (local dev only): run as a local admin.
   if (!supabaseAdmin) {
+    if (IS_VERCEL || process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Server is missing Supabase configuration (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).' });
+    }
     req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
     return next();
   }
