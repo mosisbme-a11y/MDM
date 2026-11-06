@@ -49,16 +49,14 @@ const AUTH_CACHE_MS = 30_000;
 const authCache = new Map(); // token -> { user, expires }
 
 async function requireAuth(req, res, next) {
+  // No Supabase configured (local dev only): run as a local admin.
   if (!supabaseAdmin) {
     req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
     return next();
   }
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) {
-    req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
-    return next();
-  }
+  if (!token) return res.status(401).json({ error: 'Not signed in' });
   const cached = authCache.get(token);
   if (cached && cached.expires > Date.now()) {
     req.user = cached.user;
@@ -66,27 +64,24 @@ async function requireAuth(req, res, next) {
   }
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data || !data.user) {
-      req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
-      return next();
-    }
+    if (error || !data || !data.user) return res.status(401).json({ error: 'Session expired or invalid. Please sign in again.' });
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('uid,email,full_name,username,role,hub,is_admin,is_active')
       .eq('uid', data.user.id)
       .maybeSingle();
-    if (profileError || !profile || profile.is_active === false) {
-      req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
-      return next();
+    if (profileError) {
+      console.error('[AUTH] Profile lookup failed:', profileError.message);
+      return res.status(500).json({ error: `Profile lookup failed: ${profileError.message}` });
     }
+    if (!profile || profile.is_active === false) return res.status(403).json({ error: 'Account not found or disabled' });
     req.user = { id: data.user.id, email: data.user.email, profile };
     if (authCache.size > 500) authCache.clear();
     authCache.set(token, { user: req.user, expires: Date.now() + AUTH_CACHE_MS });
     next();
   } catch (err: any) {
-    console.warn('[AUTH] Fallback to local-admin due to auth error:', err?.message || err);
-    req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator (Recovery)', role: 'admin' } };
-    return next();
+    console.error('[AUTH] Verification error:', err?.message || err);
+    return res.status(503).json({ error: 'Authentication service unavailable' });
   }
 }
 
@@ -349,65 +344,28 @@ app.post('/api/master-data-logs', asyncRoute(async (req, res) => {
 
 // --- Delta sync: manifest + single-chunk read/write + commit (small requests, serverless-safe) ---
 app.get('/api/system-master-data/manifest', asyncRoute(async (req, res) => {
-  try {
-    const manifest = await getManifest();
-    res.json(manifest);
-  } catch (err) {
-    console.warn('[Server] Error in manifest endpoint:', err);
-    res.json({
-      version: 1,
-      lastUpdated: new Date().toISOString(),
-      lastUpdatedBy: 'Inventory Administrator',
-      updateKind: 'Master Inventory',
-      serverTime: new Date().toISOString(),
-      counts: { items: 0, multipleStock: 0, receiving: 0, distribution: 0, materialMaster: 0, hfList: 0 },
-      chunkSize: 500,
-      fields: {}
-    });
-  }
+  res.json(await getManifest());
 }));
 
 app.get('/api/system-master-data/chunk', asyncRoute(async (req, res) => {
-  try {
-    res.json({ payload: await getDatasetRow(req.query.key) });
-  } catch (err) {
-    console.warn('[Server] Error in chunk endpoint:', err);
-    res.json({ payload: [] });
-  }
+  res.json({ payload: await getDatasetRow(req.query.key) });
 }));
 
 app.put('/api/system-master-data/chunk', asyncRoute(async (req, res) => {
-  try {
-    const { field, index, payload } = req.body || {};
-    await putChunk(String(field || ''), Number(index), payload);
-    res.json({ success: true });
-  } catch (err) {
-    console.warn('[Server] Error in putChunk endpoint:', err);
-    res.json({ success: true });
-  }
+  const { field, index, payload } = req.body || {};
+  await putChunk(String(field || ''), Number(index), payload);
+  res.json({ success: true });
 }));
 
 app.post('/api/system-master-data/commit', asyncRoute(async (req, res) => {
   const body = req.body || {};
   const updatedBy = body.updatedBy || (req.user && req.user.profile && req.user.profile.full_name) || (req.user && req.user.email) || 'Inventory Administrator';
-  try {
-    res.json(await commitMasterData({
-      fields: body.fields || {},
-      categoryThresholds: body.categoryThresholds,
-      updateKind: body.updateKind,
-      updatedBy
-    }));
-  } catch (err) {
-    console.warn('[Server] Error in commit endpoint:', err);
-    res.json({
-      success: true,
-      version: 1,
-      lastUpdated: new Date().toISOString(),
-      lastUpdatedBy,
-      updateKind: body.updateKind || 'Master Data Update',
-      counts: { items: 0, multipleStock: 0, receiving: 0, distribution: 0, materialMaster: 0, hfList: 0 }
-    });
-  }
+  res.json(await commitMasterData({
+    fields: body.fields || {},
+    categoryThresholds: body.categoryThresholds,
+    updateKind: body.updateKind,
+    updatedBy
+  }));
 }));
 
 // Dedicated API endpoint for DSP Email transmission with exact binary attachments
