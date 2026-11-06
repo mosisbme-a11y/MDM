@@ -338,42 +338,26 @@ export function App() {
         }
         dspSyncReadyRef.current = true;
 
-        const hasCentralRecords = (
-          (centralData.items && centralData.items.length > 0) ||
-          (centralData.multipleStockItems && centralData.multipleStockItems.length > 0) ||
-          (centralData.receivingDataRecords && centralData.receivingDataRecords.length > 0) ||
-          (centralData.distributionDataRecords && centralData.distributionDataRecords.length > 0) ||
-          (centralData.materialMasterItems && centralData.materialMasterItems.length > 0) ||
-          (centralData.hfListItems && centralData.hfListItems.length > 0) ||
-          (centralData.programMdRecords && centralData.programMdRecords.length > 0)
-        );
+        if (centralData.items !== undefined) setItems(centralData.items);
+        if (centralData.multipleStockItems !== undefined) setMultipleStockItems(centralData.multipleStockItems);
+        if (centralData.receivingDataRecords !== undefined) setReceivingDataRecords(centralData.receivingDataRecords);
+        if (centralData.distributionDataRecords !== undefined) setDistributionDataRecords(centralData.distributionDataRecords);
+        if (centralData.materialMasterItems !== undefined) setMaterialMasterItems(centralData.materialMasterItems);
+        if (centralData.hfListItems !== undefined) setHfListItems(centralData.hfListItems);
+        if (centralData.noBkdItems !== undefined) setNoBkdItems(centralData.noBkdItems);
+        if (centralData.confirmedBatches !== undefined) setConfirmedBatches(centralData.confirmedBatches);
+        if (centralData.categoryThresholds !== undefined) setCategoryThresholds(centralData.categoryThresholds);
+        if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
 
-        if (hasCentralRecords) {
-          if (centralData.items && centralData.items.length > 0) setItems(centralData.items);
-          if (centralData.multipleStockItems && centralData.multipleStockItems.length > 0) setMultipleStockItems(centralData.multipleStockItems);
-          if (centralData.receivingDataRecords && centralData.receivingDataRecords.length > 0) setReceivingDataRecords(centralData.receivingDataRecords);
-          if (centralData.distributionDataRecords && centralData.distributionDataRecords.length > 0) setDistributionDataRecords(centralData.distributionDataRecords);
-          if (centralData.materialMasterItems && centralData.materialMasterItems.length > 0) setMaterialMasterItems(centralData.materialMasterItems);
-          if (centralData.hfListItems && centralData.hfListItems.length > 0) {
-            setHfListItems(centralData.hfListItems);
-          }
-          if (centralData.noBkdItems && centralData.noBkdItems.length > 0) setNoBkdItems(centralData.noBkdItems);
-          if (centralData.confirmedBatches && centralData.confirmedBatches.length > 0) setConfirmedBatches(centralData.confirmedBatches);
-          if (centralData.categoryThresholds && Object.keys(centralData.categoryThresholds).length > 0) setCategoryThresholds(centralData.categoryThresholds);
-          if (centralData.programMdRecords && centralData.programMdRecords.length > 0) {
-            setProgramMdRecords(centralData.programMdRecords);
-          }
-
-          if (centralData.counts) {
-            setCentralSyncStatus({
-              version: centralData.version,
-              lastUpdated: centralData.lastUpdated,
-              lastUpdatedBy: centralData.lastUpdatedBy,
-              updateKind: centralData.updateKind,
-              serverTime: centralData.serverTime || new Date().toISOString(),
-              counts: centralData.counts
-            });
-          }
+        if (centralData.counts) {
+          setCentralSyncStatus({
+            version: centralData.version,
+            lastUpdated: centralData.lastUpdated,
+            lastUpdatedBy: centralData.lastUpdatedBy,
+            updateKind: centralData.updateKind,
+            serverTime: centralData.serverTime || new Date().toISOString(),
+            counts: centralData.counts
+          });
         }
       } catch (err) {
         console.warn('Initial central hydration notice:', err);

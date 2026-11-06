@@ -209,9 +209,13 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
     let manifest: Manifest;
     try {
       manifest = await fetchManifest();
-    } catch (err) {
-      console.warn('[CentralSyncService] Manifest failed, falling back to full dataset API:', err);
-      legacyServer = true;
+    } catch (err: any) {
+      if (isMissingEndpoint(err)) {
+        console.warn('[CentralSyncService] Manifest endpoint missing, falling back to full dataset API:', err);
+        legacyServer = true;
+      } else {
+        console.warn('[CentralSyncService] Manifest fetch error, temporarily using full dataset API:', err);
+      }
       return await finishFetch(await legacyFetch());
     }
     const result: any = {
@@ -315,43 +319,72 @@ export async function pushCentralMasterData(
     if (!legacyServer) {
       try {
         manifest = await fetchManifest();
-      } catch (err) {
-        console.warn('[CentralSyncService] Manifest failed, falling back to full dataset API:', err);
-        legacyServer = true;
+      } catch (err: any) {
+        if (isMissingEndpoint(err)) {
+          console.warn('[CentralSyncService] Manifest endpoint missing (legacy server)');
+          legacyServer = true;
+        } else {
+          console.warn('[CentralSyncService] Manifest fetch error, using chunking with empty manifest fallback:', err);
+        }
       }
     }
-    if (!manifest) {
-      const res = await fetch('/api/system-master-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (!res.ok) {
-        let msg = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
-        try { msg = (await res.json())?.error || msg; } catch {}
-        throw new Error(msg);
-      }
-      const respData = await res.json();
-      if (respData && respData.version) {
-        setLocalKnownVersion(respData.version);
-        resultStatus = {
-          version: respData.version, lastUpdated: respData.lastUpdated, lastUpdatedBy: respData.lastUpdatedBy,
-          updateKind: respData.updateKind, serverTime: new Date().toISOString(), counts: respData.counts
+
+    // Fallback manifest if manifest endpoint returned error, ensuring we always chunk uploads (preventing 413 Payload Too Large)
+    const effectiveManifest: Manifest = manifest || {
+      version: localKnownVersion,
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: updates.updatedBy || 'Inventory Administrator',
+      updateKind: updates.updateKind || 'Master Data Update',
+      serverTime: new Date().toISOString(),
+      counts: { items: 0, multipleStock: 0, receiving: 0, distribution: 0, materialMaster: 0, hfList: 0 },
+      chunkSize: 500,
+      fields: {}
+    };
+
+    if (legacyServer) {
+      // If legacy server without chunk endpoints, post fields individually to prevent monolithic 413
+      const fieldKeys = Object.keys(updates) as (keyof CentralMasterData)[];
+      for (const field of fieldKeys) {
+        const val = updates[field];
+        if (val === undefined) continue;
+        const fieldUpdate: any = {
+          updatedBy: updates.updatedBy,
+          updateKind: updates.updateKind
         };
-        saveLastSyncMetadata(resultStatus);
+        fieldUpdate[field] = val;
+        const res = await fetch('/api/system-master-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fieldUpdate)
+        });
+        if (!res.ok) {
+          let msg = `Server returned ${res.status} (${res.url ? new URL(res.url).pathname : 'api'})`;
+          try { msg = (await res.json())?.error || msg; } catch {}
+          throw new Error(msg);
+        }
+        const respData = await res.json();
+        if (respData && respData.version) {
+          setLocalKnownVersion(respData.version);
+          resultStatus = {
+            version: respData.version, lastUpdated: respData.lastUpdated, lastUpdatedBy: respData.lastUpdatedBy,
+            updateKind: respData.updateKind, serverTime: new Date().toISOString(), counts: respData.counts
+          };
+          saveLastSyncMetadata(resultStatus);
+        }
       }
       pendingPushes = Math.max(0, pendingPushes - 1);
       emitSyncEvent(pendingPushes > 0 ? { state: 'syncing', pending: pendingPushes } : { state: 'synced', pending: 0, kind: resultStatus?.updateKind, version: resultStatus?.version });
       return resultStatus;
     }
-    const chunkSize = manifest.chunkSize || 500;
+
+    const chunkSize = effectiveManifest.chunkSize || 500;
     const commitFields: Record<string, { hashes: string[]; total: number }> = {};
     const uploads: { field: string; index: number; key: string; hash: string; payload: any[] }[] = [];
 
     for (const field of ARRAY_FIELDS) {
       const records = (updates as any)[field];
       if (!Array.isArray(records)) continue;
-      const serverHashes = manifest.fields?.[field]?.hashes || [];
+      const serverHashes = effectiveManifest.fields?.[field]?.hashes || [];
       const hashes: string[] = [];
       for (let i = 0, n = 0; i < records.length; i += chunkSize, n++) {
         const payload = records.slice(i, i + chunkSize);
@@ -374,21 +407,22 @@ export async function pushCentralMasterData(
       chunkCache.set(u.key, { hash: u.hash, payload: u.payload });
     });
 
-    // Nothing differs from the server -> nothing to commit (also stops echo loops between browsers)
+    // Nothing differs from the server -> nothing to commit
     const unchanged =
       uploads.length === 0 &&
       updates.categoryThresholds === undefined &&
+      manifest !== null &&
       Object.entries(commitFields).every(([f, c]) => {
-        const sh = manifest.fields?.[f]?.hashes || [];
+        const sh = effectiveManifest.fields?.[f]?.hashes || [];
         return sh.length === c.hashes.length && sh.every((h, i) => h === c.hashes[i]);
       });
     if (unchanged) {
       resultStatus = {
-        version: manifest.version, lastUpdated: manifest.lastUpdated, lastUpdatedBy: manifest.lastUpdatedBy,
-        updateKind: manifest.updateKind, serverTime: manifest.serverTime, counts: manifest.counts
+        version: effectiveManifest.version, lastUpdated: effectiveManifest.lastUpdated, lastUpdatedBy: effectiveManifest.lastUpdatedBy,
+        updateKind: effectiveManifest.updateKind, serverTime: effectiveManifest.serverTime, counts: effectiveManifest.counts
       };
       pendingPushes = Math.max(0, pendingPushes - 1);
-      emitSyncEvent(pendingPushes > 0 ? { state: 'syncing', pending: pendingPushes } : { state: 'synced', pending: 0, kind: manifest.updateKind, version: manifest.version });
+      emitSyncEvent(pendingPushes > 0 ? { state: 'syncing', pending: pendingPushes } : { state: 'synced', pending: 0, kind: effectiveManifest.updateKind, version: effectiveManifest.version });
       return resultStatus;
     }
 

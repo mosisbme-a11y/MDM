@@ -35,8 +35,8 @@ app.use((req, res, next) => {
   console.log(`[DEBUG] Incoming Request: ${req.method} ${req.originalUrl}`);
   next();
 });
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // ------------------------------------------------------------------------------
 // AUTHENTICATION (Supabase Auth)

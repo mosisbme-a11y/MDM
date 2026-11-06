@@ -26,17 +26,11 @@ const STORAGE_KEY_LAST_UPDATE_TS = 'epss_admin_last_update_ts';
 const STORAGE_KEY_LAST_UPDATE_INFO = 'epss_admin_last_update_info';
 const CUSTOM_EVENT_NAME = 'epss:admin_data_updated';
 
+let lastUpdateTs = 0;
+let lastUpdateInfo: AdminUpdateInfo | null = null;
+
 // Unique session device ID
-let currentDeviceId = '';
-if (typeof window !== 'undefined') {
-  currentDeviceId = localStorage.getItem('epss_device_session_id') || '';
-  if (!currentDeviceId) {
-    currentDeviceId = 'device_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
-    try {
-      localStorage.setItem('epss_device_session_id', currentDeviceId);
-    } catch {}
-  }
-}
+let currentDeviceId = 'device_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
 
 /**
  * Broadcasts an Inventory Administrator update to all open sessions, windows, and devices.
@@ -54,12 +48,8 @@ export function broadcastAdminUpdate(kind: string, itemCount?: number, updatedBy
     deviceId: currentDeviceId
   };
 
-  try {
-    localStorage.setItem(STORAGE_KEY_LAST_UPDATE_TS, String(now));
-    localStorage.setItem(STORAGE_KEY_LAST_UPDATE_INFO, JSON.stringify(updateInfo));
-  } catch (e) {
-    console.warn('Failed to save admin update info to localStorage:', e);
-  }
+  lastUpdateTs = now;
+  lastUpdateInfo = updateInfo;
 
   // 1. BroadcastChannel (Same browser multi-tab/window)
   if ('BroadcastChannel' in window) {
@@ -83,26 +73,14 @@ export function broadcastAdminUpdate(kind: string, itemCount?: number, updatedBy
  * Gets the timestamp of the last Administrator update recorded.
  */
 export function getLastAdminUpdateTimestamp(): number {
-  if (typeof window === 'undefined') return 0;
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_LAST_UPDATE_TS);
-    return saved ? Number(saved) : 0;
-  } catch {
-    return 0;
-  }
+  return lastUpdateTs;
 }
 
 /**
  * Gets detailed metadata about the last Administrator update.
  */
 export function getLastAdminUpdateInfo(): AdminUpdateInfo | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_LAST_UPDATE_INFO);
-    return saved ? JSON.parse(saved) : null;
-  } catch {
-    return null;
-  }
+  return lastUpdateInfo;
 }
 
 /**

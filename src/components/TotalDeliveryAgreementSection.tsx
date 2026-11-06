@@ -224,15 +224,7 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
 
   useEffect(() => {
     const handleSyncFromNav = () => {
-      const savedYear = localStorage.getItem('epss_agreement_filter_year');
-      if (savedYear) {
-        setPmdYearFilter(savedYear);
-        setSelectedYear(savedYear);
-      }
-      const savedView = localStorage.getItem('epss_agreement_filter_view');
-      if (savedView) {
-        setViewMode(savedView as any);
-      }
+      // transient state
     };
 
     handleSyncFromNav();
@@ -502,11 +494,6 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   };
 
   useEffect(() => {
-    const savedView = localStorage.getItem('epss_agreement_filter_view');
-    if (savedView) {
-      setViewMode(savedView as any);
-      return;
-    }
     if (currentSubTab === 'agreement-delivery-rate') {
       setViewMode('analytics');
     } else if (currentSubTab === 'agreement-cards') {
@@ -1103,7 +1090,6 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   const handleResetDefaults = () => {
     if (window.confirm('Reset all agreements to the standard EPSS National Framework Accords? Custom agreements will be cleared.')) {
       setAgreements(DEFAULT_MEDICAL_DEVICE_AGREEMENTS);
-      localStorage.removeItem('epss_medical_device_agreements');
     }
   };
 

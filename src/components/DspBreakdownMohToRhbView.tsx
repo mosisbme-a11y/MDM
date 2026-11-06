@@ -1,4 +1,3 @@
-import { saveDspRecordsToIndexedDB } from "../utils/indexedDbCache";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   FileSpreadsheet, 
@@ -227,20 +226,17 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     const list: Array<{ id: string; materialCode: string; description: string; qty: number; source: string }> = [];
     
     try {
-      const storedRec = localStorage.getItem('epss_dsp_received_epss_rows') || localStorage.getItem('epss_dsp_request_template_rows');
-      if (storedRec) {
-        const parsed = JSON.parse(storedRec);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((item: any, idx: number) => {
-            list.push({
-              id: `rec-import-${idx}-${item.material || item.id}`,
-              materialCode: item.material || item.materialCode || `MAT-${1000 + idx}`,
-              description: item.materialDescription || item.description || 'Medical Device',
-              qty: item.qty || item.quantity || 10,
-              source: 'Transmitted DSP Payload'
-            });
+      const sourceRows = dspReceivedEpssRows || dspReceivedMohRows;
+      if (sourceRows && Array.isArray(sourceRows)) {
+        sourceRows.forEach((item: any, idx: number) => {
+          list.push({
+            id: `rec-import-${idx}-${item.material || item.id}`,
+            materialCode: item.material || item.materialCode || `MAT-${1000 + idx}`,
+            description: item.materialDescription || item.description || 'Medical Device',
+            qty: item.qty || item.quantity || 10,
+            source: 'Transmitted DSP Payload'
           });
-        }
+        });
       }
     } catch {}
 
@@ -569,7 +565,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
     const totalQty = Object.values(totals).reduce((sum, v) => sum + v, 0);
 
-    const activeDspName = localStorage.getItem('epss_dsp_request_dsp_name') || 'DSP 2026 - MCH Equipment Allocation';
+    const activeDspName = 'DSP 2026 - MCH Equipment Allocation';
 
     const newRecord: DspWorkflowRecord = {
       id: `dsp-brk-tx-${Date.now()}`,
@@ -601,7 +597,6 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
     };
 
     setRecords(prev => [newRecord, ...prev]);
-    saveDspRecordsToIndexedDB([newRecord, ...records]);
     
     if (onTriggerCloudSync) {
       onTriggerCloudSync(`✓ Secured Breakdown Request ${refNum} transmitted to ${targetedActiveRegions.length} Ethiopian Regions!`, {
