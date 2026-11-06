@@ -422,6 +422,14 @@ export async function getManifest() {
         missing.push(f);
       }
     }
+    // Datasets that were never written have a zero count: no need to list the whole table for them
+    // (that extra query ran on EVERY manifest request, i.e. every push and every pull).
+    const needListing = missing.filter((f) => Number((meta.counts || {})[COUNT_KEY[f]] || 0) > 0);
+    const knownEmpty = missing.filter((f) => !needListing.includes(f));
+    for (const f of knownEmpty) fields[f] = { keys: [], hashes: [] };
+    missing.length = 0;
+    missing.push(...needListing);
+
     if (missing.length && client) {
       // Datasets written before delta sync existed (or by the full-save endpoint): list their rows, hashes unknown.
       let keys = [];
