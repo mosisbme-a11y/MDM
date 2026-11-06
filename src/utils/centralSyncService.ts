@@ -14,6 +14,7 @@ import {
   UploadedAgreementBatch
 } from '../types';
 import { supabase } from '../lib/supabase';
+import { cacheGet, cacheGetAllWithPrefix, cacheSetMany, cacheDeleteWithPrefix, cacheClearAll } from './syncCacheDb';
 
 export interface CentralMasterDataCounts {
   items: number;
@@ -199,17 +200,121 @@ async function fetchManifest(): Promise<Manifest> {
   return getJson<Manifest>('/api/system-master-data/manifest');
 }
 
+// ------------------------------------------------------------------------------
+// PERSISTENT CHUNK CACHE (IndexedDB)
+// Chunks downloaded/uploaded on this device are kept across hard refreshes, so a reload
+// shows data instantly and only downloads what changed on the server.
+// ------------------------------------------------------------------------------
+const CHUNK_PREFIX = 'chunk:';
+const META_KEY = 'meta';
+
+interface CachedMeta {
+  status: CentralSyncStatus;
+  fields: Record<string, ManifestField>;
+  categoryThresholds: Record<string, CategoryThreshold>;
+}
+let cachedMeta: CachedMeta | null = null;
+let cacheLoadPromise: Promise<void> | null = null;
+
+/** Loads the persisted chunks + meta into memory once. Safe to call many times. */
+function ensureCacheLoaded(): Promise<void> {
+  if (!cacheLoadPromise) {
+    cacheLoadPromise = (async () => {
+      try {
+        const [chunks, meta] = await Promise.all([
+          cacheGetAllWithPrefix<{ hash: string; payload: any[] }>(CHUNK_PREFIX),
+          cacheGet<CachedMeta>(META_KEY)
+        ]);
+        chunks.forEach((v, k) => {
+          const key = k.slice(CHUNK_PREFIX.length);
+          if (v && v.hash && Array.isArray(v.payload) && !chunkCache.has(key)) chunkCache.set(key, v);
+        });
+        if (meta && meta.fields && meta.status) cachedMeta = meta;
+      } catch {
+        // cache is optional
+      }
+    })();
+  }
+  return cacheLoadPromise;
+}
+
+function persistChunks(entries: { key: string; hash: string; payload: any[] }[]): void {
+  void cacheSetMany(entries.map((e) => [CHUNK_PREFIX + e.key, { hash: e.hash, payload: e.payload }]));
+}
+
+function persistMeta(meta: CachedMeta): void {
+  cachedMeta = meta;
+  void (async () => {
+    await cacheSetMany([[META_KEY, meta]]);
+    // Drop chunks no longer referenced (e.g. a dataset that shrank)
+    const keep = new Set<string>();
+    Object.values(meta.fields).forEach((f) => f.keys.forEach((k) => keep.add(CHUNK_PREFIX + k)));
+    await cacheDeleteWithPrefix(CHUNK_PREFIX, keep);
+  })();
+}
+
+/** Wipes the on-device copy (call on sign-out so the next user never sees it). */
+export async function clearCentralSyncCache(): Promise<void> {
+  chunkCache.clear();
+  cachedMeta = null;
+  cacheLoadPromise = null;
+  localKnownVersion = 0;
+  lastSyncMetadata = null;
+  await cacheClearAll();
+}
+
+/**
+ * Instantly returns the last dataset this device downloaded (no network), or null when there is none
+ * or any chunk is missing/out of date. The caller should still run fetchCentralMasterData() afterwards
+ * to pick up changes. Deliberately does NOT touch the "known version" so the revalidation still runs.
+ */
+export async function loadCachedCentralMasterData(): Promise<CentralMasterData | null> {
+  await ensureCacheLoaded();
+  const meta = cachedMeta;
+  if (!meta) return null;
+  const result: any = { ...meta.status, categoryThresholds: meta.categoryThresholds || {} };
+  for (const field of ARRAY_FIELDS) {
+    const f = meta.fields[field] || { keys: [], hashes: [] };
+    const rows: any[][] = [];
+    for (let i = 0; i < f.keys.length; i++) {
+      const cached = chunkCache.get(f.keys[i]);
+      if (!cached || !f.hashes[i] || cached.hash !== f.hashes[i]) return null; // inconsistent -> use the network
+      rows.push(cached.payload);
+    }
+    result[field] = rows.flat();
+  }
+  return result as CentralMasterData;
+}
+
+let inFlightFetch: Promise<CentralMasterData | null> | null = null;
+
 /**
  * Fetches the complete centralized dataset from the server API (stored in Supabase),
- * downloading only the chunks that changed since this browser last looked.
+ * downloading only the chunks that changed since this device last looked.
+ * Concurrent callers share one request.
  */
-export async function fetchCentralMasterData(): Promise<CentralMasterData | null> {
+export function fetchCentralMasterData(): Promise<CentralMasterData | null> {
+  if (!inFlightFetch) {
+    inFlightFetch = doFetchCentralMasterData().finally(() => {
+      inFlightFetch = null;
+    });
+  }
+  return inFlightFetch;
+}
+
+async function doFetchCentralMasterData(): Promise<CentralMasterData | null> {
   try {
+    await ensureCacheLoaded();
     if (legacyServer) return await finishFetch(await legacyFetch());
     let manifest: Manifest;
     try {
       manifest = await fetchManifest();
     } catch (err: any) {
+      if (err && (err.status === 401 || err.status === 403)) {
+        // Not signed in (yet) - a second request to the full-dataset API would fail the same way.
+        console.warn('[CentralSyncService] Not authorised to read central data yet:', err.status);
+        return null;
+      }
       if (isMissingEndpoint(err)) {
         console.warn('[CentralSyncService] Manifest endpoint missing, falling back to full dataset API:', err);
         legacyServer = true;
@@ -217,6 +322,12 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
         console.warn('[CentralSyncService] Manifest fetch error, temporarily using full dataset API:', err);
       }
       return await finishFetch(await legacyFetch());
+    }
+    // The server answers 200 with an empty, version-0 manifest when its database read fails.
+    // Treating that as "the dataset is empty" would wipe the user's screen, so refuse it.
+    if ((manifest as any).error) {
+      console.warn('[CentralSyncService] Server could not read the dataset, keeping current data:', (manifest as any).error);
+      return null;
     }
     const result: any = {
       version: manifest.version,
@@ -240,21 +351,43 @@ export async function fetchCentralMasterData(): Promise<CentralMasterData | null
       });
     }
 
-    await runPool(jobs, 6, async (job) => {
+    const downloaded: { key: string; hash: string; payload: any[] }[] = [];
+    const thresholdsPromise = getJson<{ payload: any }>('/api/system-master-data/chunk?key=categoryThresholds')
+      .then(({ payload }) => (payload && typeof payload === 'object' ? payload : {}))
+      .catch(() => null);
+
+    await runPool(jobs, 8, async (job) => {
       const { payload } = await getJson<{ payload: any[] }>(`/api/system-master-data/chunk?key=${encodeURIComponent(job.key)}`);
       const rows = Array.isArray(payload) ? payload : [];
       parts[job.field][job.index] = rows;
-      if (job.hash) chunkCache.set(job.key, { hash: job.hash, payload: rows });
-      else chunkCache.delete(job.key);
+      if (job.hash) {
+        chunkCache.set(job.key, { hash: job.hash, payload: rows });
+        downloaded.push({ key: job.key, hash: job.hash, payload: rows });
+      } else {
+        chunkCache.delete(job.key);
+      }
     });
 
     for (const field of ARRAY_FIELDS) result[field] = parts[field].flat();
-    try {
-      const { payload } = await getJson<{ payload: any }>('/api/system-master-data/chunk?key=categoryThresholds');
-      result.categoryThresholds = payload && typeof payload === 'object' ? payload : {};
-    } catch {
-      result.categoryThresholds = {};
-    }
+    const thresholds = await thresholdsPromise;
+    result.categoryThresholds = thresholds ?? cachedMeta?.categoryThresholds ?? {};
+
+    // Remember this complete, consistent snapshot for the next reload
+    if (downloaded.length) persistChunks(downloaded);
+    const metaFields: Record<string, ManifestField> = {};
+    for (const field of ARRAY_FIELDS) metaFields[field] = manifest.fields?.[field] || { keys: [], hashes: [] };
+    persistMeta({
+      status: {
+        version: manifest.version,
+        lastUpdated: manifest.lastUpdated,
+        lastUpdatedBy: manifest.lastUpdatedBy,
+        updateKind: manifest.updateKind,
+        serverTime: manifest.serverTime,
+        counts: manifest.counts
+      },
+      fields: metaFields,
+      categoryThresholds: result.categoryThresholds
+    });
 
     return await finishFetch(result as CentralMasterData);
   } catch (err) {
@@ -421,6 +554,7 @@ async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSy
         throw e;
       }
       chunkCache.set(u.key, { hash: u.hash, payload: u.payload });
+      persistChunks([{ key: u.key, hash: u.hash, payload: u.payload }]);
       uploadedChunks += 1;
       emitSyncEvent({ state: 'syncing', pending: pendingPushes, kind: updates.updateKind, progress: { done: uploadedChunks, total: uploads.length } });
     });
@@ -470,6 +604,18 @@ async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSy
           counts: respData.counts
         };
         saveLastSyncMetadata(resultStatus);
+        // Keep the on-device snapshot consistent with what we just committed
+        if (cachedMeta) {
+          const fields = { ...cachedMeta.fields };
+          for (const [f, c] of Object.entries(commitFields)) {
+            fields[f] = { keys: c.hashes.map((_, i) => chunkKeyOf(f, i)), hashes: c.hashes };
+          }
+          persistMeta({
+            status: { ...resultStatus, counts: resultStatus.counts || cachedMeta.status.counts },
+            fields,
+            categoryThresholds: updates.categoryThresholds ?? cachedMeta.categoryThresholds
+          });
+        }
       }
     } else {
       console.error('[CentralSyncService] Commit failed, res:', res.status, res.statusText);
@@ -606,10 +752,10 @@ export function subscribeCentralSync(
   }
 
   // 2. Periodic interval
-  const intervalId = setInterval(() => performCheck('heartbeat'), pollIntervalMs);
+  const intervalId = setInterval(() => { if (!document.hidden) performCheck('heartbeat'); }, pollIntervalMs);
 
   // 3. Regain focus or visibility
-  const handleFocus = () => performCheck('window_focus');
+  const handleFocus = () => { if (!document.hidden) performCheck('window_focus'); };
   window.addEventListener('focus', handleFocus);
   document.addEventListener('visibilitychange', handleFocus);
 
