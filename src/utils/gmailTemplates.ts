@@ -33,7 +33,7 @@ export interface GmailTemplateVars {
 let memoryTemplates = {
   customSubject: DEFAULT_GMAIL_SUBJECT_TEMPLATE,
   customBody: DEFAULT_GMAIL_BODY_TEMPLATE,
-  officialEmail: 'mosisbme@gmail.com',
+  officialEmail: '',
   ccEmail: ''
 };
 
