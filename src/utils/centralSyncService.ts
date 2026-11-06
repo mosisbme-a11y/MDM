@@ -448,6 +448,11 @@ type PushUpdates = Partial<CentralMasterData> & {
 // Details of the most recent failed attempt (read by the retry wrapper below).
 let lastPushFailure: { message: string; status?: number } | null = null;
 
+/** Reason the last push failed (null if it succeeded). Used so UI toasts can show the REAL result. */
+export function getLastPushFailure(): { message: string; status?: number } | null {
+  return lastPushFailure;
+}
+
 async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSyncStatus | null> {
   let resultStatus: CentralSyncStatus | null = null;
   let errorMessage = '';
