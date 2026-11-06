@@ -69,7 +69,7 @@ interface HFListViewProps {
   onSelectItem?: (item: HealthFacilityRecord) => void;
   onFilterPlant?: (plantCode: string) => void;
   onClearAllHFData?: () => void;
-  onUploadHFData?: (items: HealthFacilityRecord[], mode: 'replace' | 'append', files?: { name: string, url: string }[]) => void;
+  onUploadHFData?: (items: HealthFacilityRecord[], mode: 'replace' | 'append', files?: { name: string, url: string }[]) => Promise<boolean | void> | void;
   onAddFacility?: (facility: HealthFacilityRecord) => void;
   onDeleteFacility?: (id: string) => void;
   isAdmin?: boolean;
@@ -225,12 +225,12 @@ export const HFListView: React.FC<HFListViewProps> = ({
       if (onUploadHFData) {
         // Files were already stored in Supabase Storage above (uploadAndRecordFile)
         const uploadedFiles: { name: string, url: string }[] = [];
-        onUploadHFData(allItems, 'append', uploadedFiles);
+        setUploadToast({ type: 'success', message: `Saving ${allItems.length} facilities from ${files.length} file(s) to the server...` });
+        const ok = await onUploadHFData(allItems, 'append', uploadedFiles);
+        setUploadToast(ok === false
+          ? { type: 'error', message: `❌ ${allItems.length} facilities were read from ${files.length} file(s) but NOT saved to the server. Sign out, sign in again, then re-upload.` }
+          : { type: 'success', message: `✓ Saved ${allItems.length} facilities from ${files.length} file(s) to the server.` });
       }
-      setUploadToast({
-        type: 'success',
-        message: `✓ Immediately recorded & saved ${allItems.length} facilities from ${files.length} file(s)! Synced to Supabase.`
-      });
     } else {
       // MODE 2: DISPLAY MULTIPLE UPLOAD CONFIRMATION CARD FOR 1-CLICK SAVE
       setPendingBatch({
@@ -251,18 +251,15 @@ export const HFListView: React.FC<HFListViewProps> = ({
     }
   };
 
-  const handleCommitPendingBatch = (mode: 'append' | 'replace') => {
+  const handleCommitPendingBatch = async (mode: 'append' | 'replace') => {
     if (!pendingBatch) return;
-    if (onUploadHFData) {
-      onUploadHFData(pendingBatch.items, mode);
-    }
-    setUploadToast({
-      type: 'success',
-      message: `✓ Confirmed & saved ${pendingBatch.totalCount} facilities from ${pendingBatch.files.length} file(s) (${
-        mode === 'append' ? 'Appended & Merged' : 'Fresh List'
-      })!`
-    });
+    const batch = pendingBatch;
     setPendingBatch(null);
+    setUploadToast({ type: 'success', message: `Saving ${batch.totalCount} facilities to the server...` });
+    const ok = onUploadHFData ? await onUploadHFData(batch.items, mode) : undefined;
+    setUploadToast(ok === false
+      ? { type: 'error', message: `❌ ${batch.totalCount} facilities were NOT saved to the server. Sign out, sign in again, then re-upload.` }
+      : { type: 'success', message: `✓ Confirmed & saved ${batch.totalCount} facilities from ${batch.files.length} file(s) (${mode === 'append' ? 'Appended & Merged' : 'Fresh List'}).` });
   };
 
   const toggleAutoRecord = () => {
