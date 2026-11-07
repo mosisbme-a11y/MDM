@@ -245,11 +245,9 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [securitySealConfirmed, setSecuritySealConfirmed] = useState(true);
   const [auditClearancePassed, setAuditClearancePassed] = useState(true);
 
-  // Import Items Selection State
-  const [importSource, setImportSource] = useState<'received' | 'stock' | 'custom'>('received');
+  // Import Items Selection State - STRICTLY Transmitted DSP Payload from EPSS
   const [selectedImportItemIds, setSelectedImportItemIds] = useState<string[]>([]);
-  const [customMaterialCode, setCustomMaterialCode] = useState('');
-  const [customMaterialDesc, setCustomMaterialDesc] = useState('');
+  const [importSearchQuery, setImportSearchQuery] = useState('');
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -285,11 +283,17 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       totalAmount?: number;
     }> = [];
     
-    // 1. Find all official records received from EPSS (Stage 2.1)
+    // 1. Find all official records received from EPSS (Stage 2.1 or transmitted in 1.1)
     const epssReceivedRecords = records.filter(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return sub === '2.1' || (r.stage === 'moh-osp-management' && (r.subStage === '2.1' || r.subject?.toLowerCase().includes('received from epss')));
-    }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
+      return sub === '2.1' || sub === '1.1' || (r.stage === 'moh-osp-management' && (r.subStage === '2.1' || r.subject?.toLowerCase().includes('received from epss')));
+    }).sort((a, b) => {
+      const subA = canonicalizeSubStage(a.subStage, a.stage);
+      const subB = canonicalizeSubStage(b.subStage, b.stage);
+      if (subA === '2.1' && subB !== '2.1') return -1;
+      if (subB === '2.1' && subA !== '2.1') return 1;
+      return new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime();
+    });
 
     const latestReceivedRecord = epssReceivedRecords[0];
     const sourceRef = latestReceivedRecord?.dspRefNumber || 'EPSS/MD-DSP/2026/464';
@@ -412,15 +416,16 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     }
   }, [availableReceivedItems]);
 
-  const availableStockItems = useMemo(() => {
-    return multipleStockItems.map(s => ({
-      id: `stock-${s.id}`,
-      materialCode: s.material,
-      description: s.materialDescription,
-      qty: s.unrestrictedStock,
-      source: `Stock - WBS: ${s.wbsElement || 'General'}`
-    }));
-  }, [multipleStockItems]);
+  // Filtered Transmitted DSP Items for search
+  const filteredAvailableReceivedItems = useMemo(() => {
+    if (!importSearchQuery.trim()) return availableReceivedItems;
+    const q = importSearchQuery.toLowerCase();
+    return availableReceivedItems.filter(item =>
+      item.materialCode.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.source.toLowerCase().includes(q)
+    );
+  }, [availableReceivedItems, importSearchQuery]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -511,49 +516,24 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     showToast('Equipment column removed.');
   };
 
-  // Import Selected Items into Columns
+  // Import Selected Items into Columns - STRICTLY from EPSS to MOH transmittal
   const handleApplyImportedItems = () => {
-    if (importSource === 'custom') {
-      if (!customMaterialCode.trim() || !customMaterialDesc.trim()) {
-        alert('Please enter both Material Code and Description.');
-        return;
-      }
-      const newCol: MatrixColumn = {
-        id: `mat-custom-${Date.now()}`,
-        materialCode: customMaterialCode.trim(),
-        description: customMaterialDesc.trim()
-      };
-      setColumns(prev => [...prev, newCol]);
-      setCustomMaterialCode('');
-      setCustomMaterialDesc('');
-      setIsImportItemsModalOpen(false);
-      showToast(`✓ Added custom item "${newCol.description}" as column.`);
+    const itemsToApply = selectedImportItemIds.length > 0
+      ? availableReceivedItems.filter(s => selectedImportItemIds.includes(s.id))
+      : availableReceivedItems;
+
+    if (itemsToApply.length === 0) {
+      alert('No transmitted items from EPSS to MOH are available to import. Please transmit a DSP Request from Sub-step 1.1 first.');
       return;
     }
 
-    const sourceList = importSource === 'received' ? availableReceivedItems : availableStockItems;
-    const selectedItems = sourceList.filter(s => selectedImportItemIds.includes(s.id));
-
-    if (selectedItems.length === 0) {
-      alert('Please select at least one item to import.');
-      return;
-    }
-
-    const newCols: MatrixColumn[] = selectedItems.map((item, idx) => ({
-      id: `mat-imported-${Date.now()}-${idx}-${item.materialCode}`,
+    const newCols: MatrixColumn[] = itemsToApply.map((item, idx) => ({
+      id: `mat-tx-${idx}-${item.materialCode}`,
       materialCode: item.materialCode,
       description: item.description
     }));
 
-    setColumns(prev => {
-      const isDummy = prev.some(c => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
-      if (isDummy || prev.length === 0) {
-        return newCols;
-      }
-      const existingCodes = new Set(prev.map(c => `${c.materialCode}|${c.description}`));
-      const filteredNew = newCols.filter(c => !existingCodes.has(`${c.materialCode}|${c.description}`));
-      return [...prev, ...filteredNew];
-    });
+    setColumns(newCols);
 
     setRows(prevRows => {
       const baseRows = prevRows.length > 0 ? prevRows : [
@@ -563,7 +543,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       return baseRows.map(row => {
         const updatedQty = { ...row.quantities };
         newCols.forEach((col, idx) => {
-          const itemObj = selectedItems[idx];
+          const itemObj = itemsToApply[idx];
           updatedQty[col.id] = Math.max(0, Math.floor((itemObj?.qty || 1) / baseRows.length));
         });
         return { ...row, quantities: updatedQty };
@@ -576,7 +556,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
 
     setIsImportItemsModalOpen(false);
     setSelectedImportItemIds([]);
-    showToast(`✓ Imported ${newCols.length} equipment items into Breakdown Matrix!`);
+    showToast(`✓ Applied ${newCols.length} transmitted equipment columns to Regional Breakdown Matrix!`);
   };
 
   // Quick helper to simulate transmittal from EPSS to MOH
@@ -1258,7 +1238,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
-            This breakdown template maps medical devices across all <strong className="text-slate-900">15 Ethiopian Regions</strong>. You can import equipment columns directly from transmitted stock or custom material codes.
+            This breakdown template maps medical devices across all <strong className="text-slate-900">15 Ethiopian Regions</strong>. All equipment columns are strictly derived from verified DSP payload transmitted from EPSS to MOH.
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1291,7 +1271,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">Import Equipment Items into Matrix Columns</h3>
-                  <p className="text-xs text-slate-400 font-medium mt-1">Select items from transmitted DSP payload, stock ledger, or enter custom item</p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Select verified equipment items transmitted from EPSS to MOH to include in Regional Breakdown</p>
                 </div>
               </div>
               <button
@@ -1303,164 +1283,175 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </button>
             </div>
 
-            <div className="px-6 py-4">
-              {/* Source Tab Switcher */}
-              <div className="flex items-center gap-3 mb-6 bg-slate-50 p-1.5 rounded-2xl w-fit border border-slate-200/50">
-                <button
-                  type="button"
-                  onClick={() => setImportSource('received')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    importSource === 'received' 
-                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Transmitted DSP Payload ({availableReceivedItems.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImportSource('stock')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    importSource === 'stock' 
-                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Multiple Stock Ledger ({availableStockItems.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImportSource('custom')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    importSource === 'custom' 
-                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  + Custom Item Entry
-                </button>
+            <div className="px-6 py-4 space-y-4">
+              {/* Tab & Controls - STRICTLY Transmitted DSP Payload from EPSS to MOH */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    className="px-6 py-2 rounded-full text-xs font-black transition-all bg-[#0096B1] text-white shadow-md shadow-cyan-500/20 cursor-default"
+                  >
+                    Transmitted DSP Payload ({availableReceivedItems.length})
+                  </button>
+                </div>
+
+                {/* Search & Selection Helpers */}
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search material code or description..."
+                      value={importSearchQuery}
+                      onChange={(e) => setImportSearchQuery(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-cyan-500 w-64 shadow-2xs"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedImportItemIds.length === filteredAvailableReceivedItems.length) {
+                        setSelectedImportItemIds([]);
+                      } else {
+                        setSelectedImportItemIds(filteredAvailableReceivedItems.map(i => i.id));
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-200"
+                  >
+                    {selectedImportItemIds.length === filteredAvailableReceivedItems.length && filteredAvailableReceivedItems.length > 0
+                      ? 'Deselect All'
+                      : `Select All (${filteredAvailableReceivedItems.length})`}
+                  </button>
+                  {selectedImportItemIds.length > 0 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-800 text-[11px] font-black border border-cyan-200">
+                      {selectedImportItemIds.length} Selected
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Source Selection Content */}
-              {importSource === 'custom' ? (
-                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Plus className="w-4 h-4 text-cyan-600" />
-                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Add Custom Material Column</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider ml-1">Material Code</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 403-XRRD-0101"
-                        value={customMaterialCode}
-                        onChange={(e) => setCustomMaterialCode(e.target.value)}
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 transition-all shadow-xs"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider ml-1">Material Description</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Anesthesia machine with monitor"
-                        value={customMaterialDesc}
-                        onChange={(e) => setCustomMaterialDesc(e.target.value)}
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 transition-all shadow-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="max-h-[380px] overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-[#EDF2F7] text-[11px] font-black text-slate-600 uppercase sticky top-0 z-10 border-b border-slate-200">
-                        <tr>
-                          <th className="py-4 px-4 w-12 text-center">
-                            <input
-                              type="checkbox"
-                              checked={
-                                (importSource === 'received' ? availableReceivedItems : availableStockItems).length > 0 &&
-                                selectedImportItemIds.length === (importSource === 'received' ? availableReceivedItems : availableStockItems).length
-                              }
-                              onChange={(e) => {
-                                const list = importSource === 'received' ? availableReceivedItems : availableStockItems;
-                                if (e.target.checked) setSelectedImportItemIds(list.map(l => l.id));
-                                else setSelectedImportItemIds([]);
-                              }}
-                              className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
-                            />
-                          </th>
-                          <th className="py-4 px-4">Material Code</th>
-                          <th className="py-4 px-4">Description</th>
-                          <th className="py-4 px-4 text-right">Available Qty</th>
-                          <th className="py-4 px-6 text-right">Source Reference</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {(importSource === 'received' ? availableReceivedItems : availableStockItems).map((item) => {
-                          const isSelected = selectedImportItemIds.includes(item.id);
-                          return (
-                            <tr 
-                              key={item.id} 
-                              onClick={() => {
-                                setSelectedImportItemIds(prev => 
-                                  prev.includes(item.id) ? prev.filter(x => x !== item.id) : [...prev, item.id]
-                                );
-                              }}
-                              className={`hover:bg-cyan-50/30 cursor-pointer transition-all ${isSelected ? 'bg-cyan-50/60' : ''}`}
-                            >
-                              <td className="py-4 px-4 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
-                                />
-                              </td>
-                              <td className="py-4 px-4 font-mono font-black text-indigo-900 tracking-tighter">{item.materialCode}</td>
-                              <td className="py-4 px-4 font-bold text-slate-700 leading-tight">{item.description}</td>
-                              <td className="py-4 px-4 text-right font-mono font-black text-cyan-700 text-sm">{formatNumber(item.qty)}</td>
-                              <td className="py-4 px-6 text-right text-slate-400 font-mono text-[10px] leading-tight">
-                                <span className="opacity-60">Ref:</span> <span className="font-bold text-slate-500">{item.source.replace('Ref: ', '')}</span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {(importSource === 'received' ? availableReceivedItems : availableStockItems).length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="py-12 text-center">
-                              <div className="flex flex-col items-center gap-3">
-                                <Package className="w-10 h-10 text-slate-200" />
-                                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">No Items Available to Import</span>
-                              </div>
+              {/* Table of Transmitted Items */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="max-h-[380px] overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-[#EDF2F7] text-[11px] font-black text-slate-600 uppercase sticky top-0 z-10 border-b border-slate-200">
+                      <tr>
+                        <th className="py-4 px-4 w-12 text-center">
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredAvailableReceivedItems.length > 0 &&
+                              selectedImportItemIds.length === filteredAvailableReceivedItems.length
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedImportItemIds(filteredAvailableReceivedItems.map(l => l.id));
+                              else setSelectedImportItemIds([]);
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
+                          />
+                        </th>
+                        <th className="py-4 px-4">Material Code</th>
+                        <th className="py-4 px-4">Description</th>
+                        <th className="py-4 px-4 text-right">Available Qty</th>
+                        <th className="py-4 px-6 text-right">Source Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {filteredAvailableReceivedItems.map((item) => {
+                        const isSelected = selectedImportItemIds.includes(item.id);
+                        return (
+                          <tr 
+                            key={item.id} 
+                            onClick={() => {
+                              setSelectedImportItemIds(prev => 
+                                prev.includes(item.id) ? prev.filter(x => x !== item.id) : [...prev, item.id]
+                              );
+                            }}
+                            className={`hover:bg-cyan-50/30 cursor-pointer transition-all ${isSelected ? 'bg-cyan-50/60' : ''}`}
+                          >
+                            <td className="py-4 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-4 px-4 font-mono font-black text-indigo-900 tracking-tighter">{item.materialCode}</td>
+                            <td className="py-4 px-4 font-bold text-slate-700 leading-tight">{item.description}</td>
+                            <td className="py-4 px-4 text-right font-mono font-black text-cyan-700 text-sm">{formatNumber(item.qty)}</td>
+                            <td className="py-4 px-6 text-right text-slate-400 font-mono text-[10px] leading-tight">
+                              <span className="opacity-60">Ref:</span> <span className="font-bold text-slate-500">{item.source.replace('Ref: ', '')}</span>
                             </td>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                        );
+                      })}
+                      {filteredAvailableReceivedItems.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center">
+                            <div className="flex flex-col items-center gap-3">
+                              <Package className="w-10 h-10 text-slate-200" />
+                              <span className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                                {availableReceivedItems.length === 0 
+                                  ? 'No Transmitted DSP Items Received from EPSS Yet' 
+                                  : 'No items match your search filter'}
+                              </span>
+                              {availableReceivedItems.length === 0 ? (
+                                <div className="space-y-3">
+                                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                                    Equipment items will appear here once EPSS transmits a DSP Request to MOH in Sub-step 1.1. Only verified payload data transmitted from EPSS to MOH can be imported into the Regional Breakdown Matrix.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={handleQuickTransmitSampleEpss}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 mx-auto cursor-pointer shadow-xs transition"
+                                  >
+                                    <Sparkles className="w-4 h-4" />
+                                    <span>Simulate EPSS to MOH Transmission</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400">
+                                  No transmitted items matched "{importSearchQuery}". Try a different keyword or clear search.
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
             </div>
 
-            <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setIsImportItemsModalOpen(false)}
-                className="px-6 py-2.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-black transition-all cursor-pointer text-xs uppercase tracking-widest border border-slate-200 shadow-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyImportedItems}
-                className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-black transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-cyan-200 uppercase tracking-widest active:scale-95"
-              >
-                <Check className="w-4 h-4" />
-                <span>Apply Equipment Columns</span>
-              </button>
+            <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="text-xs text-slate-500 font-medium">
+                {selectedImportItemIds.length > 0 ? (
+                  <span>Selected <strong className="text-cyan-700 font-bold">{selectedImportItemIds.length}</strong> of {availableReceivedItems.length} transmitted items</span>
+                ) : (
+                  <span>Click Apply to import all <strong className="text-slate-800 font-bold">{availableReceivedItems.length}</strong> transmitted equipment items</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsImportItemsModalOpen(false)}
+                  className="px-6 py-2.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-black transition-all cursor-pointer text-xs uppercase tracking-widest border border-slate-200 shadow-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyImportedItems}
+                  className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-black transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-cyan-200 uppercase tracking-widest active:scale-95"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>
+                    Apply Equipment Columns ({selectedImportItemIds.length > 0 ? selectedImportItemIds.length : availableReceivedItems.length})
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
