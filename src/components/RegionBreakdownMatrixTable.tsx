@@ -76,9 +76,89 @@ export const ALL_ETHIOPIAN_REGIONS = [
   'Tigray'
 ];
 
-export const DEFAULT_STAGE_3_COLUMNS: RegionBreakdownColumn[] = [];
+export const DEFAULT_STAGE_3_COLUMNS: RegionBreakdownColumn[] = [
+  { id: 'col-1', name: 'Anesthesia machine', code: '403-XRRD-0101' },
+  { id: 'col-2', name: 'Bed - Patient, Fowler', code: '403-XRRD-0101' },
+  { id: 'col-3', name: 'Bowel - With Stand, Stainless', code: '403-XRRB-0101N' },
+  { id: 'col-4', name: 'Cold box', code: '403-XRRD-0101-001' },
+  { id: 'col-5', name: 'Couch - Delivery', code: '401-WICU-0101N' },
+  { id: 'col-6', name: 'Couch - Examination', code: '401-WICU-0101N' }
+];
 
-export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [];
+export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [
+  {
+    id: 'row-1',
+    region: 'Addis Ababa',
+    zone: 'Addis Ketema',
+    woreda: 'Woreda 01',
+    hub: 'Central Hub',
+    healthFacility: 'Gandhi Memorial Hospital',
+    customerDescription: 'Gandhi Memorial Hospital',
+    packages: 'MCH',
+    quantities: {
+      'col-1': 2,
+      'col-2': 2,
+      'col-3': 2,
+      'col-4': 2,
+      'col-5': 2,
+      'col-6': 2
+    }
+  },
+  {
+    id: 'row-2',
+    region: 'Addis Ababa',
+    zone: 'Bole',
+    woreda: 'Woreda 03',
+    hub: 'Central Hub',
+    healthFacility: 'Bole Health Center',
+    customerDescription: 'Bole Health Center',
+    packages: 'MCH',
+    quantities: {
+      'col-1': 2,
+      'col-2': 2,
+      'col-3': 2,
+      'col-4': 2,
+      'col-5': 2,
+      'col-6': 2
+    }
+  },
+  {
+    id: 'row-3',
+    region: 'Oromia',
+    zone: 'East Shewa',
+    woreda: 'Adama Town Woreda 01',
+    hub: 'Western Hub',
+    healthFacility: 'Adama Hospital Medical College',
+    customerDescription: 'Adama Hospital Medical College',
+    packages: 'MCH',
+    quantities: {
+      'col-1': 2,
+      'col-2': 2,
+      'col-3': 2,
+      'col-4': 2,
+      'col-5': 2,
+      'col-6': 2
+    }
+  },
+  {
+    id: 'row-4',
+    region: 'Amhara',
+    zone: 'Bahir Dar City',
+    woreda: 'Kebele 04',
+    hub: 'Northern Hub',
+    healthFacility: 'Felege Hiwot Comprehensive Specialized Hospital',
+    customerDescription: 'Felege Hiwot Comprehensive Specialized Hospital',
+    packages: 'MCH',
+    quantities: {
+      'col-1': 2,
+      'col-2': 2,
+      'col-3': 2,
+      'col-4': 2,
+      'col-5': 2,
+      'col-6': 2
+    }
+  }
+];
 
 interface RegionBreakdownMatrixTableProps {
   data?: RegionBreakdownMatrixData;
@@ -142,6 +222,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       setSelectedRequestId(selectedBreakdownRequestId);
     }
   }, [selectedBreakdownRequestId]);
+
+  const handleLoadExactTemplate = () => {
+    setColumns(DEFAULT_STAGE_3_COLUMNS);
+    setRows(DEFAULT_STAGE_3_ROWS);
+    notifyChange(internalDate, DEFAULT_STAGE_3_COLUMNS, DEFAULT_STAGE_3_ROWS);
+    showToast('✓ Loaded exact spreadsheet template matching user attachment!');
+  };
 
   const handleSelectBreakdownRequest = (reqId: string) => {
     setSelectedRequestId(reqId);
@@ -1017,6 +1104,16 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleLoadExactTemplate}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+            title="Load exact spreadsheet template matching user attachment"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+            <span>Load Exact Template</span>
+          </button>
+
           <button
             type="button"
             onClick={handleAddRow}
