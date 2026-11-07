@@ -230,7 +230,8 @@ Notes: ${folder.notes || 'N/A'}`;
     let sourceRows: DspRequestTemplateRow[] = [];
 
     if (sourceRows.length === 0) {
-      sourceRows = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
+      const allStockHp = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
+      sourceRows = allStockHp.slice(0, 5);
     }
 
     const refNum = `EPSS/MD-DSP/${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`;

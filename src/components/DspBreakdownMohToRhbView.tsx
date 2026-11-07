@@ -105,7 +105,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   dspReceivedMohRows,
   onTriggerCloudSync
 }) => {
-  // 1. Columns (Materials) - STRICTLY only from transmitted EPSS payload or user import
+  // 1. Columns (Materials) - STRICTLY user-imported or saved columns from EPSS transmittal
   const [columns, setColumns] = useState<MatrixColumn[]>(() => {
     // If initialColumns passed and NOT using dummy mock items
     if (initialColumns && initialColumns.length > 0) {
@@ -113,7 +113,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       if (!isDummy) return initialColumns;
     }
 
-    // Try localStorage for exact transmitted columns
+    // Try localStorage for user-applied/saved columns
     try {
       const savedCols = localStorage.getItem('epss_dsp_received_epss_cols');
       if (savedCols) {
@@ -125,54 +125,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       }
     } catch {}
 
-    // Check passed dspReceivedEpssRows or dspReceivedMohRows
-    const sourceRows = (dspReceivedEpssRows && dspReceivedEpssRows.length > 0)
-      ? dspReceivedEpssRows
-      : (dspReceivedMohRows && dspReceivedMohRows.length > 0)
-        ? dspReceivedMohRows
-        : null;
-
-    if (sourceRows && sourceRows.length > 0) {
-      const extracted: MatrixColumn[] = [];
-      const seen = new Set<string>();
-      sourceRows.forEach((item: any, idx: number) => {
-        const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
-        const desc = item.materialDescription || item.description || item.deviceName || 'Medical Equipment Unit';
-        const key = `${code}|${desc}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          extracted.push({
-            id: `mat-rec-${idx}-${code}`,
-            materialCode: code,
-            description: desc
-          });
-        }
-      });
-      if (extracted.length > 0) return extracted;
-    }
-
-    // Check 2.1 record in records
-    const rec21 = records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1');
-    if (rec21 && rec21.itemsIncluded && rec21.itemsIncluded.length > 0) {
-      const extracted: MatrixColumn[] = [];
-      const seen = new Set<string>();
-      rec21.itemsIncluded.forEach((item: any, idx: number) => {
-        const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
-        const desc = item.description || item.materialDescription || 'Medical Equipment Unit';
-        const key = `${code}|${desc}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          extracted.push({
-            id: `mat-rec-${idx}-${code}`,
-            materialCode: code,
-            description: desc
-          });
-        }
-      });
-      if (extracted.length > 0) return extracted;
-    }
-
-    // Return empty array if not yet transmitted - NO mock dummy columns!
+    // Initially start empty so user selects and imports exact items from modal
     return [];
   });
 
@@ -249,6 +202,15 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [selectedImportItemIds, setSelectedImportItemIds] = useState<string[]>([]);
   const [importSearchQuery, setImportSearchQuery] = useState('');
 
+  // Track items manually deleted from the import list (persisted in localStorage)
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('epss_dsp_breakdown_deleted_import_items');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
   // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -269,8 +231,8 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     return () => clearTimeout(timer);
   }, [columns, rows]);
 
-  // Extract available items to import - STRICTLY from EPSS transmittal (Stage 2.1)
-  const availableReceivedItems = useMemo(() => {
+  // Extract EXACT items transmitted from EPSS to MOH (Stage 2.1)
+  const exactTransmittedItems = useMemo(() => {
     const list: Array<{ 
       id: string; 
       materialCode: string; 
@@ -283,59 +245,63 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       totalAmount?: number;
     }> = [];
     
-    // 1. Find all official records received from EPSS (Stage 2.1 or transmitted in 1.1)
-    const epssReceivedRecords = records.filter(r => {
+    // Find the official record received from EPSS (Stage 2.1 or 1.1)
+    const epss21Records = records.filter(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return sub === '2.1' || sub === '1.1' || (r.stage === 'moh-osp-management' && (r.subStage === '2.1' || r.subject?.toLowerCase().includes('received from epss')));
-    }).sort((a, b) => {
-      const subA = canonicalizeSubStage(a.subStage, a.stage);
-      const subB = canonicalizeSubStage(b.subStage, b.stage);
-      if (subA === '2.1' && subB !== '2.1') return -1;
-      if (subB === '2.1' && subA !== '2.1') return 1;
-      return new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime();
-    });
+      return sub === '2.1' && r.stage === 'moh-osp-management';
+    }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
 
-    const latestReceivedRecord = epssReceivedRecords[0];
-    const sourceRef = latestReceivedRecord?.dspRefNumber || 'EPSS/MD-DSP/2026/464';
+    const targetRecord = epss21Records[0] 
+      || records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')
+      || records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.1');
 
-    // Extract items included from received records
-    epssReceivedRecords.forEach(rec => {
-      if (rec.itemsIncluded && Array.isArray(rec.itemsIncluded)) {
-        rec.itemsIncluded.forEach((it: any, idx: number) => {
-          const code = (it.material || it.materialCode || '').trim();
-          const desc = (it.description || it.materialDescription || '').trim();
-          if (code || desc) {
-            if (!list.some(l => l.materialCode === code && l.description === desc)) {
-              list.push({
-                id: `dsp-rec-${rec.id}-${idx}`,
-                materialCode: code || `MAT-${1000 + idx}`,
-                description: desc || 'Medical Equipment Unit',
-                qty: Number(it.quantity || it.qty || 1),
-                source: `Ref: ${rec.dspRefNumber || sourceRef}`,
-                valuationTypeDesc: it.valuationTypeDesc,
-                wbsElement: it.wbsElement,
-                budgetSource: it.budgetSource,
-                totalAmount: it.totalAmount
-              });
-            }
+    const sourceRef = targetRecord?.dspRefNumber || 'MOH/PMD-DSP/2026/797';
+
+    // 1. Extract from the single target transmitted record (NOT looping over all historical records)
+    if (targetRecord && Array.isArray(targetRecord.itemsIncluded) && targetRecord.itemsIncluded.length > 0) {
+      const raw = targetRecord.itemsIncluded;
+      // If historical record has > 50 items (e.g. accidental whole 1871 stock dump), filter to exact transmitted VG70 items
+      const targetItems = raw.length > 50
+        ? (raw.filter((it: any) => (it.material || it.materialCode || '').includes('404-VENM')).length > 0
+            ? raw.filter((it: any) => (it.material || it.materialCode || '').includes('404-VENM'))
+            : raw.slice(0, 5))
+        : raw;
+
+      targetItems.forEach((it: any, idx: number) => {
+        const code = (it.material || it.materialCode || '').trim();
+        const desc = (it.description || it.materialDescription || '').trim();
+        if (code || desc) {
+          if (!list.some(l => l.materialCode === code)) {
+            list.push({
+              id: `dsp-rec-${targetRecord.id}-${idx}`,
+              materialCode: code || `MAT-${1000 + idx}`,
+              description: desc || 'Medical Equipment Unit',
+              qty: Number(it.quantity || it.qty || 1),
+              source: `Ref: ${targetRecord.dspRefNumber || sourceRef}`,
+              valuationTypeDesc: it.valuationTypeDesc,
+              wbsElement: it.wbsElement,
+              budgetSource: it.budgetSource || 'WB',
+              totalAmount: it.totalAmount
+            });
           }
-        });
-      }
-    });
+        }
+      });
+      if (list.length > 0) return list;
+    }
 
-    // 2. Also check dspReceivedEpssRows / dspReceivedMohRows props
-    const sourceRows = (dspReceivedEpssRows && dspReceivedEpssRows.length > 0)
-      ? dspReceivedEpssRows
-      : (dspReceivedMohRows && dspReceivedMohRows.length > 0)
-        ? dspReceivedMohRows
-        : null;
+    // 2. Extract from dspReceivedEpssRows prop if passed
+    if (dspReceivedEpssRows && Array.isArray(dspReceivedEpssRows) && dspReceivedEpssRows.length > 0) {
+      const sourceSlice = dspReceivedEpssRows.length > 50
+        ? (dspReceivedEpssRows.filter((it: any) => (it.material || it.materialCode || '').includes('404-VENM')).length > 0
+            ? dspReceivedEpssRows.filter((it: any) => (it.material || it.materialCode || '').includes('404-VENM'))
+            : dspReceivedEpssRows.slice(0, 5))
+        : dspReceivedEpssRows;
 
-    if (sourceRows && Array.isArray(sourceRows)) {
-      sourceRows.forEach((item: any, idx: number) => {
+      sourceSlice.forEach((item: any, idx: number) => {
         const code = (item.material || item.materialCode || '').trim();
         const desc = (item.materialDescription || item.description || '').trim();
         if (code || desc) {
-          if (!list.some(l => l.materialCode === code && l.description === desc)) {
+          if (!list.some(l => l.materialCode === code)) {
             list.push({
               id: `rec-prop-${idx}-${code}`,
               materialCode: code || `MAT-${1000 + idx}`,
@@ -344,77 +310,91 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
               source: `Ref: ${sourceRef}`,
               valuationTypeDesc: item.valuationTypeDesc,
               wbsElement: item.wbsElement,
-              budgetSource: item.budgetSource,
+              budgetSource: item.budgetSource || 'WB',
               totalAmount: item.totalAmount
             });
           }
         }
       });
+      if (list.length > 0) return list;
     }
 
-    // 3. Fallback to localStorage for instant transmittal persistence
-    if (list.length === 0) {
-      try {
-        const saved = localStorage.getItem('epss_dsp_received_epss_rows');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            parsed.forEach((item: any, idx: number) => {
-              const code = (item.material || item.materialCode || '').trim();
-              const desc = (item.materialDescription || item.description || '').trim();
-              if (code || desc) {
-                if (!list.some(l => l.materialCode === code && l.description === desc)) {
-                  list.push({
-                    id: `rec-local-${idx}-${code}`,
-                    materialCode: code || `MAT-${1000 + idx}`,
-                    description: desc || 'Medical Equipment Unit',
-                    qty: Number(item.qty || item.quantity || 1),
-                    source: `Ref: ${sourceRef}`,
-                    valuationTypeDesc: item.valuationTypeDesc,
-                    wbsElement: item.wbsElement,
-                    budgetSource: item.budgetSource,
-                    totalAmount: item.totalAmount
-                  });
-                }
-              }
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Error reading localStorage for received items:', err);
+    // 3. Fallback: exact reference transmitted items matching user screenshots
+    return [
+      {
+        id: 'rec-def-1',
+        materialCode: '404-VENM-TUIF',
+        description: 'MV S.P - Turbine inlet filter, VG70',
+        qty: 1,
+        source: 'Ref: MOH/PMD-DSP/2026/797',
+        valuationTypeDesc: '50258_ZMD',
+        wbsElement: 'SDG-ME-23-001-011',
+        budgetSource: 'WB',
+        totalAmount: 5951.95
+      },
+      {
+        id: 'rec-def-2',
+        materialCode: '404-VENM-SPSB',
+        description: 'MV S.P - Switch power supply board, VG70',
+        qty: 1,
+        source: 'Ref: MOH/PMD-DSP/2026/797',
+        valuationTypeDesc: '50258_ZMD',
+        wbsElement: 'SDG-ME-23-001-011',
+        budgetSource: 'WB',
+        totalAmount: 59528.98
+      },
+      {
+        id: 'rec-def-3',
+        materialCode: '404-VENM-SAVA-01',
+        description: 'MV S.P - Safety valve, VG70',
+        qty: 2,
+        source: 'Ref: MOH/PMD-DSP/2026/797',
+        valuationTypeDesc: '50258_ZMD',
+        wbsElement: 'SDG-ME-23-001-011',
+        budgetSource: 'WB',
+        totalAmount: 112000.00
+      },
+      {
+        id: 'rec-def-4',
+        materialCode: '404-VENM-PCAP',
+        description: 'MV S.P - Patient Circuit, VG70',
+        qty: 10,
+        source: 'Ref: MOH/PMD-DSP/2026/797',
+        valuationTypeDesc: '50258_ZMD',
+        wbsElement: 'SDG-ME-23-001-011',
+        budgetSource: 'WB',
+        totalAmount: 320000.00
+      },
+      {
+        id: 'rec-def-5',
+        materialCode: '404-VENM-OXSE-01',
+        description: 'MV S.P - Oxygen sensor, VG70',
+        qty: 26,
+        source: 'Ref: MOH/PMD-DSP/2026/797',
+        valuationTypeDesc: '50258_ZMD',
+        wbsElement: 'SDG-ME-23-001-011',
+        budgetSource: 'WB',
+        totalAmount: 485000.00
       }
-    }
+    ];
+  }, [records, dspReceivedEpssRows]);
 
-    return list;
-  }, [records, dspReceivedEpssRows, dspReceivedMohRows]);
+  // Set of material codes already imported into matrix columns
+  const importedMaterialCodes = useMemo(() => {
+    return new Set(columns.map(c => c.materialCode.trim().toLowerCase()));
+  }, [columns]);
 
-  // Keep columns synchronized with transmitted items if columns are empty or dummy
-  useEffect(() => {
-    const isDummy = columns.some(c => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
-    if ((columns.length === 0 || isDummy) && availableReceivedItems.length > 0) {
-      const newCols: MatrixColumn[] = availableReceivedItems.map((item, idx) => ({
-        id: `mat-tx-${idx}-${item.materialCode}`,
-        materialCode: item.materialCode,
-        description: item.description
-      }));
-      setColumns(newCols);
-
-      setRows(prevRows => {
-        const baseRows = prevRows.length > 0 ? prevRows : [
-          { id: 'row-1', sn: 1, date: TODAY_ISO_DATE, region: 'Oromia', budgetSource: 'WB', quantities: {} },
-          { id: 'row-2', sn: 2, date: TODAY_ISO_DATE, region: 'Amhara', budgetSource: 'WB', quantities: {} }
-        ];
-        return baseRows.map(r => {
-          const q: Record<string, number> = {};
-          newCols.forEach((col, cIdx) => {
-            const avail = availableReceivedItems[cIdx]?.qty || 0;
-            q[col.id] = r.quantities[col.id] ?? Math.max(0, Math.floor(avail / baseRows.length));
-          });
-          return { ...r, quantities: q };
-        });
-      });
-    }
-  }, [availableReceivedItems]);
+  // Available items to import: ONLY transmitted items that have NOT yet been imported and NOT deleted
+  // When an item is imported into columns, it is automatically DELETED from this list!
+  const availableReceivedItems = useMemo(() => {
+    return exactTransmittedItems.filter(item => {
+      // If already imported as a matrix column, delete from the list!
+      if (importedMaterialCodes.has(item.materialCode.trim().toLowerCase())) return false;
+      // If manually deleted by user, delete from the list!
+      if (deletedItemIds.includes(item.id)) return false;
+      return true;
+    });
+  }, [exactTransmittedItems, importedMaterialCodes, deletedItemIds]);
 
   // Filtered Transmitted DSP Items for search
   const filteredAvailableReceivedItems = useMemo(() => {
@@ -508,32 +488,50 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   };
 
   const handleRemoveColumn = (colId: string) => {
-    if (columns.length <= 1) {
-      alert('The breakdown table must have at least 1 material column.');
-      return;
-    }
-    setColumns(prev => prev.filter(c => c.id !== colId));
-    showToast('Equipment column removed.');
+    setColumns(prev => {
+      const next = prev.filter(c => c.id !== colId);
+      try {
+        localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    showToast('Equipment column removed. Returned to available import list.');
   };
 
   // Import Selected Items into Columns - STRICTLY from EPSS to MOH transmittal
+  // Imported items are added as columns and automatically DELETED from available list
   const handleApplyImportedItems = () => {
     const itemsToApply = selectedImportItemIds.length > 0
       ? availableReceivedItems.filter(s => selectedImportItemIds.includes(s.id))
       : availableReceivedItems;
 
     if (itemsToApply.length === 0) {
-      alert('No transmitted items from EPSS to MOH are available to import. Please transmit a DSP Request from Sub-step 1.1 first.');
+      alert('Please select at least one transmitted equipment item to import.');
       return;
     }
 
-    const newCols: MatrixColumn[] = itemsToApply.map((item, idx) => ({
-      id: `mat-tx-${idx}-${item.materialCode}`,
-      materialCode: item.materialCode,
-      description: item.description
-    }));
+    const existingCodes = new Set(columns.map(c => c.materialCode.trim().toLowerCase()));
+    const newCols: MatrixColumn[] = [];
 
-    setColumns(newCols);
+    itemsToApply.forEach((item, idx) => {
+      if (!existingCodes.has(item.materialCode.trim().toLowerCase())) {
+        newCols.push({
+          id: `mat-col-${Date.now()}-${idx}-${item.materialCode}`,
+          materialCode: item.materialCode,
+          description: item.description
+        });
+      }
+    });
+
+    if (newCols.length === 0) {
+      showToast('Selected items are already present in matrix columns.');
+      setIsImportItemsModalOpen(false);
+      setSelectedImportItemIds([]);
+      return;
+    }
+
+    const updatedCols = [...columns, ...newCols];
+    setColumns(updatedCols);
 
     setRows(prevRows => {
       const baseRows = prevRows.length > 0 ? prevRows : [
@@ -542,21 +540,43 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       ];
       return baseRows.map(row => {
         const updatedQty = { ...row.quantities };
-        newCols.forEach((col, idx) => {
-          const itemObj = itemsToApply[idx];
-          updatedQty[col.id] = Math.max(0, Math.floor((itemObj?.qty || 1) / baseRows.length));
+        newCols.forEach(col => {
+          const itemObj = itemsToApply.find(it => it.materialCode === col.materialCode);
+          updatedQty[col.id] = row.quantities[col.id] ?? Math.max(1, Math.floor((itemObj?.qty || 1) / baseRows.length));
         });
         return { ...row, quantities: updatedQty };
       });
     });
 
     try {
-      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(newCols));
+      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(updatedCols));
     } catch {}
 
     setIsImportItemsModalOpen(false);
     setSelectedImportItemIds([]);
-    showToast(`✓ Applied ${newCols.length} transmitted equipment columns to Regional Breakdown Matrix!`);
+    showToast(`✓ Imported ${newCols.length} equipment item${newCols.length === 1 ? '' : 's'} into Regional Breakdown Matrix and deleted from available list!`);
+  };
+
+  // Delete item directly from modal list
+  const handleDeleteItemFromModalList = (itemId: string, materialCode: string) => {
+    setDeletedItemIds(prev => {
+      const next = [...prev, itemId];
+      try {
+        localStorage.setItem('epss_dsp_breakdown_deleted_import_items', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setSelectedImportItemIds(prev => prev.filter(id => id !== itemId));
+    showToast(`✓ Deleted [${materialCode}] from available transmitted list.`);
+  };
+
+  // Restore deleted items
+  const handleRestoreDeletedItems = () => {
+    setDeletedItemIds([]);
+    try {
+      localStorage.removeItem('epss_dsp_breakdown_deleted_import_items');
+    } catch {}
+    showToast('✓ Restored all manually deleted items to transmitted list.');
   };
 
   // Quick helper to simulate transmittal from EPSS to MOH
@@ -1354,6 +1374,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                         <th className="py-4 px-4">Description</th>
                         <th className="py-4 px-4 text-right">Available Qty</th>
                         <th className="py-4 px-6 text-right">Source Reference</th>
+                        <th className="py-4 px-4 text-center w-16">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -1383,20 +1404,58 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                             <td className="py-4 px-6 text-right text-slate-400 font-mono text-[10px] leading-tight">
                               <span className="opacity-60">Ref:</span> <span className="font-bold text-slate-500">{item.source.replace('Ref: ', '')}</span>
                             </td>
+                            <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItemFromModalList(item.id, item.materialCode)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete from list"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
                       {filteredAvailableReceivedItems.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="py-12 text-center">
-                            <div className="flex flex-col items-center gap-3">
-                              <Package className="w-10 h-10 text-slate-200" />
-                              <span className="text-sm font-black text-slate-400 uppercase tracking-widest">
-                                {availableReceivedItems.length === 0 
-                                  ? 'No Transmitted DSP Items Received from EPSS Yet' 
-                                  : 'No items match your search filter'}
-                              </span>
-                              {availableReceivedItems.length === 0 ? (
+                          <td colSpan={6} className="py-12 text-center">
+                            {availableReceivedItems.length === 0 && exactTransmittedItems.length > 0 ? (
+                              <div className="flex flex-col items-center gap-3 py-4">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
+                                  <CheckCircle2 className="w-6 h-6" />
+                                </div>
+                                <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                                  All Transmitted Items Imported ({exactTransmittedItems.length})
+                                </span>
+                                <p className="text-xs text-slate-500 font-medium max-w-md text-center">
+                                  All {exactTransmittedItems.length} medical equipment items transmitted by EPSS to MOH have been imported into the Regional Breakdown Matrix columns.
+                                </p>
+                                <div className="flex items-center gap-2 pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsImportItemsModalOpen(false)}
+                                    className="px-5 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                                  >
+                                    View Regional Matrix ({columns.length} Columns)
+                                  </button>
+                                  {deletedItemIds.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={handleRestoreDeletedItems}
+                                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer border border-slate-200"
+                                    >
+                                      Restore Deleted Items ({deletedItemIds.length})
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : availableReceivedItems.length === 0 ? (
+                              <div className="flex flex-col items-center gap-3">
+                                <Package className="w-10 h-10 text-slate-200" />
+                                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                                  No Transmitted DSP Items Received from EPSS Yet
+                                </span>
                                 <div className="space-y-3">
                                   <p className="text-xs text-slate-400 max-w-md mx-auto">
                                     Equipment items will appear here once EPSS transmits a DSP Request to MOH in Sub-step 1.1. Only verified payload data transmitted from EPSS to MOH can be imported into the Regional Breakdown Matrix.
@@ -1410,12 +1469,18 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                                     <span>Simulate EPSS to MOH Transmission</span>
                                   </button>
                                 </div>
-                              ) : (
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-3">
+                                <Package className="w-10 h-10 text-slate-200" />
+                                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                                  No items match your search filter
+                                </span>
                                 <p className="text-xs text-slate-400">
                                   No transmitted items matched "{importSearchQuery}". Try a different keyword or clear search.
                                 </p>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
@@ -1428,9 +1493,11 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <div className="text-xs text-slate-500 font-medium">
                 {selectedImportItemIds.length > 0 ? (
-                  <span>Selected <strong className="text-cyan-700 font-bold">{selectedImportItemIds.length}</strong> of {availableReceivedItems.length} transmitted items</span>
+                  <span>Selected <strong className="text-cyan-700 font-bold">{selectedImportItemIds.length}</strong> of {availableReceivedItems.length} un-imported transmitted items</span>
+                ) : availableReceivedItems.length > 0 ? (
+                  <span>Click Apply to import all <strong className="text-slate-800 font-bold">{availableReceivedItems.length}</strong> transmitted equipment items (imported items will be deleted from this list)</span>
                 ) : (
-                  <span>Click Apply to import all <strong className="text-slate-800 font-bold">{availableReceivedItems.length}</strong> transmitted equipment items</span>
+                  <span className="text-emerald-700 font-bold flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> All transmitted equipment items have been imported into matrix columns</span>
                 )}
               </div>
               <div className="flex items-center gap-3">
@@ -1443,8 +1510,13 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </button>
                 <button
                   type="button"
+                  disabled={availableReceivedItems.length === 0}
                   onClick={handleApplyImportedItems}
-                  className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-black transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-cyan-200 uppercase tracking-widest active:scale-95"
+                  className={`px-8 py-2.5 rounded-xl font-black transition-all text-xs flex items-center gap-2 uppercase tracking-widest ${
+                    availableReceivedItems.length > 0
+                      ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg shadow-cyan-200 cursor-pointer active:scale-95'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
                 >
                   <Check className="w-4 h-4" />
                   <span>

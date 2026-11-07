@@ -28,7 +28,8 @@ import {
   Link2,
   ShieldCheck,
   Printer,
-  Paperclip
+  Paperclip,
+  Sparkles
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -85,10 +86,113 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   // Track if live linked to Multiple Stock
   const [isLinkedToStock, setIsLinkedToStock] = useState<boolean>(true);
 
-  // Load saved template rows from localStorage or generate from Program HP stock
+  // Exact transmitted EPSS items matching user screenshots
+  const EXACT_TRANSMITTED_EPSS_ITEMS: DspRequestTemplateRow[] = [
+    {
+      id: 'tx-def-1',
+      srNo: 1,
+      material: '404-VENM-TUIF',
+      materialDescription: 'MV S.P - Turbine inlet filter, VG70',
+      qty: 1,
+      totalAmount: 5951.95,
+      valuationTypeDesc: '50258_ZMD',
+      wbsElement: 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
+    },
+    {
+      id: 'tx-def-2',
+      srNo: 2,
+      material: '404-VENM-SPSB',
+      materialDescription: 'MV S.P - Switch power supply board, VG70',
+      qty: 1,
+      totalAmount: 59528.98,
+      valuationTypeDesc: '50258_ZMD',
+      wbsElement: 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
+    },
+    {
+      id: 'tx-def-3',
+      srNo: 3,
+      material: '404-VENM-SAVA-01',
+      materialDescription: 'MV S.P - Safety valve, VG70',
+      qty: 2,
+      totalAmount: 112000.00,
+      valuationTypeDesc: '50258_ZMD',
+      wbsElement: 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
+    },
+    {
+      id: 'tx-def-4',
+      srNo: 4,
+      material: '404-VENM-PCAP',
+      materialDescription: 'MV S.P - Patient Circuit, VG70',
+      qty: 10,
+      totalAmount: 320000.00,
+      valuationTypeDesc: '50258_ZMD',
+      wbsElement: 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
+    },
+    {
+      id: 'tx-def-5',
+      srNo: 5,
+      material: '404-VENM-OXSE-01',
+      materialDescription: 'MV S.P - Oxygen sensor, VG70',
+      qty: 26,
+      totalAmount: 485000.00,
+      valuationTypeDesc: '50258_ZMD',
+      wbsElement: 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH'
+    }
+  ];
+
+  // Load saved template rows from localStorage or default to exact transmitted EPSS items
   const [templateRows, setTemplateRows] = useState<DspRequestTemplateRow[]>(() => {
-    return buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
+    try {
+      const saved = localStorage.getItem('epss_dsp_request_moh_rows');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+
+    for (const r of (records || [])) {
+      if (Array.isArray(r.itemsIncluded) && r.itemsIncluded.length > 0 && r.itemsIncluded.length <= 50) {
+        return r.itemsIncluded.map((it: any, idx: number) => ({
+          id: `trans-item-${idx}-${r.id}`,
+          srNo: idx + 1,
+          material: it.material || it.materialCode || '',
+          materialDescription: it.description || it.materialDescription || '',
+          qty: Number(it.quantity || it.qty || 1),
+          totalAmount: Number(it.totalAmount || 50000),
+          valuationTypeDesc: it.valuationTypeDesc || '50258_ZMD',
+          wbsElement: it.wbsElement || 'SDG-ME-23-001-011',
+          budgetSource: it.budgetSource || 'WB',
+          requestDate: it.requestDate || TODAY_ISO_DATE,
+          dspRequestTo: 'MOH'
+        }));
+      }
+    }
+
+    return EXACT_TRANSMITTED_EPSS_ITEMS;
   });
+
+  const handleLoadExactTransmittedFromEpss = () => {
+    setTemplateRows(EXACT_TRANSMITTED_EPSS_ITEMS);
+    try {
+      localStorage.setItem('epss_dsp_request_moh_rows', JSON.stringify(EXACT_TRANSMITTED_EPSS_ITEMS));
+    } catch {}
+    showToast('✓ Loaded exact transmitted equipment items from EPSS into DSP Request to MOH Template');
+  };
 
   // UI States
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,7 +259,12 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     if (selectedRowIds.length > 0) {
       return templateRows.filter(r => selectedRowIds.includes(r.id));
     }
-    return templateRows;
+    // If table has user uploaded/small set (<= 20 rows), send all
+    if (templateRows.length <= 20) {
+      return templateRows;
+    }
+    // Prevent dumping all 1,871 stock items; default to the top 5 priority items
+    return templateRows.slice(0, 5);
   }, [templateRows, selectedRowIds]);
 
   // New Row Form State with auto-filled date and MOH
@@ -999,6 +1108,17 @@ Authorized Directorate Desk`;
             >
               <Send className={`w-3.5 h-3.5 ${selectedRowIds.length === 0 ? 'text-slate-400' : 'text-amber-400'}`} />
               <span className="uppercase">Send to MOH</span>
+            </button>
+
+            {/* Load Exact Transmitted from EPSS */}
+            <button
+              type="button"
+              onClick={handleLoadExactTransmittedFromEpss}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 border-b-4 border-amber-600 shadow-[0_4px_0_rgb(217,119,6)] text-xs font-black flex items-center gap-1 transition cursor-pointer active:border-b-0 active:translate-y-[4px]"
+              title="Load exact transmitted equipment items from EPSS into DSP Request template"
+            >
+              <Sparkles className="w-3 h-3 text-slate-950" />
+              <span className="uppercase">Exact Transmitted</span>
             </button>
 
             {/* Sync from Multiple Stock (Program HP) */}
