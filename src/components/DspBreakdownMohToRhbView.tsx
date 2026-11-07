@@ -20,6 +20,7 @@ import {
   MessageCircle,
   ShieldCheck,
   Paperclip,
+  Package,
   PackagePlus,
   Globe,
   Lock,
@@ -226,6 +227,13 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const availableReceivedItems = useMemo(() => {
     const list: Array<{ id: string; materialCode: string; description: string; qty: number; source: string }> = [];
     
+    // Find the latest transmitted record from EPSS to MOH (Stage 2.1)
+    const latestReceivedRecord = [...records]
+      .filter(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')
+      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime())[0];
+
+    const sourceRef = latestReceivedRecord?.dspRefNumber || 'EPSS/MD-DSP/2026/464';
+
     try {
       const sourceRows = dspReceivedEpssRows || dspReceivedMohRows;
       if (sourceRows && Array.isArray(sourceRows)) {
@@ -235,7 +243,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
             materialCode: item.material || item.materialCode || `MAT-${1000 + idx}`,
             description: item.materialDescription || item.description || 'Medical Device',
             qty: item.qty || item.quantity || 10,
-            source: 'Transmitted DSP Payload'
+            source: `Ref: ${sourceRef}`
           });
         });
       }
@@ -258,7 +266,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     });
 
     return list;
-  }, [records]);
+  }, [records, dspReceivedEpssRows, dspReceivedMohRows]);
 
   const availableStockItems = useMemo(() => {
     return multipleStockItems.map(s => ({
@@ -989,160 +997,178 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
         </div>
       </div>
 
-      {/* MODAL 1: IMPORT / SELECT EQUIPMENT COLUMNS */}
       {isImportItemsModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-cyan-50 text-cyan-700">
-                  <PackagePlus className="w-5 h-5" />
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-in">
+            <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-cyan-50 text-cyan-600 border border-cyan-100 shadow-sm">
+                  <PackagePlus className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase">Import Equipment Items into Matrix Columns</h3>
-                  <p className="text-[11px] text-slate-400">Select items from transmitted DSP payload, stock ledger, or enter custom item</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">Import Equipment Items into Matrix Columns</h3>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Select items from transmitted DSP payload, stock ledger, or enter custom item</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsImportItemsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Source Tab Switcher */}
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <button
-                type="button"
-                onClick={() => setImportSource('received')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  importSource === 'received' 
-                    ? 'bg-cyan-600 text-white shadow-xs' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Transmitted DSP Payload ({availableReceivedItems.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportSource('stock')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  importSource === 'stock' 
-                    ? 'bg-cyan-600 text-white shadow-xs' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Multiple Stock Ledger ({availableStockItems.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportSource('custom')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  importSource === 'custom' 
-                    ? 'bg-cyan-600 text-white shadow-xs' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                + Custom Item Entry
-              </button>
-            </div>
+            <div className="px-6 py-4">
+              {/* Source Tab Switcher */}
+              <div className="flex items-center gap-3 mb-6 bg-slate-50 p-1.5 rounded-2xl w-fit border border-slate-200/50">
+                <button
+                  type="button"
+                  onClick={() => setImportSource('received')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    importSource === 'received' 
+                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Transmitted DSP Payload ({availableReceivedItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportSource('stock')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    importSource === 'stock' 
+                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Multiple Stock Ledger ({availableStockItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportSource('custom')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    importSource === 'custom' 
+                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-200' 
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  + Custom Item Entry
+                </button>
+              </div>
 
-            {/* Source Selection Content */}
-            {importSource === 'custom' ? (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                <h4 className="text-xs font-bold text-slate-800">Add Custom Material Column</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Material Code</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 403-XRRD-0101"
-                      value={customMaterialCode}
-                      onChange={(e) => setCustomMaterialCode(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
-                    />
+              {/* Source Selection Content */}
+              {importSource === 'custom' ? (
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Plus className="w-4 h-4 text-cyan-600" />
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Add Custom Material Column</h4>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Material Description</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Anesthesia machine with monitor"
-                      value={customMaterialDesc}
-                      onChange={(e) => setCustomMaterialDesc(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider ml-1">Material Code</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 403-XRRD-0101"
+                        value={customMaterialCode}
+                        onChange={(e) => setCustomMaterialCode(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 transition-all shadow-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-black text-slate-500 uppercase tracking-wider ml-1">Material Description</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Anesthesia machine with monitor"
+                        value={customMaterialDesc}
+                        onChange={(e) => setCustomMaterialDesc(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 transition-all shadow-xs"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="border border-slate-200 rounded-xl bg-slate-50/50 max-h-60 overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-100 text-[10px] font-bold text-slate-600 uppercase sticky top-0">
-                    <tr>
-                      <th className="p-2.5 text-center w-10">
-                        <input
-                          type="checkbox"
-                          onChange={(e) => {
-                            const list = importSource === 'received' ? availableReceivedItems : availableStockItems;
-                            if (e.target.checked) setSelectedImportItemIds(list.map(l => l.id));
-                            else setSelectedImportItemIds([]);
-                          }}
-                          className="rounded accent-cyan-600 cursor-pointer"
-                        />
-                      </th>
-                      <th className="p-2.5">Material Code</th>
-                      <th className="p-2.5">Description</th>
-                      <th className="p-2.5 text-right">Available Qty</th>
-                      <th className="p-2.5">Source Reference</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {(importSource === 'received' ? availableReceivedItems : availableStockItems).map((item) => {
-                      const isSelected = selectedImportItemIds.includes(item.id);
-                      return (
-                        <tr 
-                          key={item.id} 
-                          onClick={() => {
-                            setSelectedImportItemIds(prev => 
-                              prev.includes(item.id) ? prev.filter(x => x !== item.id) : [...prev, item.id]
-                            );
-                          }}
-                          className={`hover:bg-cyan-50/50 cursor-pointer transition ${isSelected ? 'bg-cyan-50' : ''}`}
-                        >
-                          <td className="p-2.5 text-center">
+              ) : (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="max-h-[380px] overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[#EDF2F7] text-[11px] font-black text-slate-600 uppercase sticky top-0 z-10 border-b border-slate-200">
+                        <tr>
+                          <th className="py-4 px-4 w-12 text-center">
                             <input
                               type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              className="rounded accent-cyan-600 cursor-pointer"
+                              onChange={(e) => {
+                                const list = importSource === 'received' ? availableReceivedItems : availableStockItems;
+                                if (e.target.checked) setSelectedImportItemIds(list.map(l => l.id));
+                                else setSelectedImportItemIds([]);
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
                             />
-                          </td>
-                          <td className="p-2.5 font-mono font-bold text-slate-900">{item.materialCode}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{item.description}</td>
-                          <td className="p-2.5 text-right font-mono font-bold text-cyan-800">{formatNumber(item.qty)}</td>
-                          <td className="p-2.5 text-slate-500 font-mono text-[10px]">{item.source}</td>
+                          </th>
+                          <th className="py-4 px-4">Material Code</th>
+                          <th className="py-4 px-4">Description</th>
+                          <th className="py-4 px-4 text-right">Available Qty</th>
+                          <th className="py-4 px-6 text-right">Source Reference</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {(importSource === 'received' ? availableReceivedItems : availableStockItems).map((item) => {
+                          const isSelected = selectedImportItemIds.includes(item.id);
+                          return (
+                            <tr 
+                              key={item.id} 
+                              onClick={() => {
+                                setSelectedImportItemIds(prev => 
+                                  prev.includes(item.id) ? prev.filter(x => x !== item.id) : [...prev, item.id]
+                                );
+                              }}
+                              className={`hover:bg-cyan-50/30 cursor-pointer transition-all ${isSelected ? 'bg-cyan-50/60' : ''}`}
+                            >
+                              <td className="py-4 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all cursor-pointer"
+                                />
+                              </td>
+                              <td className="py-4 px-4 font-mono font-black text-indigo-900 tracking-tighter">{item.materialCode}</td>
+                              <td className="py-4 px-4 font-bold text-slate-700 leading-tight">{item.description}</td>
+                              <td className="py-4 px-4 text-right font-mono font-black text-cyan-700 text-sm">{formatNumber(item.qty)}</td>
+                              <td className="py-4 px-6 text-right text-slate-400 font-mono text-[10px] leading-tight">
+                                <span className="opacity-60">Ref:</span> <span className="font-bold text-slate-500">{item.source.replace('Ref: ', '')}</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {(importSource === 'received' ? availableReceivedItems : availableStockItems).length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-12 text-center">
+                              <div className="flex flex-col items-center gap-3">
+                                <Package className="w-10 h-10 text-slate-200" />
+                                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">No Items Available to Import</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setIsImportItemsModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer text-xs"
+                className="px-6 py-2.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl font-black transition-all cursor-pointer text-xs uppercase tracking-widest border border-slate-200 shadow-xs"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplyImportedItems}
-                className="px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold transition cursor-pointer text-xs flex items-center gap-1.5 shadow-sm"
+                className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-black transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-cyan-200 uppercase tracking-widest active:scale-95"
               >
                 <Check className="w-4 h-4" />
                 <span>Apply Equipment Columns</span>

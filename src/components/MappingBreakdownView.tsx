@@ -238,20 +238,29 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
 
     // Check if row 0 of rowsJson contains explicit item codes for each column (e.g. 2-tier header files)
     const firstRowData = rowsJson[0] || {};
-    const hasCodeRowInFirstRow = equipmentHeaders.every(h => {
+    
+    // Improvement: Better detection of 2-tier headers as shown in user screenshot {C0871FED-A796-4A43-868D-774FC3A71926}.png
+    const hasCodeRowInFirstRow = equipmentHeaders.some(h => {
       const val = String(firstRowData[h] || '').trim();
-      return val && isNaN(Number(val)) && (/[A-Z0-9]{3,}/i.test(val) || val.includes('-'));
+      // If it looks like a code (uppercase with dashes) or specifically mentioned in the screenshot like "ITEM-1"
+      return val && isNaN(Number(val)) && (/[A-Z0-9]{3,}/i.test(val) || val.includes('-') || val.startsWith('ITEM-'));
     });
 
     let effectiveRowsJson = rowsJson;
 
     finalColumns = equipmentHeaders.map((h, i) => {
       let codeVal = '';
+      let nameVal = h;
+
       if (hasCodeRowInFirstRow) {
         codeVal = String(firstRowData[h] || '').trim();
+        // If the header itself is an empty marker like "__EMPTY_1", use the first row data as the name if it's not a pure code
+        if (h.startsWith('__EMPTY_') || h.toLowerCase() === 'item') {
+          nameVal = codeVal;
+        }
       }
 
-      const { name, code } = extractCodeAndName(h, codeVal || `ITEM-${i + 1}`);
+      const { name, code } = extractCodeAndName(nameVal, codeVal || `ITEM-${i + 1}`);
       return {
         id: `col-adhoc-${i}`,
         name: name,
@@ -354,7 +363,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
   // Region to Hub Dictionary is now top-level
 
-  const handleMapWithHub = () => {
+  const handleMapWithHubs = () => {
     setIsAnalyzing(true);
     setUploadFeedback({ message: 'Analyzing facilities and mapping to optimal regional hubs...', type: 'info' });
     
@@ -596,15 +605,15 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                     <span>Reset to Master</span>
                   </button>
                 )}
-                <button
-                  onClick={handleMapWithHub}
-                  disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-emerald-500 transition active:scale-95 disabled:opacity-50 cursor-pointer"
-                  title="Analyze and map currently viewed facilities to regional hubs"
-                >
-                  <MapIcon size={16} />
-                  <span>{isAnalyzing ? 'Analyzing...' : 'Map with Hub'}</span>
-                </button>
+                  <button
+                    onClick={handleMapWithHubs}
+                    disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-emerald-500 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                    title="Analyze and map currently viewed facilities to regional hubs"
+                  >
+                    <MapIcon size={16} />
+                    <span>{isAnalyzing ? 'Analyzing...' : 'Map with Hubs'}</span>
+                  </button>
 
                 <button
                   onClick={handleDownloadMismatched}

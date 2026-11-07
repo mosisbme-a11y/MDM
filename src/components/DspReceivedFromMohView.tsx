@@ -578,8 +578,8 @@ Notes: ${folder.notes || 'N/A'}`;
               <div>
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <span>DSP Dossier Archive (Received from EPSS)</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
-                    {receivedRecords.length} Stored Dossiers
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 uppercase">
+                    {receivedRecords.length} STORED DOSSIERS
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium">
@@ -609,57 +609,69 @@ Notes: ${folder.notes || 'N/A'}`;
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {receivedRecords.map((rec) => (
-                <div 
-                  key={rec.id} 
-                  onClick={() => setSelectedDossier(rec)}
-                  className="bg-slate-50/80 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl p-4 space-y-3 transition-all shadow-2xs group relative cursor-pointer"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl group-hover:bg-amber-200 transition-colors">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-[9px] font-mono font-black text-indigo-700 block uppercase tracking-widest mb-0.5">
-                          {rec.dspRefNumber}
-                        </span>
-                        <h4 className="text-xs font-black text-slate-900 truncate uppercase leading-tight" title={rec.dspName}>
-                          {rec.dspName || "Unnamed DSP Request"}
-                        </h4>
-                      </div>
-                    </div>
-                    <div className="p-1 bg-white rounded-lg border border-slate-200 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Eye className="w-4 h-4" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white/80 p-2 rounded-lg border border-slate-100 text-[10px]">
-                      <span className="text-slate-400 block mb-0.5 uppercase font-bold">Transmitted</span>
-                      <span className="font-mono font-bold text-slate-800">{rec.dateSubmitted}</span>
-                    </div>
-                    <div className="bg-white/80 p-2 rounded-lg border border-slate-100 text-[10px]">
-                      <span className="text-slate-400 block mb-0.5 uppercase font-bold">Materials</span>
-                      <span className="font-bold text-cyan-800">{rec.totalDevices} Items</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[10px] pt-1 font-bold">
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                      <Building2 className="w-3 h-3" />
-                      <span>EPSS HO Transmittal</span>
-                    </div>
-                    <div className="text-emerald-700 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" />
-                      <span>Stored & Verified</span>
-                    </div>
-                  </div>
-                  
-                  <div className="absolute inset-0 border-2 border-indigo-600 rounded-xl opacity-0 group-hover:opacity-10 transition-opacity" />
-                </div>
-              ))}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-md bg-slate-50/30 p-1">
+              <table className="w-full border-collapse text-left text-xs bg-white rounded-xl overflow-hidden">
+                <thead>
+                  <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
+                    <th className="py-4 px-4 w-12 text-center border-r border-white/10">S/N</th>
+                    <th className="py-4 px-6 border-r border-white/10">Date</th>
+                    <th className="py-4 px-6 border-r border-white/10">Dsp Name</th>
+                    <th className="py-4 px-6 border-r border-white/10">Status</th>
+                    <th className="py-4 px-4 w-24 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                  {receivedRecords.map((rec, idx) => (
+                    <tr 
+                      key={rec.id} 
+                      onClick={() => setSelectedDossier(rec)}
+                      className="hover:bg-indigo-50/50 cursor-pointer transition-all group"
+                    >
+                      <td className="py-4 px-4 text-center font-bold text-slate-400 font-mono border-r border-slate-50">
+                        {idx + 1}
+                      </td>
+                      <td className="py-4 px-6 font-mono font-bold text-slate-600 border-r border-slate-50">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{rec.dateSubmitted}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 border-r border-slate-50">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-amber-100 text-amber-800 rounded-xl group-hover:bg-amber-200 group-hover:scale-110 transition-all shadow-3xs">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-black uppercase text-slate-900 leading-tight tracking-tight">
+                              {rec.dspName || "Unnamed DSP Request"}
+                            </span>
+                            <span className="text-[9px] font-mono font-bold text-indigo-500 uppercase tracking-widest mt-0.5">
+                              {rec.dspRefNumber}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 border-r border-slate-50">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-3xs">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            Stored & Verified
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase shadow-sm group-hover:shadow-md transition-all active:scale-95"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Full</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -973,140 +985,159 @@ Notes: ${folder.notes || 'N/A'}`;
 
       {/* Dossier Table Section (Visible if is21 and dossier selected, or if not is21 and data exists) */}
       {(!is21 || selectedDossier) && receivedRows.length > 0 && (
-        <div className="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4">
-          <div className="bg-[#0B1527] p-4 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-400 rounded-lg text-slate-900">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-widest leading-tight">
-                  {is21 ? `DSP DOSSIER: ${selectedDossier?.dspName}` : 'DSP Received from MOH — Official Allocation Dossier'}
-                </h3>
-                <div className="text-[10px] font-bold text-amber-400 mt-0.5">
-                  Ref: <span className="underline italic">{is21 ? selectedDossier?.dspRefNumber : (receivedRecords[0]?.dspRefNumber || 'EPSS/MD-DSP/2026/042')}</span>
-                  <span className="mx-2 opacity-50">|</span>
-                  Date: {is21 ? selectedDossier?.dateSubmitted : (receivedRecords[0]?.dateSubmitted || TODAY_ISO_DATE)}
+        <div className="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-500">
+          <div className="bg-[#0B1527] p-6 text-white">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-400 rounded-2xl text-slate-950 shadow-lg shadow-amber-400/20">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-black uppercase tracking-widest leading-tight text-white">
+                      {is21 ? `OFFICIAL DSP DOSSIER: ${selectedDossier?.dspName}` : 'DSP Received from MOH — Official Allocation Dossier'}
+                    </h3>
+                    <span className="px-3 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-tighter">
+                      Verified Data
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-[11px] font-bold text-amber-400/90">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Reference:</span>
+                      <span className="underline italic font-mono">{is21 ? selectedDossier?.dspRefNumber : (receivedRecords[0]?.dspRefNumber || 'EPSS/MD-DSP/2026/042')}</span>
+                    </div>
+                    <div className="w-px h-3 bg-white/20 hidden md:block" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Transmitted:</span>
+                      <span className="font-mono">{is21 ? selectedDossier?.dateSubmitted : (receivedRecords[0]?.dateSubmitted || TODAY_ISO_DATE)}</span>
+                    </div>
+                    <div className="w-px h-3 bg-white/20 hidden md:block" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Sender:</span>
+                      <span className="uppercase">{is21 ? selectedDossier?.senderOrg : 'MOH PMD Directorate'}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintDossier}
+                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/10"
+                  title="Print Dossier"
+                >
+                  <Printer className="w-5 h-5" />
+                </button>
+                {is21 && (
+                  <button 
+                    onClick={() => setSelectedDossier(null)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-widest transition cursor-pointer shadow-lg shadow-rose-600/20 active:scale-95"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Close Dossier</span>
+                  </button>
+                )}
+              </div>
             </div>
-            
-            {is21 && (
-              <button 
-                onClick={() => setSelectedDossier(null)}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                title="Close Dossier"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[11px]">
+          <div className="overflow-x-auto bg-slate-50/50 p-1">
+            <table className="w-full border-collapse text-[11px] bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
               <thead>
-                <tr className="bg-[#FFA500] text-slate-950 font-black uppercase border-b-2 border-slate-900">
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">S/N</th>
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL</th>
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL DESCRIPTION</th>
-                  <th className="py-3 px-3 text-center border-r border-slate-900/10">QTY</th>
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">TOTAL AMOUNT (ETB)</th>
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">VALUATION TYPE DESC</th>
-                  <th className="py-3 px-3 text-left border-r border-slate-900/10">WBS ELEMENT</th>
-                  <th className="py-3 px-3 text-center border-r border-slate-900/10">BUDGET SOURCE</th>
-                  <th className="py-3 px-3 text-left">REQUEST DATE</th>
-                  <th className="py-3 px-3 text-center">ACTION</th>
+                <tr className="bg-[#FFA500] text-slate-950 font-black uppercase border-b-2 border-slate-900 sticky top-0 z-10">
+                  <th className="py-4 px-4 text-left border-r border-slate-900/10 w-12">S/N</th>
+                  <th className="py-4 px-4 text-left border-r border-slate-900/10">Material Code</th>
+                  <th className="py-4 px-6 text-left border-r border-slate-900/10">Full Description</th>
+                  <th className="py-4 px-4 text-center border-r border-slate-900/10 w-20">Qty</th>
+                  <th className="py-4 px-4 text-left border-r border-slate-900/10">Valuation (ETB)</th>
+                  <th className="py-4 px-4 text-left border-r border-slate-900/10">WBS Element</th>
+                  <th className="py-4 px-4 text-center border-r border-slate-900/10">Budget</th>
+                  <th className="py-4 px-4 text-left">Date</th>
+                  <th className="py-4 px-4 text-center w-16">Action</th>
                 </tr>
               </thead>
-              <tbody className="bg-[#FFFBEB]">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {filteredRows.map((row, idx) => (
-                  <tr key={row.id || idx} className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50 group transition-colors">
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-center">{idx + 1}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">{row.material}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-semibold text-slate-800">{row.materialDescription}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-xs">{formatNumber(row.qty)}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-black text-emerald-800">
-                      <span className="mr-3 text-[10px]">ETB</span>
-                      <span>{formatNumber(row.totalAmount)}</span>
+                  <tr key={row.id || idx} className="hover:bg-amber-50/40 group transition-all duration-200">
+                    <td className="py-3.5 px-4 border-r border-slate-50 text-center font-bold text-slate-400 font-mono">{idx + 1}</td>
+                    <td className="py-3.5 px-4 border-r border-slate-50 font-mono font-black text-indigo-700 tracking-tight">{row.material}</td>
+                    <td className="py-3.5 px-6 border-r border-slate-50 font-bold text-slate-800 leading-tight">{row.materialDescription}</td>
+                    <td className="py-3.5 px-4 border-r border-slate-50 font-black text-center text-cyan-700 text-sm">{formatNumber(row.qty)}</td>
+                    <td className="py-3.5 px-4 border-r border-slate-50 font-black text-emerald-700">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[10px] opacity-60">ETB</span>
+                        <span>{formatNumber(row.totalAmount)}</span>
+                      </div>
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-600 text-[10px]">{row.valuationTypeDesc}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-400 text-[10px]">{row.wbsElement}</td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-2xs">{row.budgetSource}</span>
+                    <td className="py-3.5 px-4 border-r border-slate-50 font-mono text-slate-500 font-bold">{row.wbsElement}</td>
+                    <td className="py-3.5 px-4 border-r border-slate-50 text-center">
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-black text-[10px] border border-amber-200 shadow-3xs uppercase">{row.budgetSource}</span>
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-500 italic">{row.requestDate}</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <button onClick={() => handleRemoveRow(row.id)} className="p-1 text-slate-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                    <td className="py-3.5 px-4 border-r border-slate-50 font-mono text-slate-400 italic text-[10px]">{row.requestDate}</td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button 
+                        onClick={() => handleRemoveRow(row.id)} 
+                        className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                        title="Remove from stored dossier"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}
-                
+              </tbody>
+              <tfoot className="border-t-2 border-slate-900">
                 <tr className="bg-[#FFA500] text-slate-950 font-black">
-                  <td colSpan={3} className="py-3 px-4 text-right uppercase text-[10px] tracking-widest">TOTAL ALLOCATED SUMMARY:</td>
-                  <td className="py-3 px-3 text-center border-l border-slate-900/20">
-                    <div className="leading-tight"><div className="text-xs">{formatNumber(totals.totalQty)}</div><div className="text-[8px] uppercase">Units</div></div>
+                  <td colSpan={3} className="py-4 px-6 text-right uppercase text-[10px] tracking-[0.2em]">Institutional Allocation Total Summary:</td>
+                  <td className="py-4 px-4 text-center border-l border-slate-900/20">
+                    <div className="flex flex-col items-center">
+                      <div className="text-sm">{formatNumber(totals.totalQty)}</div>
+                      <div className="text-[8px] uppercase tracking-tighter opacity-70">Units</div>
+                    </div>
                   </td>
-                  <td className="py-3 px-3 border-l border-slate-900/20">
-                    <div className="flex items-center gap-1.5"><span className="text-[10px]">ETB</span><span className="text-xs">{formatNumber(totals.totalValuation)}</span></div>
+                  <td colSpan={2} className="py-4 px-6 border-l border-slate-900/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] opacity-60">TOTAL ETB:</span>
+                      <span className="text-sm font-black">{formatNumber(totals.totalValuation)}</span>
+                    </div>
                   </td>
-                  <td colSpan={5} className="py-3 px-4 font-bold border-l border-slate-900/20 text-[9px]">
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5" /><span>Official equipment quota transmission received from EPSS HO (Sub-step 2.1)</span></div>
+                  <td colSpan={3} className="py-4 px-6 font-bold border-l border-slate-900/20 text-[9px] leading-snug">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 bg-emerald-500 rounded-full text-white shadow-sm">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                      <span>Official equipment quota transmission received from EPSS HO (Sub-step 2.1) and verified for MOH storage.</span>
+                    </div>
                   </td>
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* EMPTY STATE FOR 1.2 */}
-      {!is21 && receivedRows.length === 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-xs"><Building2 className="w-8 h-8" /></div>
-          <div className="max-w-md mx-auto space-y-1.5">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Awaiting DSP Endorsement from MOH</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">Once you click <strong className="text-slate-800">"Send to MOH"</strong> from Sub-Step 1.1, the exact 10-column materials will appear here.</p>
-          </div>
-          <div className="flex justify-center gap-3"><button onClick={() => onSelectSubTab?.('dsp-ho-1-1')} className="px-4 py-2 rounded-xl bg-[#0B1527] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md"><span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse" /><span>Go to Sub-Step 1.1</span><ArrowRight size={14} /></button></div>
-        </div>
-      )}
-
-      {/* Selected Folder Modal Concept preserved for letters */}
-      {selectedFolderModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-5 shadow-2xl space-y-4 animate-scale-in">
-            <div className="flex justify-between items-start border-b pb-2">
-              <h3 className="font-black uppercase text-xs tracking-widest text-indigo-700">Official Folder Envelope</h3>
-              <button onClick={() => setSelectedFolderModal(null)}><X size={20} /></button>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-[11px]">
-              <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-slate-400 font-bold block">Ref:</span> {selectedFolderModal.officialLetterRef}</div>
-                <div><span className="text-slate-400 font-bold block">Date:</span> {selectedFolderModal.dateTransmitted}</div>
-              </div>
-              <div><span className="text-slate-400 font-bold block">Subject:</span> {selectedFolderModal.subject}</div>
-            </div>
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2"><Paperclip size={18} className="text-amber-700" /><span className="font-mono font-bold text-amber-950">{selectedFolderModal.letterFileName}</span></div>
-              <button onClick={() => handleDownloadFolderLetter(selectedFolderModal)} className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg font-black text-[10px] uppercase cursor-pointer">Download PDF</button>
-            </div>
           </div>
         </div>
       )}
 
       {/* PIPELINE FOOTER */}
       {((is21 && selectedDossier) || (!is21 && receivedRows.length > 0)) && (
-        <div className="bg-gradient-to-r from-slate-900 to-[#1E3A5F] text-white p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800 shadow-sm animate-in fade-in zoom-in-95">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-400 text-slate-950"><ShieldCheck className="w-6 h-6" /></div>
+        <div className="bg-gradient-to-r from-[#0B1527] to-[#1E3A5F] text-white p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800 shadow-xl animate-in fade-in zoom-in-95 duration-500 mt-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 rounded-2xl bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20 animate-pulse">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
             <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">Ready for Next Operational Phase</h4>
-              <p className="text-[11px] text-slate-200 mt-0.5">Initiate regional mapping or advance to the official breakdown matrix request.</p>
+              <h4 className="text-sm font-black uppercase tracking-[0.15em] text-amber-400 mb-1">Ready for Operational Breakdown Phase</h4>
+              <p className="text-xs text-slate-300 font-medium max-w-md">
+                Allocations are stored and verified. You can now initiate regional health facility mapping or proceed to the official breakdown matrix request.
+              </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => onSelectSubTab?.(is21 ? 'dsp-moh-2-2' : 'dsp-ho-1-3-1')} className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md">
-              <span>Advance Pipeline</span><ChevronRight size={14} />
+          <div className="flex gap-3">
+            <button 
+              onClick={() => onSelectSubTab?.(is21 ? 'dsp-moh-2-2' : 'dsp-ho-1-3-1')} 
+              className="px-8 py-3 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-amber-400/20 flex items-center gap-2 group active:scale-95"
+            >
+              <span>Proceed to {is21 ? 'Regional Breakdown' : 'Map HF'}</span>
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
         </div>
