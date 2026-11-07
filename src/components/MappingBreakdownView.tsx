@@ -57,6 +57,7 @@ const REGION_HUB_MAP: Record<string, string> = {
 /**
  * Universal Zero-Fail Analyzer for ANY Uploaded File (Excel, CSV, Text)
  * Automatically detects or infers Facility Name, Region, Zone, Woreda, and Equipment/Quantities.
+ * Preserves exact uploaded item descriptions and item codes.
  */
 function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[]): {
   columns: RegionBreakdownColumn[];
@@ -68,18 +69,42 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
     throw new Error('The uploaded file is empty or could not be read.');
   }
 
+  // Helper to extract embedded item code e.g. "Anesthesia machine (403-XRRD-0101)" or "Bed [CODE: 401-WICU-0101]"
+  const extractCodeAndName = (rawText: string, fallbackCode?: string): { name: string; code: string } => {
+    const text = (rawText || '').trim();
+    if (!text) return { name: 'Item', code: fallbackCode || 'CODE-01' };
+
+    // Match code in parentheses or brackets e.g. (403-XRRD-0101) or [403-XRRD-0101]
+    const bracketMatch = text.match(/[\(\[](?:code:\s*)?([A-Z0-9]{3,}(?:-[A-Z0-9]+)+)[\)\]]/i);
+    if (bracketMatch) {
+      const code = bracketMatch[1].trim();
+      const name = text.replace(bracketMatch[0], '').trim().replace(/[-–—]\s*$/, '').trim();
+      return { name: name || text, code };
+    }
+
+    // Match trailing code pattern e.g. "Anesthesia machine - 403-XRRD-0101"
+    const trailingMatch = text.match(/[-–—]\s*([A-Z0-9]{3,}(?:-[A-Z0-9]+)+)$/i);
+    if (trailingMatch) {
+      const code = trailingMatch[1].trim();
+      const name = text.replace(trailingMatch[0], '').trim();
+      return { name: name || text, code };
+    }
+
+    return { name: text, code: fallbackCode || text };
+  };
+
   // 1. Extract all headers
   const headers = Object.keys(rowsJson[0]);
 
   // 2. Comprehensive Header Regex Patterns
   const facilityRegex = /facility|customer|hospital|health|center|clinic|site|destination|location|unit|institution|organization|consignee|beneficiary|recipient|to_name|to|name|description|descr|cust|hf_name|hf|benef/i;
   const regionRegex = /region|state|province|area|territory|rhb|place/i;
-  const zoneRegex = /zone|district|subcity|sub_city|plant/i;
+  const zoneRegex = /zone|district|subcity|sub_city/i;
   const woredaRegex = /woreda|subdistrict|town|city/i;
   const hubRegex = /hub|delivering|plant/i;
-  const itemRegex = /item|material|description|article|product|device|equipment/i;
+  const itemRegex = /item|material|description|article|product|device|equipment|name/i;
   const qtyRegex = /qty|quantity|amount|total|count|allocated/i;
-  const codeRegex = /code|material_code|sku|id|item_code/i;
+  const codeRegex = /code|material_code|sku|id|item_code|material_num|material_no|part_no|code_no/i;
 
   let facilityCol = headers.find(h => facilityRegex.test(h));
   let regionCol = headers.find(h => regionRegex.test(h));
@@ -148,30 +173,34 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
   }> = {};
 
   if (isListMode) {
-    // Collect all unique items to form columns
+    // Collect all unique items to form columns preserving exact description and code
     const itemMap: Record<string, { name: string, code: string }> = {};
     rowsJson.forEach(row => {
-      const itemName = String(row[listItemCol!] || 'Unknown Item').trim();
-      const itemCode = String(row[listCodeCol!] || `CODE-${itemName.slice(0, 3).toUpperCase()}`).trim();
-      if (!itemMap[itemName]) {
-        itemMap[itemName] = { name: itemName, code: itemCode };
+      const rawItemName = String(row[listItemCol!] || 'Unknown Item').trim();
+      const rawItemCode = listCodeCol ? String(row[listCodeCol!] || '').trim() : '';
+
+      const { name, code } = extractCodeAndName(rawItemName, rawItemCode || `CODE-${rawItemName.slice(0, 3).toUpperCase()}`);
+      const finalCode = rawItemCode || code;
+
+      if (!itemMap[rawItemName]) {
+        itemMap[rawItemName] = { name: name || rawItemName, code: finalCode || rawItemName };
       }
     });
 
-    finalColumns = Object.keys(itemMap).map((name, i) => ({
+    finalColumns = Object.keys(itemMap).map((rawName, i) => ({
       id: `col-up-${i}`,
-      name: name,
-      code: itemMap[name].code
+      name: itemMap[rawName].name,
+      code: itemMap[rawName].code
     }));
 
     // Group and aggregate
     rowsJson.forEach(row => {
       const facilityName = String(row[facilityCol!] || 'Unknown Facility').trim();
-      const itemName = String(row[listItemCol!] || 'Unknown Item').trim();
+      const rawItemName = String(row[listItemCol!] || 'Unknown Item').trim();
       const qty = Number(row[listQtyCol!] || 0);
       
-      const colId = finalColumns.find(c => c.name === itemName)?.id;
-      if (!colId) return;
+      const colObj = finalColumns.find(c => c.name === itemMap[rawItemName]?.name || c.name === rawItemName);
+      if (!colObj) return;
 
       if (!facilityGroups[facilityName]) {
         // Find master data match
@@ -187,12 +216,12 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
           zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
           woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : 'General Regional Hub',
+          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : String(row[hubCol!] || 'General Regional Hub'),
           quantities: {}
         };
       }
       
-      facilityGroups[facilityName].quantities[colId] = (facilityGroups[facilityName].quantities[colId] || 0) + qty;
+      facilityGroups[facilityName].quantities[colObj.id] = (facilityGroups[facilityName].quantities[colObj.id] || 0) + qty;
     });
 
   } else {
@@ -207,15 +236,37 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
       equipmentHeaders = ['Allocation Quantity'];
     }
 
-    finalColumns = equipmentHeaders.map((h, i) => ({
-      id: `col-adhoc-${i}`,
-      name: h,
-      code: `ITEM-${i + 1}`
-    }));
+    // Check if row 0 of rowsJson contains explicit item codes for each column (e.g. 2-tier header files)
+    const firstRowData = rowsJson[0] || {};
+    const hasCodeRowInFirstRow = equipmentHeaders.every(h => {
+      const val = String(firstRowData[h] || '').trim();
+      return val && isNaN(Number(val)) && (/[A-Z0-9]{3,}/i.test(val) || val.includes('-'));
+    });
 
-    rowsJson.forEach(row => {
+    let effectiveRowsJson = rowsJson;
+
+    finalColumns = equipmentHeaders.map((h, i) => {
+      let codeVal = '';
+      if (hasCodeRowInFirstRow) {
+        codeVal = String(firstRowData[h] || '').trim();
+      }
+
+      const { name, code } = extractCodeAndName(h, codeVal || `ITEM-${i + 1}`);
+      return {
+        id: `col-adhoc-${i}`,
+        name: name,
+        code: codeVal || code
+      };
+    });
+
+    if (hasCodeRowInFirstRow) {
+      effectiveRowsJson = rowsJson.slice(1);
+    }
+
+    effectiveRowsJson.forEach(row => {
       const facilityName = String(row[facilityCol!] || 'Unknown Facility').trim();
-      
+      if (!facilityName || facilityName === 'Unknown Facility') return;
+
       if (!facilityGroups[facilityName]) {
         const masterMatch = hfMasterData.find(hf => 
           hf.customerDescription.toLowerCase() === facilityName.toLowerCase() || 
@@ -229,13 +280,14 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
           zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
           woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : 'General Regional Hub',
+          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : String(row[hubCol!] || 'General Regional Hub'),
           quantities: {}
         };
       }
 
-      finalColumns.forEach(col => {
-        const cellVal = row[col.name];
+      equipmentHeaders.forEach((headerName, colIdx) => {
+        const col = finalColumns[colIdx];
+        const cellVal = row[headerName];
         const qty = typeof cellVal === 'number' ? cellVal : (Number(cellVal) || 0);
         facilityGroups[facilityName].quantities[col.id] = (facilityGroups[facilityName].quantities[col.id] || 0) + qty;
       });
@@ -308,7 +360,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     
     setTimeout(() => {
       if (adHocDataActive && matrixData) {
-        // Map Hubs for Ad-hoc Data
+        // Map Hubs for Ad-hoc Data while retaining exact uploaded item descriptions and codes
         const updatedRows = matrixData.rows.map(row => {
           const region = row.region || '';
           const matchedHub = Object.entries(REGION_HUB_MAP).find(([reg]) => 
@@ -317,12 +369,15 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           
           return {
             ...row,
-            zone: row.zone || matchedHub?.[1] || 'General Regional Hub'
+            hub: matchedHub?.[1] || row.hub || 'General Regional Hub'
           };
         });
         
-        setMatrixData({ ...matrixData, rows: updatedRows });
-        setUploadFeedback({ message: '✓ Analysis complete: Facilities mapped with correct Hubs based on region.', type: 'success' });
+        setMatrixData({
+          ...matrixData,
+          rows: updatedRows
+        });
+        setUploadFeedback({ message: '✓ Analysis complete: Facilities mapped with exact uploaded item descriptions, codes, and correct Hubs based on region.', type: 'success' });
       } else {
         // Map Hubs for Master Data
         const updated = hfListItems.map(hf => {
