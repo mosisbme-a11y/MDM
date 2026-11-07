@@ -210,10 +210,12 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       return currentDossier.stage4MatrixData.columns;
     }
     return [
-      { id: '401-WICU-0101N', code: '401-WICU-0101N', name: 'Couch - Delivery' },
-      { id: '403-XRRB-0101N', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainles' },
-      { id: '403-XRRD-0101', code: '403-XRRD-0101', name: 'Anesthesia machine' },
-      { id: '403-XRRD-0101-001', code: '403-XRRD-0101-001', name: 'Cold box' }
+      { id: 'col-1', code: '403-XRRD-0101', name: 'Anesthesia machine' },
+      { id: 'col-2', code: '403-XRRD-0101', name: 'Anesthesia machine' },
+      { id: 'col-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless' },
+      { id: 'col-4', code: '403-XRRD-0101-001', name: 'Cold box' },
+      { id: 'col-5', code: '401-WICU-0101N', name: 'Couch - Delivery' },
+      { id: 'col-6', code: '401-WICU-0101N', name: 'Couch - Examination' }
     ];
   }, [currentDossier]);
 
@@ -223,7 +225,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       return currentDossier.hubAggregationData.allocations;
     }
 
-    // Fallback: build from Stage 4 or sample data matching image_c19bef21.png
+    // Fallback: build from Stage 4 or sample data matching user screenshot
     const sourceRows = currentDossier?.stage4MatrixData?.rows || [];
     if (sourceRows.length > 0) {
       return sourceRows.map((r: any, idx: number) => {
@@ -250,41 +252,64 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       });
     }
 
-    // Default sample allocations matching image_c19bef21.png
+    // Default sample allocations matching user screenshot (Plants AA01, AD01, DI01)
     return [
       {
         id: 'alloc-aa01-1',
         healthFacility: 'Tikur Anbessa Specialized Hospital',
         region: 'Addis Ababa',
-        zone: 'Lideta Zone',
-        woreda: 'Woreda 08',
+        zone: 'Addis Ketema',
+        woreda: 'Woreda 01',
         packages: 'MCH',
         hubCode: 'AA01',
-        hubName: 'Addis Ababa (Hub 1)',
+        hubName: 'Addis Ababa Central Hub',
         quantities: {
-          '401-WICU-0101N': 4,
-          '403-XRRB-0101N': 2,
-          '403-XRRD-0101': 4,
-          '403-XRRD-0101-001': 2
+          'col-1': 6,
+          'col-2': 6,
+          'col-3': 2,
+          'col-4': 2,
+          'col-5': 2,
+          'col-6': 2
         },
-        totalQty: 12
+        totalQty: 20
       },
       {
         id: 'alloc-ad01-1',
-        healthFacility: 'Adama General Hospital',
+        healthFacility: 'Adama Hospital Medical College',
         region: 'Oromia',
-        zone: 'East Shoa Zone',
-        woreda: 'Adama Woreda',
+        zone: 'East Shewa',
+        woreda: 'Adama Town Woreda 01',
         packages: 'MCH',
         hubCode: 'AD01',
         hubName: 'Adama Hub',
         quantities: {
-          '401-WICU-0101N': 16,
-          '403-XRRB-0101N': 8,
-          '403-XRRD-0101': 16,
-          '403-XRRD-0101-001': 8
+          'col-1': 2,
+          'col-2': 2,
+          'col-3': 2,
+          'col-4': 2,
+          'col-5': 2,
+          'col-6': 2
         },
-        totalQty: 48
+        totalQty: 12
+      },
+      {
+        id: 'alloc-di01-1',
+        healthFacility: 'Dire Dawa Dil Chora Hospital',
+        region: 'Dire Dawa',
+        zone: 'Dire Dawa Administration',
+        woreda: 'Woreda 01',
+        packages: 'MCH',
+        hubCode: 'DI01',
+        hubName: 'Dire Dawa Hub',
+        quantities: {
+          'col-1': 2,
+          'col-2': 2,
+          'col-3': 2,
+          'col-4': 2,
+          'col-5': 2,
+          'col-6': 2
+        },
+        totalQty: 12
       }
     ];
   }, [currentDossier, hfListItems]);
