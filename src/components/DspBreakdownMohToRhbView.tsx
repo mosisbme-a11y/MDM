@@ -168,6 +168,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const [isImportItemsModalOpen, setIsImportItemsModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isEpssDossierModalOpen, setIsEpssDossierModalOpen] = useState(false);
   
   const [selectedNewRegion, setSelectedNewRegion] = useState<string>(ETHIOPIAN_REGIONS[0]);
   const [newRowBudgetSource, setNewRowBudgetSource] = useState<string>('');
@@ -716,6 +717,17 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             >
               <Download className="w-3.5 h-3.5" />
               <span>Excel (.xlsx)</span>
+            </button>
+
+            {/* View Received EPSS Dossier Reference Button */}
+            <button
+              type="button"
+              onClick={() => setIsEpssDossierModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-slate-700"
+              title="View the original 10-column allocation dossier received from EPSS HO"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Show EPSS Dossier</span>
             </button>
 
             {/* Submit to RHBs with Security Verification */}
@@ -1512,6 +1524,162 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
           </div>
         </div>
       )}
+      {/* MODAL 5: EPSS DOSSIER VIEW (EXACT REPLICA OF SUB-STEP 2.1) */}
+      {isEpssDossierModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-6xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-in">
+            {/* Dark Blue Header Block */}
+            <div className="bg-[#0B1527] p-5 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-400 rounded-lg text-slate-900">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-black uppercase tracking-tight">
+                    DSP RECEIVED FROM EPSS — STORED TRANSMITTED ALLOCATION ({(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) ? 2 : dspReceivedEpssRows.length} LINE ITEMS)
+                  </h3>
+                  <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase">
+                    EPSS HO Transmitted
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEpssDossierModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="text-xs font-bold text-amber-400">
+                Official Letter: <span className="underline italic">EPSS/LET/2026/2466</span>
+              </div>
+            </div>
+
+            {/* Table Area */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr className="bg-[#FFA500] text-slate-950 font-black uppercase border-b-2 border-slate-900">
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">S/N</th>
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL</th>
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL DESCRIPTION</th>
+                    <th className="py-3 px-3 text-center border-r border-slate-900/10">QTY</th>
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">TOTAL AMOUNT (ETB)</th>
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">VALUATION TYPE DESC</th>
+                    <th className="py-3 px-3 text-left border-r border-slate-900/10">WBS ELEMENT</th>
+                    <th className="py-3 px-3 text-center border-r border-slate-900/10">BUDGET SOURCE</th>
+                    <th className="py-3 px-3 text-left">REQUEST DATE</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-[#FFFBEB]">
+                  {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) ? (
+                    <>
+                      {/* Mock Data 1 */}
+                      <tr className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
+                        <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">1</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">404-VENM-TUIF</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-semibold text-slate-800">MV S.P - Turbine inlet filter, VG70</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-sm">1</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-emerald-800">
+                          <span className="mr-3">ETB</span>
+                          <span>5,951.95</span>
+                        </td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-600">50258_ZMD</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-400">SDG-ME-23-001-011</td>
+                        <td className="py-3 px-3 border-r border-slate-200 text-center">
+                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-sm">WB</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-500 italic">2026-05-15</td>
+                      </tr>
+                      {/* Mock Data 2 */}
+                      <tr className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
+                        <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">2</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">404-VENM-SPSB</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-semibold text-slate-800">MV S.P - Switch power supply board, VG70</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-sm">1</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-emerald-800">
+                          <span className="mr-3">ETB</span>
+                          <span>59,528.98</span>
+                        </td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-600">50258_ZMD</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-400">SDG-ME-23-001-011</td>
+                        <td className="py-3 px-3 border-r border-slate-200 text-center">
+                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-sm">WB</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-500 italic">2026-05-15</td>
+                      </tr>
+                    </>
+                  ) : (
+                    dspReceivedEpssRows.map((row: any, idx: number) => (
+                      <tr key={idx} className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
+                        <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">{idx + 1}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">{row.material || row.materialCode}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-semibold text-slate-800">{row.materialDescription || row.description}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-sm">{row.qty || row.quantity}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-emerald-800">
+                          <span className="mr-3">ETB</span>
+                          <span>{formatNumber(row.totalAmount || (row.qty * 32000))}</span>
+                        </td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-600">{row.valuationType || '50258_ZMD'}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-400">{row.wbsElement || 'SDG-ME-23-001-011'}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 text-center">
+                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-sm">WB</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-500 italic">2026-05-15</td>
+                      </tr>
+                    ))
+                  )}
+                  {/* Total Summary Row */}
+                  <tr className="bg-[#FFA500] text-slate-950 font-black">
+                    <td colSpan={3} className="py-4 px-4 text-right uppercase text-xs tracking-tighter">
+                      TOTAL ALLOCATED SUMMARY:
+                    </td>
+                    <td className="py-4 px-3 text-center border-l border-slate-900/20">
+                      <div className="leading-tight">
+                        <div className="text-sm">
+                          {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) 
+                            ? 2 
+                            : dspReceivedEpssRows.reduce((sum: number, r: any) => sum + (r.qty || 0), 0)}
+                        </div>
+                        <div className="text-[9px] uppercase">Units</div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-3 border-l border-slate-900/20">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs">ETB</span>
+                        <span className="text-sm">
+                          {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0)
+                            ? "65,480.93"
+                            : formatNumber(dspReceivedEpssRows.reduce((sum: number, r: any) => sum + (r.totalAmount || (r.qty * 32000)), 0))}
+                        </span>
+                      </div>
+                    </td>
+                    <td colSpan={4} className="py-4 px-4 font-bold border-l border-slate-900/20 text-[10px]">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-slate-950" />
+                        <span>Official equipment quota transmission received from EPSS HO (Sub-step 2.1)</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer with Close */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsEpssDossierModalOpen(false)}
+                className="px-8 py-2.5 bg-[#0B1527] hover:bg-black text-white rounded-xl font-bold transition cursor-pointer shadow-md flex items-center gap-2"
+              >
+                <CheckSquare className="w-4 h-4 text-amber-400" />
+                <span>Close Dossier View</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 };

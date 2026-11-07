@@ -72,22 +72,26 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   const targetSubStage = is21 ? '2.1' : '1.2';
   const targetStage = is21 ? 'moh-osp-management' : 'head-office-dsp';
 
-  // Find official received record for target subStage
-  const receivedRecord = useMemo(() => {
-    return records.find(r => {
+  // Find all official received records for target subStage
+  const receivedRecords = useMemo(() => {
+    return records.filter(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
       return sub === targetSubStage && r.stage === targetStage;
-    });
+    }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records, targetSubStage, targetStage]);
+
+  // Handle selected dossier for full view
+  const [selectedDossier, setSelectedDossier] = useState<DspWorkflowRecord | null>(null);
 
   // Load the exact received rows (from receivedRecord or empty)
   const [receivedRows, setReceivedRows] = useState<DspRequestTemplateRow[]>([]);
 
-  // Re-sync if receivedRecord changes
+  // Re-sync if receivedRecord changes (fallback for backward compatibility or direct view)
   useEffect(() => {
-    if (receivedRecord && receivedRecord.itemsIncluded && receivedRecord.itemsIncluded.length > 0 && !receivedRecord.id.includes('sample')) {
-      const mapped = receivedRecord.itemsIncluded.map((it: any, idx: number) => ({
-        id: `rec-item-${idx}`,
+    const mainRecord = selectedDossier || receivedRecords[0];
+    if (mainRecord && mainRecord.itemsIncluded && mainRecord.itemsIncluded.length > 0 && !mainRecord.id.includes('sample')) {
+      const mapped = mainRecord.itemsIncluded.map((it: any, idx: number) => ({
+        id: `rec-item-${idx}-${mainRecord.id}`,
         srNo: idx + 1,
         material: it.material,
         materialDescription: it.description,
@@ -96,12 +100,14 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
         valuationTypeDesc: it.valuationTypeDesc || 'Standard Price (S)',
         wbsElement: it.wbsElement || 'SDG-ME-23-001-011',
         budgetSource: it.budgetSource || 'WB',
-        requestDate: it.requestDate || receivedRecord.dateSubmitted || TODAY_ISO_DATE,
+        requestDate: it.requestDate || mainRecord.dateSubmitted || TODAY_ISO_DATE,
         dspRequestTo: 'MOH'
       }));
       setReceivedRows(mapped);
+    } else {
+      setReceivedRows([]);
     }
-  }, [receivedRecord]);
+  }, [selectedDossier, receivedRecords]);
 
   // Transmitted Official Letters Folder State
   const [selectedFolderModal, setSelectedFolderModal] = useState<any | null>(null);
@@ -229,16 +235,18 @@ Notes: ${folder.notes || 'N/A'}`;
 
     const refNum = `EPSS/MD-DSP/${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`;
     const mohReceivedRef = `MOH/PMD-DSP/${new Date().getFullYear()}/${String(Math.floor(200 + Math.random() * 800))}`;
+    const dspNameValue = "DSP 2026 - National Medical Equipment Allocation";
 
     const newRecord11: DspWorkflowRecord = {
       id: `dsp-dossier-${Date.now()}`,
       dspRefNumber: refNum,
+      dspName: dspNameValue,
       stage: 'head-office-dsp',
       subStage: '1.1',
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
       recipientOrg: 'Ministry of Health (PMD Directorate)',
-      subject: `DSP Request to MOH: Program (HP) Equipment Allocation Request (${sourceRows.length} Materials)`,
+      subject: `DSP [${dspNameValue}]: Request to MOH (${sourceRows.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: sourceRows.length,
@@ -265,18 +273,16 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `Transmitted via 10-Column Standard DSP Request Template linked with Multiple Stock (Program HP).`
     };
 
-    const activeDspName = 'DSP 2026 - MCH Equipment Allocation';
-
     const newRecord12: DspWorkflowRecord = {
       id: `dsp-moh-received-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
+      dspName: dspNameValue,
       stage: 'head-office-dsp',
       subStage: '1.2',
       stageTitle: 'Head Office DSP Management',
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      dspName: activeDspName,
-      subject: `DSP [${activeDspName}]: Official MOH Endorsement to EPSS (${sourceRows.length} Materials)`,
+      subject: `DSP [${dspNameValue}]: Official MOH Endorsement to EPSS (${sourceRows.length} Materials)`,
       status: 'Endorsed & Approved',
       dateSubmitted: TODAY_ISO_DATE,
       approvedDate: TODAY_ISO_DATE,
@@ -310,29 +316,60 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `Transmitted from EPSS HO and received/endorsed by MOH PMD Directorate. Exact ${sourceRows.length} line items stored.`
     };
 
-    setReceivedRows(sourceRows);
+    const newRecord21: DspWorkflowRecord = {
+      id: `dsp-moh-received-21-${Date.now()}`,
+      dspRefNumber: mohReceivedRef,
+      dspName: dspNameValue,
+      stage: 'moh-osp-management',
+      subStage: '2.1',
+      stageTitle: 'MOH OSP Management',
+      senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      recipientOrg: 'Ministry of Health (PMD Directorate)',
+      subject: `DSP [${dspNameValue}]: Received from EPSS (${sourceRows.length} Items)`,
+      status: 'Submitted & Pending',
+      dateSubmitted: TODAY_ISO_DATE,
+      totalDevices: sourceRows.length,
+      totalQuantity: sourceRows.reduce((acc, r) => acc + (r.qty || 0), 0),
+      totalValuationETB: sourceRows.reduce((acc, r) => acc + (r.totalAmount || 0), 0),
+      officialLetterRef: `EPSS/LET/${new Date().getFullYear()}/8821`,
+      signatory: 'Mosisa (Authorized User)',
+      signatoryRole: 'Directorate Technical Lead',
+      itemsIncluded: sourceRows.map(r => ({
+        material: r.material,
+        description: r.materialDescription,
+        quantity: r.qty,
+        plant: 'AA01 Central',
+        allocatedFacility: 'MOH Allocation Quota',
+        valuationTypeDesc: r.valuationTypeDesc,
+        wbsElement: r.wbsElement,
+        budgetSource: r.budgetSource,
+        requestDate: r.requestDate,
+        dspRequestTo: r.dspRequestTo,
+        totalAmount: r.totalAmount
+      })),
+      targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
+      targetedFacilitiesCount: 14,
+      notes: `DSP Name: ${dspNameValue}. Transmitted via Sub-step 1.1.`
+    };
 
-    // Update records state: clear previous default for 1.2
     setRecords(prev => {
       const filtered = prev.filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        // Clear old sample or previous 1.2 records
-        if (sub === '1.2') return false;
+        if (sub === '1.2' || sub === '2.1') return false;
         return true;
       });
-      const updated = [newRecord11, newRecord12, ...filtered];
-      return updated;
+      return [newRecord11, newRecord12, newRecord21, ...filtered];
     });
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`DSP Request ${refNum} transmitted to MOH & stored exact inside DSP Received from MOH (1.2)`, {
+      onTriggerCloudSync(`DSP Request ${refNum} transmitted to MOH & stored exact inside DSP Received from EPSS (2.1)`, {
         type: 'CREATE',
-        title: `DSP Received from MOH: ${mohReceivedRef}`,
-        payload: newRecord12
+        title: `DSP Received from EPSS: ${mohReceivedRef}`,
+        payload: newRecord21
       });
     }
 
-    showToast(`✓ Stored exact ${sourceRows.length} transmitted items inside DSP Received from MOH & cleared previous default!`);
+    showToast(`✓ Stored exact ${sourceRows.length} transmitted items as "${dspNameValue}" Dossier!`);
   };
 
   // Clear received records and reset
@@ -342,6 +379,7 @@ Notes: ${folder.notes || 'N/A'}`;
       const filtered = prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== targetSubStage);
       return filtered;
     });
+    setSelectedDossier(null);
     showToast('✓ Received DSP data cleared');
   };
 
@@ -350,9 +388,10 @@ Notes: ${folder.notes || 'N/A'}`;
     const updated = receivedRows.filter(r => r.id !== rowId);
     setReceivedRows(updated);
     try {
-      if (receivedRecord) {
+      const targetRec = selectedDossier || receivedRecords[0];
+      if (targetRec) {
         const updatedRecord: DspWorkflowRecord = {
-          ...receivedRecord,
+          ...targetRec,
           totalDevices: updated.length,
           totalQuantity: updated.reduce((sum, r) => sum + (r.qty || 0), 0),
           totalValuationETB: updated.reduce((sum, r) => sum + (r.totalAmount || 0), 0),
@@ -364,7 +403,7 @@ Notes: ${folder.notes || 'N/A'}`;
           }))
         };
         setRecords(prev => {
-          const filtered = prev.filter(r => r.id !== receivedRecord.id);
+          const filtered = prev.filter(r => r.id !== targetRec.id);
           return [updatedRecord, ...filtered];
         });
       }
@@ -470,7 +509,7 @@ Notes: ${folder.notes || 'N/A'}`;
                 {is21 ? 'DSP RECEIVED FROM EPSS' : 'DSP RECEIVED FROM MOH'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-950">
-                {receivedRows.length}
+                {is21 ? receivedRecords.length : receivedRows.length}
               </span>
             </div>
 
@@ -481,7 +520,7 @@ Notes: ${folder.notes || 'N/A'}`;
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                  Exact Transmitted Data Stored
+                  Official Dossiers Stored
                 </span>
               </div>
               <div className="text-xs font-semibold text-slate-700">
@@ -492,18 +531,18 @@ Notes: ${folder.notes || 'N/A'}`;
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Return to 1.1 DSP Request to MOH */}
-            <button
-              type="button"
-              onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1527] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] active:border-b-0 active:translate-y-[4px]"
-              title="Return to Sub-Step 1.1: DSP Request to MOH"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-              <span className="uppercase font-black">DSP Request to MOH</span>
-            </button>
+            {!is21 && (
+              <button
+                type="button"
+                onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1527] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] active:border-b-0 active:translate-y-[4px]"
+                title="Return to Sub-Step 1.1: DSP Request to MOH"
+              >
+                <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                <span className="uppercase font-black">DSP Request to MOH</span>
+              </button>
+            )}
 
-            {/* Download Excel */}
             <button
               type="button"
               disabled={receivedRows.length === 0}
@@ -512,169 +551,172 @@ Notes: ${folder.notes || 'N/A'}`;
               title="Download official received Excel spreadsheet"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="uppercase font-black">Download Excel</span>
+              <span className="uppercase font-black">Excel</span>
             </button>
 
-            {/* Print Official Receipt */}
             <button
               type="button"
-              disabled={receivedRows.length === 0}
-              onClick={handlePrintDossier}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-              title="Print official ministerial response dossier"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print</span>
-            </button>
-
-            {/* Proceed to Stage 1.3: Map HF to Hub */}
-            <button
-              type="button"
-              onClick={() => onSelectSubTab?.('dsp-ho-1-3-1')}
+              onClick={() => onSelectSubTab?.(is21 ? 'dsp-moh-2-2' : 'dsp-ho-1-3-1')}
               className="px-3.5 py-1.5 rounded-xl bg-[#0B1527] hover:bg-[#111f38] text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] active:border-b-0 active:translate-y-[4px]"
-              title="Advance to Sub-Step 1.3: Map HF to Hub based on Master Data"
+              title={`Advance to ${is21 ? 'Regional Breakdown' : '1.3 Map HF'}`}
             >
-              <span className="uppercase font-black">Proceed to 1.3 Map HF</span>
+              <span className="uppercase font-black">Proceed to {is21 ? '2.2 Request to RHB' : '1.3 Map HF'}</span>
               <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* TRANSMITTED OFFICIAL LETTERS & DOSSIERS FOLDER */}
-      <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
-              <FolderArchive className="w-5 h-5" />
+      {/* DOSSIER ARCHIVE SECTION (FOR SUB-STEP 2.1) */}
+      {is21 && (
+        <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
+                <FolderArchive className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <span>DSP Dossier Archive (Received from EPSS)</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
+                    {receivedRecords.length} Stored Dossiers
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Official Equipment Allocations transmitted from EPSS HO, stored as files by DSP Name.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <span>📁 Transmitted EPSS to MOH Official Letters Folder</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
-                  {transmittedFolderList.length} Stored Envelopes
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Separately stored official letter dossiers transmitted from EPSS HO to Ministry of Health
+            
+            <button
+              type="button"
+              onClick={handleQuickTransmitCurrentFrom11}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Simulate Received DSP</span>
+            </button>
+          </div>
+
+          {receivedRecords.length === 0 ? (
+            <div className="p-10 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                <FileText className="w-6 h-6 text-slate-300" />
+              </div>
+              <p className="text-xs text-slate-500 font-bold">No DSP Dossiers received yet.</p>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                Once a DSP Request is sent from EPSS HO (Sub-step 1.1), it will appear here as an official file named after its DSP Name.
               </p>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {receivedRecords.map((rec) => (
+                <div 
+                  key={rec.id} 
+                  onClick={() => setSelectedDossier(rec)}
+                  className="bg-slate-50/80 border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl p-4 space-y-3 transition-all shadow-2xs group relative cursor-pointer"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl group-hover:bg-amber-200 transition-colors">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-mono font-black text-indigo-700 block uppercase tracking-widest mb-0.5">
+                          {rec.dspRefNumber}
+                        </span>
+                        <h4 className="text-xs font-black text-slate-900 truncate uppercase leading-tight" title={rec.dspName}>
+                          {rec.dspName || "Unnamed DSP Request"}
+                        </h4>
+                      </div>
+                    </div>
+                    <div className="p-1 bg-white rounded-lg border border-slate-200 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Eye className="w-4 h-4" />
+                    </div>
+                  </div>
 
-          {/* Upload Letter Directly to Folder */}
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              id="folder-direct-letter-upload"
-              className="hidden"
-              accept=".pdf,.doc,.docx,image/*"
-              onChange={handleUploadDirectLetterToFolder}
-            />
-            <label
-              htmlFor="folder-direct-letter-upload"
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-              title="Upload signed Official Request Covering Letter directly into this folder"
-            >
-              <Paperclip className="w-3.5 h-3.5" />
-              <span>Upload Letter to Folder</span>
-            </label>
-          </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white/80 p-2 rounded-lg border border-slate-100 text-[10px]">
+                      <span className="text-slate-400 block mb-0.5 uppercase font-bold">Transmitted</span>
+                      <span className="font-mono font-bold text-slate-800">{rec.dateSubmitted}</span>
+                    </div>
+                    <div className="bg-white/80 p-2 rounded-lg border border-slate-100 text-[10px]">
+                      <span className="text-slate-400 block mb-0.5 uppercase font-bold">Materials</span>
+                      <span className="font-bold text-cyan-800">{rec.totalDevices} Items</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] pt-1 font-bold">
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Building2 className="w-3 h-3" />
+                      <span>EPSS HO Transmittal</span>
+                    </div>
+                    <div className="text-emerald-700 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Stored & Verified</span>
+                    </div>
+                  </div>
+                  
+                  <div className="absolute inset-0 border-2 border-indigo-600 rounded-xl opacity-0 group-hover:opacity-10 transition-opacity" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Folder Envelope Cards Grid */}
-        {transmittedFolderList.length === 0 ? (
-          <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-2">
-            <Folder className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-xs text-slate-500 font-bold">No official letters stored in this folder yet.</p>
-            <p className="text-[11px] text-slate-400">
-              When you send an official letter from EPSS to MOH, it is automatically stored separately inside this folder.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {transmittedFolderList.map((folder, fIdx) => (
-              <div key={folder.id || fIdx} className="bg-slate-50/80 border border-slate-200 hover:border-indigo-400 rounded-xl p-3.5 space-y-2.5 transition-all shadow-2xs group relative">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-amber-100 text-amber-800 rounded-lg shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[9px] font-mono font-bold text-indigo-700 block uppercase tracking-widest">
-                        {folder.dspRefNumber}
-                      </span>
-                      <h4 className="text-xs font-bold text-slate-900 truncate" title={folder.officialLetterRef}>
-                        Ref: {folder.officialLetterRef}
-                      </h4>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                    EPSS ➔ MOH
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-600 font-medium line-clamp-2" title={folder.subject}>
-                  {folder.subject}
-                </p>
-
-                <div className="p-2 bg-white rounded-lg border border-slate-200 text-[11px] space-y-1">
-                  <div className="flex justify-between text-slate-500">
-                    <span>Transmitted:</span>
-                    <strong className="text-slate-800 font-mono">{folder.dateTransmitted}</strong>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Signatory:</span>
-                    <strong className="text-slate-800">{folder.signatory} ({folder.signatoryRole})</strong>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Equipment Dossier:</span>
-                    <strong className="text-cyan-800 font-black">{folder.totalDevices} Items ({formatNumber(folder.totalQuantity)} Units)</strong>
-                  </div>
-                </div>
-
-                {/* File Attachment Card */}
-                <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Paperclip className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                    <span className="font-mono font-bold text-amber-950 text-[11px] truncate">
-                      {folder.letterFileName || `Official_Letter_${folder.officialLetterRef.replace(/[\/\s]/g, '_')}.pdf`}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadFolderLetter(folder)}
-                    className="p-1.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 text-[10px] font-bold transition cursor-pointer shrink-0 flex items-center gap-1"
-                    title="Download official letter PDF"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Download</span>
-                  </button>
-                </div>
-
-                {/* Folder Action Bar */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFolderModal(folder)}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Inspect Folder Dossier</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFolderLetter(folder.id)}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded transition cursor-pointer"
-                    title="Delete folder record"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      {/* Legacy Transmitted Folder concepts removed in favor of Dossier List, but we can keep it as a 'Letters Folder' if needed */}
+      {!is21 && (
+        <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
+                <FolderArchive className="w-5 h-5" />
               </div>
-            ))}
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <span>📁 Transmitted EPSS to MOH Official Letters Folder</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
+                    {transmittedFolderList.length} Stored Envelopes
+                  </span>
+                </h3>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="file" id="folder-direct-letter-upload" className="hidden" onChange={handleUploadDirectLetterToFolder} />
+              <label htmlFor="folder-direct-letter-upload" className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all">
+                <Paperclip className="w-3.5 h-3.5" />
+                <span>Upload Letter to Folder</span>
+              </label>
+            </div>
           </div>
-        )}
-      </div>
+
+          {transmittedFolderList.length === 0 ? (
+            <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 text-[11px] text-slate-400 font-bold">
+              No official letters stored in this folder yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {transmittedFolderList.map((folder, fIdx) => (
+                <div key={folder.id || fIdx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold text-indigo-700">{folder.dspRefNumber}</span>
+                    <button onClick={() => handleRemoveFolderLetter(folder.id)} className="text-rose-400 hover:text-rose-600"><Trash2 size={12} /></button>
+                  </div>
+                  <h4 className="text-[11px] font-black truncate">{folder.subject}</h4>
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => handleDownloadFolderLetter(folder)} className="px-2 py-1 bg-amber-200 text-amber-950 rounded text-[10px] font-bold flex items-center gap-1">
+                      <Download size={10} />
+                      <span>PDF</span>
+                    </button>
+                    <button onClick={() => setSelectedFolderModal(folder)} className="text-indigo-600 text-[10px] font-bold hover:underline">Inspect</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Inspect Folder Letter Dossier Modal */}
       {selectedFolderModal && (
@@ -871,10 +913,10 @@ Notes: ${folder.notes || 'N/A'}`;
                   MOH Response Ref & SLA
                 </div>
                 <div className="text-xs font-mono font-black text-amber-700 mt-0.5 truncate">
-                  {receivedRecord?.dspRefNumber || `MOH/PMD-DSP/${new Date().getFullYear()}/042`}
+                  {(selectedDossier || receivedRecords[0])?.dspRefNumber || `MOH/PMD-DSP/${new Date().getFullYear()}/042`}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                  Date: {receivedRecord?.dateSubmitted || TODAY_ISO_DATE} • Turnaround: 0d (Instant)
+                  Date: {(selectedDossier || receivedRecords[0])?.dateSubmitted || TODAY_ISO_DATE} • Turnaround: 0d (Instant)
                 </div>
               </div>
               <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
@@ -929,187 +971,147 @@ Notes: ${folder.notes || 'N/A'}`;
             </div>
           </div>
 
-          {/* EXACT 10-COLUMN TABLE MATCHING THE TRANSMITTED STANDARD TEMPLATE */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-3 bg-gradient-to-r from-[#0B1527] to-[#1E3A5F] text-white flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <FileSpreadsheet className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-black uppercase tracking-wider text-white">
-                  {is21 ? 'DSP Received from EPSS' : 'DSP Received from MOH'} — Stored Transmitted Allocation ({filteredRows.length} Line Items)
-                </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-400 text-slate-950">
-                  {is21 ? 'EPSS HO Transmitted' : 'MOH PMD Endorsed'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-300 font-medium">
-                Official Letter: <span className="text-amber-300 font-mono font-bold">{receivedRecord?.officialLetterRef || (is21 ? 'EPSS/LET/2026/1577' : 'MOH/LET/2026/782')}</span>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#F59E0B] text-slate-950 font-black uppercase text-[11px] tracking-wider border-b-2 border-amber-600 select-none">
-                    <th className="py-3 px-3 text-center border-r border-amber-500/80 w-12">S/N</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80">Material</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80">Material Description</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-right">Qty</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-right">Total Amount (ETB)</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80">Valuation Type Desc</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80">WBS Element</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">Budget Source</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">Request Date</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">Received From</th>
-                    <th className="py-3 px-3 border-r border-amber-500/80 text-center">{is21 ? 'EPSS Status' : 'MOH Endorsement'}</th>
-                    <th className="py-3 px-3 text-center w-16">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-100/60 font-medium text-slate-800">
-                  {filteredRows.map((row, idx) => {
-                    const isEven = idx % 2 === 0;
-                    return (
-                      <tr
-                        key={row.id || idx}
-                        className={`transition-colors ${
-                          isEven ? 'bg-[#FEF9C3]/60 hover:bg-[#FEF08A]/80' : 'bg-[#FEF08A]/40 hover:bg-[#FEF08A]/80'
-                        }`}
-                      >
-                        {/* 1. S/N */}
-                        <td className="py-2.5 px-3 text-center font-bold text-slate-700 border-r border-amber-200/50">
-                          {idx + 1}
-                        </td>
-
-                        {/* 2. Material */}
-                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-900 border-r border-amber-200/50 whitespace-nowrap">
-                          {row.material}
-                        </td>
-
-                        {/* 3. Material Description */}
-                        <td className="py-2.5 px-3 font-semibold text-slate-900 border-r border-amber-200/50 min-w-[240px]">
-                          {row.materialDescription}
-                        </td>
-
-                        {/* 4. Qty */}
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-900 border-r border-amber-200/50 whitespace-nowrap">
-                          {formatNumber(row.qty)}
-                        </td>
-
-                        {/* 5. Total Amount */}
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-900 border-r border-amber-200/50 whitespace-nowrap">
-                          {formatCurrency(row.totalAmount)}
-                        </td>
-
-                        {/* 6. Valuation Type Desc */}
-                        <td className="py-2.5 px-3 font-medium text-slate-700 border-r border-amber-200/50 whitespace-nowrap">
-                          {row.valuationTypeDesc}
-                        </td>
-
-                        {/* 7. WBS Element */}
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 border-r border-amber-200/50 whitespace-nowrap">
-                          {row.wbsElement}
-                        </td>
-
-                        {/* 8. Budget Source */}
-                        <td className="py-2.5 px-3 text-center border-r border-amber-200/50 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-950 border border-amber-300">
-                            {row.budgetSource}
-                          </span>
-                        </td>
-
-                        {/* 9. Request Date */}
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-700 border-r border-amber-200/50 whitespace-nowrap">
-                          {row.requestDate}
-                        </td>
-
-                        {/* 10. Received From */}
-                        <td className="py-2.5 px-3 text-center font-black text-slate-900 border-r border-amber-200/50 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[#1E3A5F] text-white">
-                            {is21 ? 'EPSS HO' : 'MOH PMD'}
-                          </span>
-                        </td>
-
-                        {/* 11. Status */}
-                        <td className="py-2.5 px-3 text-center border-r border-amber-200/50 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            {is21 ? 'Received' : 'Approved'}
-                          </span>
-                        </td>
-
-                        {/* 12. Action Remove Button */}
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRow(row.id)}
-                            className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
-                            title="Remove this item from stored DSP Received data"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-
-                {/* Table Footer with Totals */}
-                <tfoot>
-                  <tr className="bg-[#F59E0B] text-slate-950 font-black text-xs border-t-2 border-amber-600">
-                    <td colSpan={3} className="py-3 px-3 text-right uppercase tracking-wider border-r border-amber-500">
-                      Total Allocated Summary:
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono font-black text-slate-950 border-r border-amber-500">
-                      {formatNumber(totals.totalQty)} Units
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono font-black text-slate-950 border-r border-amber-500">
-                      {formatCurrency(totals.totalValuation)}
-                    </td>
-                    <td colSpan={6} className="py-3 px-3 text-slate-900 text-[11px] font-semibold">
-                      {is21 ? '✓ Official equipment quota transmission received from EPSS Head Office' : '✓ Official ministerial allocation quota ratified by Ministry of Health (PMD Directorate)'}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          {/* Workflow Pipeline Action Callout */}
-          <div className="bg-gradient-to-r from-slate-900 to-[#1E3A5F] text-white p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800 shadow-sm">
+      {/* Dossier Table Section (Visible if is21 and dossier selected, or if not is21 and data exists) */}
+      {(!is21 || selectedDossier) && receivedRows.length > 0 && (
+        <div className="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4">
+          <div className="bg-[#0B1527] p-4 text-white flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-400 text-slate-950">
-                <ShieldCheck className="w-6 h-6" />
+              <div className="p-2 bg-amber-400 rounded-lg text-slate-900">
+                <FileText className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
-                  Ready for Next Head Office & Regional Operations
-                </h4>
-                <p className="text-[11px] text-slate-200 mt-0.5">
-                  With MOH approval stored, you can map health facilities to EPSS branch hubs or initiate the regional breakdown matrix request to Regional Health Bureaus (RHBs).
-                </p>
+                <h3 className="text-xs font-black uppercase tracking-widest leading-tight">
+                  {is21 ? `DSP DOSSIER: ${selectedDossier?.dspName}` : 'DSP Received from MOH — Official Allocation Dossier'}
+                </h3>
+                <div className="text-[10px] font-bold text-amber-400 mt-0.5">
+                  Ref: <span className="underline italic">{is21 ? selectedDossier?.dspRefNumber : (receivedRecords[0]?.dspRefNumber || 'EPSS/MD-DSP/2026/042')}</span>
+                  <span className="mx-2 opacity-50">|</span>
+                  Date: {is21 ? selectedDossier?.dateSubmitted : (receivedRecords[0]?.dateSubmitted || TODAY_ISO_DATE)}
+                </div>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => onSelectSubTab?.('dsp-ho-1-3-1')}
-                className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md"
+            
+            {is21 && (
+              <button 
+                onClick={() => setSelectedDossier(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                title="Close Dossier"
               >
-                <span>Sub-Step 1.3: Map HF to Hub</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <X className="w-5 h-5" />
               </button>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={() => onSelectSubTab?.('dsp-moh-2-2')}
-                className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm"
-              >
-                <span>Stage 2: Regional Breakdown</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="bg-[#FFA500] text-slate-950 font-black uppercase border-b-2 border-slate-900">
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">S/N</th>
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL</th>
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">MATERIAL DESCRIPTION</th>
+                  <th className="py-3 px-3 text-center border-r border-slate-900/10">QTY</th>
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">TOTAL AMOUNT (ETB)</th>
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">VALUATION TYPE DESC</th>
+                  <th className="py-3 px-3 text-left border-r border-slate-900/10">WBS ELEMENT</th>
+                  <th className="py-3 px-3 text-center border-r border-slate-900/10">BUDGET SOURCE</th>
+                  <th className="py-3 px-3 text-left">REQUEST DATE</th>
+                  <th className="py-3 px-3 text-center">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="bg-[#FFFBEB]">
+                {filteredRows.map((row, idx) => (
+                  <tr key={row.id || idx} className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50 group transition-colors">
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-center">{idx + 1}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">{row.material}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-semibold text-slate-800">{row.materialDescription}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-xs">{formatNumber(row.qty)}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-black text-emerald-800">
+                      <span className="mr-3 text-[10px]">ETB</span>
+                      <span>{formatNumber(row.totalAmount)}</span>
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-600 text-[10px]">{row.valuationTypeDesc}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-400 text-[10px]">{row.wbsElement}</td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 text-center">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-2xs">{row.budgetSource}</span>
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-500 italic">{row.requestDate}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <button onClick={() => handleRemoveRow(row.id)} className="p-1 text-slate-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                    </td>
+                  </tr>
+                ))}
+                
+                <tr className="bg-[#FFA500] text-slate-950 font-black">
+                  <td colSpan={3} className="py-3 px-4 text-right uppercase text-[10px] tracking-widest">TOTAL ALLOCATED SUMMARY:</td>
+                  <td className="py-3 px-3 text-center border-l border-slate-900/20">
+                    <div className="leading-tight"><div className="text-xs">{formatNumber(totals.totalQty)}</div><div className="text-[8px] uppercase">Units</div></div>
+                  </td>
+                  <td className="py-3 px-3 border-l border-slate-900/20">
+                    <div className="flex items-center gap-1.5"><span className="text-[10px]">ETB</span><span className="text-xs">{formatNumber(totals.totalValuation)}</span></div>
+                  </td>
+                  <td colSpan={5} className="py-3 px-4 font-bold border-l border-slate-900/20 text-[9px]">
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5" /><span>Official equipment quota transmission received from EPSS HO (Sub-step 2.1)</span></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* EMPTY STATE FOR 1.2 */}
+      {!is21 && receivedRows.length === 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-xs"><Building2 className="w-8 h-8" /></div>
+          <div className="max-w-md mx-auto space-y-1.5">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Awaiting DSP Endorsement from MOH</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">Once you click <strong className="text-slate-800">"Send to MOH"</strong> from Sub-Step 1.1, the exact 10-column materials will appear here.</p>
+          </div>
+          <div className="flex justify-center gap-3"><button onClick={() => onSelectSubTab?.('dsp-ho-1-1')} className="px-4 py-2 rounded-xl bg-[#0B1527] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md"><span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse" /><span>Go to Sub-Step 1.1</span><ArrowRight size={14} /></button></div>
+        </div>
+      )}
+
+      {/* Selected Folder Modal Concept preserved for letters */}
+      {selectedFolderModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-5 shadow-2xl space-y-4 animate-scale-in">
+            <div className="flex justify-between items-start border-b pb-2">
+              <h3 className="font-black uppercase text-xs tracking-widest text-indigo-700">Official Folder Envelope</h3>
+              <button onClick={() => setSelectedFolderModal(null)}><X size={20} /></button>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-[11px]">
+              <div className="grid grid-cols-2 gap-2">
+                <div><span className="text-slate-400 font-bold block">Ref:</span> {selectedFolderModal.officialLetterRef}</div>
+                <div><span className="text-slate-400 font-bold block">Date:</span> {selectedFolderModal.dateTransmitted}</div>
+              </div>
+              <div><span className="text-slate-400 font-bold block">Subject:</span> {selectedFolderModal.subject}</div>
+            </div>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2"><Paperclip size={18} className="text-amber-700" /><span className="font-mono font-bold text-amber-950">{selectedFolderModal.letterFileName}</span></div>
+              <button onClick={() => handleDownloadFolderLetter(selectedFolderModal)} className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg font-black text-[10px] uppercase cursor-pointer">Download PDF</button>
             </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* PIPELINE FOOTER */}
+      {((is21 && selectedDossier) || (!is21 && receivedRows.length > 0)) && (
+        <div className="bg-gradient-to-r from-slate-900 to-[#1E3A5F] text-white p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800 shadow-sm animate-in fade-in zoom-in-95">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-400 text-slate-950"><ShieldCheck className="w-6 h-6" /></div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">Ready for Next Operational Phase</h4>
+              <p className="text-[11px] text-slate-200 mt-0.5">Initiate regional mapping or advance to the official breakdown matrix request.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => onSelectSubTab?.(is21 ? 'dsp-moh-2-2' : 'dsp-ho-1-3-1')} className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md">
+              <span>Advance Pipeline</span><ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+      </>
       )}
     </div>
   );
