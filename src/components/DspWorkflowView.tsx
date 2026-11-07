@@ -1746,6 +1746,16 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
           subtitle="Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers"
         />
+      ) : (currentSubStep === '1.1' || (currentSubTab as string) === 'dsp-ho-1-1' || (currentSubTab as string) === 'dsp-request-moh-epss') ? (
+        <DspRequestMohTemplateView
+          multipleStockItems={multipleStockItems}
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+          onOpenDspRequestModal={() => setIsCreateModalOpen(true)}
+          onSelectSubTab={onSelectSubTab}
+        />
       ) : (currentSubStep === '1.2' || currentSubTab === 'dsp-ho-1-2') ? (
         <DspReceivedFromMohView
           records={records}
