@@ -352,6 +352,17 @@ Notes: ${folder.notes || 'N/A'}`;
       notes: `DSP Name: ${dspNameValue}. Transmitted via Sub-step 1.1.`
     };
 
+    const generatedCols = sourceRows.map((item, idx) => ({
+      id: `mat-tx-${idx}-${item.material}`,
+      materialCode: item.material,
+      description: item.materialDescription
+    }));
+
+    try {
+      localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(sourceRows));
+      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(generatedCols));
+    } catch {}
+
     setRecords(prev => {
       const filtered = prev.filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);

@@ -1795,6 +1795,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           multipleStockItems={multipleStockItems}
           initialColumns={dsp22Columns}
           initialRows={dsp22Rows}
+          dspReceivedEpssRows={
+            records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')?.itemsIncluded || []
+          }
+          dspReceivedMohRows={
+            records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2')?.itemsIncluded || []
+          }
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />

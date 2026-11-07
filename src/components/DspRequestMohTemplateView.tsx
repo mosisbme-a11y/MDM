@@ -814,6 +814,37 @@ Authorized Directorate Desk`;
       return updated;
     });
 
+    // 4. Generate matching 2.2 matrix columns directly from itemsToSend
+    const generated22Columns = itemsToSend.map((item, idx) => ({
+      id: `mat-tx-${idx}-${item.material}`,
+      materialCode: item.material,
+      description: item.materialDescription
+    }));
+    const default22Rows = [
+      {
+        id: 'row-1',
+        sn: 1,
+        date: TODAY_ISO_DATE,
+        region: 'Oromia',
+        budgetSource: itemsToSend[0]?.budgetSource || 'WB',
+        quantities: Object.fromEntries(generated22Columns.map((c, i) => [c.id, Math.max(1, Math.floor((itemsToSend[i]?.qty || 1) / 2))]))
+      },
+      {
+        id: 'row-2',
+        sn: 2,
+        date: TODAY_ISO_DATE,
+        region: 'Amhara',
+        budgetSource: itemsToSend[0]?.budgetSource || 'WB',
+        quantities: Object.fromEntries(generated22Columns.map((c, i) => [c.id, Math.max(1, Math.ceil((itemsToSend[i]?.qty || 1) / 2))]))
+      }
+    ];
+
+    try {
+      localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(itemsToSend));
+      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(generated22Columns));
+      localStorage.setItem('epss_dsp_received_epss_matrix_rows', JSON.stringify(default22Rows));
+    } catch {}
+
     try {
       // Push to Supabase Cloud so all users and devices immediately receive exact transmittal data
       pushCentralMasterData({
@@ -821,6 +852,8 @@ Authorized Directorate Desk`;
         dspReceivedMohRecord: sentRecord12,
         dspReceivedEpssRows: itemsToSend,
         dspReceivedEpssRecord: receivedRecord21,
+        dsp22Columns: generated22Columns,
+        dsp22Rows: default22Rows,
         updatedBy: 'EPSS HO Transmittal',
         updateKind: `Transmit DSP Request to MOH (${itemsToSend.length} Items)`
       });

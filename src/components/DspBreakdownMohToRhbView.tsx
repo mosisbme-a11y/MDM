@@ -105,12 +105,33 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   dspReceivedMohRows,
   onTriggerCloudSync
 }) => {
-  // 1. Columns (Materials)
+  // 1. Columns (Materials) - STRICTLY only from transmitted EPSS payload or user import
   const [columns, setColumns] = useState<MatrixColumn[]>(() => {
-    if (initialColumns && initialColumns.length > 0) return initialColumns;
-    
-    // Auto-extract from transmitted DSP payload if provided
-    const sourceRows = dspReceivedEpssRows || dspReceivedMohRows;
+    // If initialColumns passed and NOT using dummy mock items
+    if (initialColumns && initialColumns.length > 0) {
+      const isDummy = initialColumns.some(c => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
+      if (!isDummy) return initialColumns;
+    }
+
+    // Try localStorage for exact transmitted columns
+    try {
+      const savedCols = localStorage.getItem('epss_dsp_received_epss_cols');
+      if (savedCols) {
+        const parsed = JSON.parse(savedCols);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const isDummy = parsed.some((c: any) => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
+          if (!isDummy) return parsed;
+        }
+      }
+    } catch {}
+
+    // Check passed dspReceivedEpssRows or dspReceivedMohRows
+    const sourceRows = (dspReceivedEpssRows && dspReceivedEpssRows.length > 0)
+      ? dspReceivedEpssRows
+      : (dspReceivedMohRows && dspReceivedMohRows.length > 0)
+        ? dspReceivedMohRows
+        : null;
+
     if (sourceRows && sourceRows.length > 0) {
       const extracted: MatrixColumn[] = [];
       const seen = new Set<string>();
@@ -130,35 +151,62 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       if (extracted.length > 0) return extracted;
     }
 
-    return [
-      { id: 'mat-1', materialCode: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon' },
-      { id: 'mat-2', materialCode: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult' },
-      { id: 'mat-3', materialCode: '403-XRRB-0101N', description: 'Bowel - With Stand, Stainless Steel.' },
-      { id: 'mat-4', materialCode: '403-XRRD-0101-001', description: 'Cold box' },
-      { id: 'mat-5', materialCode: '401-WICU-0101N', description: 'Couch - Delivery' },
-      { id: 'mat-6', materialCode: '401-WICU-0101N', description: 'Couch - Examination' }
-    ];
+    // Check 2.1 record in records
+    const rec21 = records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1');
+    if (rec21 && rec21.itemsIncluded && rec21.itemsIncluded.length > 0) {
+      const extracted: MatrixColumn[] = [];
+      const seen = new Set<string>();
+      rec21.itemsIncluded.forEach((item: any, idx: number) => {
+        const code = item.material || item.materialCode || `MAT-${1000 + idx}`;
+        const desc = item.description || item.materialDescription || 'Medical Equipment Unit';
+        const key = `${code}|${desc}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          extracted.push({
+            id: `mat-rec-${idx}-${code}`,
+            materialCode: code,
+            description: desc
+          });
+        }
+      });
+      if (extracted.length > 0) return extracted;
+    }
+
+    // Return empty array if not yet transmitted - NO mock dummy columns!
+    return [];
   });
 
   // 2. Rows (Regions)
   const [rows, setRows] = useState<MatrixRow[]>(() => {
-    if (initialRows && initialRows.length > 0) return initialRows;
+    if (initialRows && initialRows.length > 0) {
+      const hasDummyKey = initialRows.some(r => r.quantities && ('mat-1' in r.quantities));
+      if (!hasDummyKey) return initialRows;
+    }
+
+    try {
+      const savedRows = localStorage.getItem('epss_dsp_received_epss_matrix_rows');
+      if (savedRows) {
+        const parsed = JSON.parse(savedRows);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+
     return [
       { 
         id: 'row-1', 
         sn: 1, 
         date: TODAY_ISO_DATE, 
         region: 'Oromia', 
-        budgetSource: '', 
-        quantities: { 'mat-1': 10, 'mat-2': 10, 'mat-3': 10, 'mat-4': 10, 'mat-5': 10, 'mat-6': 10 } 
+        budgetSource: 'WB', 
+        quantities: {} 
       },
       { 
         id: 'row-2', 
         sn: 2, 
         date: TODAY_ISO_DATE, 
         region: 'Amhara', 
-        budgetSource: '', 
-        quantities: { 'mat-1': 5, 'mat-2': 5, 'mat-3': 5, 'mat-4': 5, 'mat-5': 5, 'mat-6': 5 } 
+        budgetSource: 'WB', 
+        quantities: {} 
       }
     ];
   });
@@ -223,50 +271,146 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     return () => clearTimeout(timer);
   }, [columns, rows]);
 
-  // Extract available items to import from received records or stock
+  // Extract available items to import - STRICTLY from EPSS transmittal (Stage 2.1)
   const availableReceivedItems = useMemo(() => {
-    const list: Array<{ id: string; materialCode: string; description: string; qty: number; source: string }> = [];
+    const list: Array<{ 
+      id: string; 
+      materialCode: string; 
+      description: string; 
+      qty: number; 
+      source: string;
+      valuationTypeDesc?: string;
+      wbsElement?: string;
+      budgetSource?: string;
+      totalAmount?: number;
+    }> = [];
     
-    // Find the latest transmitted record from EPSS to MOH (Stage 2.1)
-    const latestReceivedRecord = [...records]
-      .filter(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')
-      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime())[0];
+    // 1. Find all official records received from EPSS (Stage 2.1)
+    const epssReceivedRecords = records.filter(r => {
+      const sub = canonicalizeSubStage(r.subStage, r.stage);
+      return sub === '2.1' || (r.stage === 'moh-osp-management' && (r.subStage === '2.1' || r.subject?.toLowerCase().includes('received from epss')));
+    }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
 
+    const latestReceivedRecord = epssReceivedRecords[0];
     const sourceRef = latestReceivedRecord?.dspRefNumber || 'EPSS/MD-DSP/2026/464';
 
-    try {
-      const sourceRows = dspReceivedEpssRows || dspReceivedMohRows;
-      if (sourceRows && Array.isArray(sourceRows)) {
-        sourceRows.forEach((item: any, idx: number) => {
-          list.push({
-            id: `rec-import-${idx}-${item.material || item.id}`,
-            materialCode: item.material || item.materialCode || `MAT-${1000 + idx}`,
-            description: item.materialDescription || item.description || 'Medical Device',
-            qty: item.qty || item.quantity || 10,
-            source: `Ref: ${sourceRef}`
-          });
-        });
-      }
-    } catch {}
-
-    records.forEach(rec => {
-      if (rec.itemsIncluded && rec.itemsIncluded.length > 0) {
-        rec.itemsIncluded.forEach((it, idx) => {
-          if (!list.some(l => l.materialCode === it.material && l.description === it.description)) {
-            list.push({
-              id: `dsp-rec-${rec.id}-${idx}`,
-              materialCode: it.material,
-              description: it.description,
-              qty: it.quantity,
-              source: `Ref: ${rec.dspRefNumber}`
-            });
+    // Extract items included from received records
+    epssReceivedRecords.forEach(rec => {
+      if (rec.itemsIncluded && Array.isArray(rec.itemsIncluded)) {
+        rec.itemsIncluded.forEach((it: any, idx: number) => {
+          const code = (it.material || it.materialCode || '').trim();
+          const desc = (it.description || it.materialDescription || '').trim();
+          if (code || desc) {
+            if (!list.some(l => l.materialCode === code && l.description === desc)) {
+              list.push({
+                id: `dsp-rec-${rec.id}-${idx}`,
+                materialCode: code || `MAT-${1000 + idx}`,
+                description: desc || 'Medical Equipment Unit',
+                qty: Number(it.quantity || it.qty || 1),
+                source: `Ref: ${rec.dspRefNumber || sourceRef}`,
+                valuationTypeDesc: it.valuationTypeDesc,
+                wbsElement: it.wbsElement,
+                budgetSource: it.budgetSource,
+                totalAmount: it.totalAmount
+              });
+            }
           }
         });
       }
     });
 
+    // 2. Also check dspReceivedEpssRows / dspReceivedMohRows props
+    const sourceRows = (dspReceivedEpssRows && dspReceivedEpssRows.length > 0)
+      ? dspReceivedEpssRows
+      : (dspReceivedMohRows && dspReceivedMohRows.length > 0)
+        ? dspReceivedMohRows
+        : null;
+
+    if (sourceRows && Array.isArray(sourceRows)) {
+      sourceRows.forEach((item: any, idx: number) => {
+        const code = (item.material || item.materialCode || '').trim();
+        const desc = (item.materialDescription || item.description || '').trim();
+        if (code || desc) {
+          if (!list.some(l => l.materialCode === code && l.description === desc)) {
+            list.push({
+              id: `rec-prop-${idx}-${code}`,
+              materialCode: code || `MAT-${1000 + idx}`,
+              description: desc || 'Medical Equipment Unit',
+              qty: Number(item.qty || item.quantity || 1),
+              source: `Ref: ${sourceRef}`,
+              valuationTypeDesc: item.valuationTypeDesc,
+              wbsElement: item.wbsElement,
+              budgetSource: item.budgetSource,
+              totalAmount: item.totalAmount
+            });
+          }
+        }
+      });
+    }
+
+    // 3. Fallback to localStorage for instant transmittal persistence
+    if (list.length === 0) {
+      try {
+        const saved = localStorage.getItem('epss_dsp_received_epss_rows');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsed.forEach((item: any, idx: number) => {
+              const code = (item.material || item.materialCode || '').trim();
+              const desc = (item.materialDescription || item.description || '').trim();
+              if (code || desc) {
+                if (!list.some(l => l.materialCode === code && l.description === desc)) {
+                  list.push({
+                    id: `rec-local-${idx}-${code}`,
+                    materialCode: code || `MAT-${1000 + idx}`,
+                    description: desc || 'Medical Equipment Unit',
+                    qty: Number(item.qty || item.quantity || 1),
+                    source: `Ref: ${sourceRef}`,
+                    valuationTypeDesc: item.valuationTypeDesc,
+                    wbsElement: item.wbsElement,
+                    budgetSource: item.budgetSource,
+                    totalAmount: item.totalAmount
+                  });
+                }
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Error reading localStorage for received items:', err);
+      }
+    }
+
     return list;
   }, [records, dspReceivedEpssRows, dspReceivedMohRows]);
+
+  // Keep columns synchronized with transmitted items if columns are empty or dummy
+  useEffect(() => {
+    const isDummy = columns.some(c => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
+    if ((columns.length === 0 || isDummy) && availableReceivedItems.length > 0) {
+      const newCols: MatrixColumn[] = availableReceivedItems.map((item, idx) => ({
+        id: `mat-tx-${idx}-${item.materialCode}`,
+        materialCode: item.materialCode,
+        description: item.description
+      }));
+      setColumns(newCols);
+
+      setRows(prevRows => {
+        const baseRows = prevRows.length > 0 ? prevRows : [
+          { id: 'row-1', sn: 1, date: TODAY_ISO_DATE, region: 'Oromia', budgetSource: 'WB', quantities: {} },
+          { id: 'row-2', sn: 2, date: TODAY_ISO_DATE, region: 'Amhara', budgetSource: 'WB', quantities: {} }
+        ];
+        return baseRows.map(r => {
+          const q: Record<string, number> = {};
+          newCols.forEach((col, cIdx) => {
+            const avail = availableReceivedItems[cIdx]?.qty || 0;
+            q[col.id] = r.quantities[col.id] ?? Math.max(0, Math.floor(avail / baseRows.length));
+          });
+          return { ...r, quantities: q };
+        });
+      });
+    }
+  }, [availableReceivedItems]);
 
   const availableStockItems = useMemo(() => {
     return multipleStockItems.map(s => ({
@@ -396,29 +540,127 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     }
 
     const newCols: MatrixColumn[] = selectedItems.map((item, idx) => ({
-      id: `mat-imported-${Date.now()}-${idx}`,
+      id: `mat-imported-${Date.now()}-${idx}-${item.materialCode}`,
       materialCode: item.materialCode,
       description: item.description
     }));
 
     setColumns(prev => {
-      const existingCodes = new Set(prev.map(c => c.materialCode + '|' + c.description));
-      const filteredNew = newCols.filter(c => !existingCodes.has(c.materialCode + '|' + c.description));
+      const isDummy = prev.some(c => c.id === 'mat-1' || c.description?.includes('Anesthesia machine'));
+      if (isDummy || prev.length === 0) {
+        return newCols;
+      }
+      const existingCodes = new Set(prev.map(c => `${c.materialCode}|${c.description}`));
+      const filteredNew = newCols.filter(c => !existingCodes.has(`${c.materialCode}|${c.description}`));
       return [...prev, ...filteredNew];
     });
 
-    setRows(prevRows => prevRows.map(row => {
-      const updatedQty = { ...row.quantities };
-      newCols.forEach((col, idx) => {
-        const itemObj = selectedItems[idx];
-        updatedQty[col.id] = Math.max(1, Math.round((itemObj?.qty || 10) / Math.max(1, prevRows.length)));
+    setRows(prevRows => {
+      const baseRows = prevRows.length > 0 ? prevRows : [
+        { id: 'row-1', sn: 1, date: TODAY_ISO_DATE, region: 'Oromia', budgetSource: 'WB', quantities: {} },
+        { id: 'row-2', sn: 2, date: TODAY_ISO_DATE, region: 'Amhara', budgetSource: 'WB', quantities: {} }
+      ];
+      return baseRows.map(row => {
+        const updatedQty = { ...row.quantities };
+        newCols.forEach((col, idx) => {
+          const itemObj = selectedItems[idx];
+          updatedQty[col.id] = Math.max(0, Math.floor((itemObj?.qty || 1) / baseRows.length));
+        });
+        return { ...row, quantities: updatedQty };
       });
-      return { ...row, quantities: updatedQty };
-    }));
+    });
+
+    try {
+      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(newCols));
+    } catch {}
 
     setIsImportItemsModalOpen(false);
     setSelectedImportItemIds([]);
     showToast(`✓ Imported ${newCols.length} equipment items into Breakdown Matrix!`);
+  };
+
+  // Quick helper to simulate transmittal from EPSS to MOH
+  const handleQuickTransmitSampleEpss = () => {
+    const hpStock = multipleStockItems.filter(s => (s.specialStockType || '').trim().toUpperCase() === 'Q');
+    const selectedStock = hpStock.length > 0 ? hpStock.slice(0, 5) : multipleStockItems.slice(0, 5);
+
+    const year = new Date().getFullYear();
+    const refNum = `EPSS/MD-DSP/${year}/${Math.floor(100 + Math.random() * 900)}`;
+    const mohRef = `MOH/PMD-DSP/${year}/${Math.floor(200 + Math.random() * 800)}`;
+    const dspNameStr = 'DSP 2026 - National Medical Equipment Allocation';
+
+    const simulatedItems = selectedStock.map((s, idx) => ({
+      material: s.material || `404-VENM-TU${idx}`,
+      description: s.materialDescription || `Medical Equipment Model ${idx + 1}`,
+      materialDescription: s.materialDescription || `Medical Equipment Model ${idx + 1}`,
+      quantity: s.unrestrictedStock || (idx + 1) * 2,
+      qty: s.unrestrictedStock || (idx + 1) * 2,
+      valuationTypeDesc: s.inventoryValuationType || '50258_ZMD',
+      wbsElement: s.wbsElement || 'SDG-ME-23-001-011',
+      budgetSource: 'WB',
+      requestDate: TODAY_ISO_DATE,
+      dspRequestTo: 'MOH',
+      totalAmount: s.currentValueOfUnrestrictedStock || 50000
+    }));
+
+    const newRecord21: DspWorkflowRecord = {
+      id: `dsp-moh-sim-${Date.now()}`,
+      dspRefNumber: mohRef,
+      dspName: dspNameStr,
+      stage: 'moh-osp-management',
+      subStage: '2.1',
+      stageTitle: 'MOH OSP Management',
+      senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      recipientOrg: 'Ministry of Health (PMD Directorate)',
+      subject: `DSP [${dspNameStr}]: Received from EPSS (${simulatedItems.length} Items)`,
+      status: 'Submitted & Pending',
+      dateSubmitted: TODAY_ISO_DATE,
+      totalDevices: simulatedItems.length,
+      totalQuantity: simulatedItems.reduce((acc, i) => acc + i.qty, 0),
+      totalValuationETB: simulatedItems.reduce((acc, i) => acc + (i.totalAmount || 0), 0),
+      targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
+      targetedFacilitiesCount: 14,
+      officialLetterRef: `EPSS/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
+      signatory: 'Mosisa (Authorized User)',
+      signatoryRole: 'Directorate Technical Lead',
+      itemsIncluded: simulatedItems.map(i => ({
+        material: i.material,
+        description: i.description,
+        quantity: i.qty,
+        plant: 'AA01 Central',
+        allocatedFacility: 'MOH Allocation Quota',
+        valuationTypeDesc: i.valuationTypeDesc,
+        wbsElement: i.wbsElement,
+        budgetSource: i.budgetSource,
+        requestDate: i.requestDate,
+        dspRequestTo: i.dspRequestTo,
+        totalAmount: i.totalAmount
+      })),
+      notes: `DSP Name: ${dspNameStr}. Simulated Transmittal.`
+    };
+
+    const newCols: MatrixColumn[] = simulatedItems.map((item, idx) => ({
+      id: `mat-tx-${idx}-${item.material}`,
+      materialCode: item.material,
+      description: item.description
+    }));
+
+    setRecords(prev => [newRecord21, ...prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== '2.1')]);
+    setColumns(newCols);
+    try {
+      localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(simulatedItems));
+      localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(newCols));
+    } catch {}
+
+    pushCentralMasterData({
+      dspReceivedEpssRows: simulatedItems,
+      dspReceivedEpssRecord: newRecord21,
+      dsp22Columns: newCols,
+      updatedBy: 'EPSS Simulation',
+      updateKind: `Simulate DSP Transmit to MOH (${simulatedItems.length} Items)`
+    });
+
+    showToast(`✓ Simulated transmittal of ${simulatedItems.length} items from EPSS to MOH!`);
   };
 
   const handleDownloadExcel = () => {
@@ -877,7 +1119,49 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </tr>
             </thead>
             <tbody className="bg-blue-50/20">
-              {filteredRows.length === 0 ? (
+              {columns.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-14 text-center bg-white">
+                    <div className="flex flex-col items-center gap-3 max-w-lg mx-auto">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                        <Package className="w-6 h-6" />
+                      </div>
+                      <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                        Awaiting Transmitted Equipment Columns from EPSS
+                      </span>
+                      <p className="text-xs text-slate-500 font-medium">
+                        EPSS HO has not transmitted an equipment payload to MOH yet. Once sent in Sub-step 1.1 ("DSP Request to MOH"), the exact equipment columns and data will automatically appear here.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => onSelectSubTab?.('dsp-mgmt')}
+                          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Go to Sub-step 1.1</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsImportItemsModalOpen(true)}
+                          className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <PackagePlus className="w-3.5 h-3.5" />
+                          <span>Import Equipment Columns</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleQuickTransmitSampleEpss}
+                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Simulate Transmitted DSP</span>
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + 5} className="py-10 text-center font-bold text-slate-600">
                     No region rows added yet. Click "Add All 15 Ethiopian Regions" or select a region above.
@@ -1096,6 +1380,10 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                           <th className="py-4 px-4 w-12 text-center">
                             <input
                               type="checkbox"
+                              checked={
+                                (importSource === 'received' ? availableReceivedItems : availableStockItems).length > 0 &&
+                                selectedImportItemIds.length === (importSource === 'received' ? availableReceivedItems : availableStockItems).length
+                              }
                               onChange={(e) => {
                                 const list = importSource === 'received' ? availableReceivedItems : availableStockItems;
                                 if (e.target.checked) setSelectedImportItemIds(list.map(l => l.id));
@@ -1562,7 +1850,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                     <FileText className="w-5 h-5" />
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-tight">
-                    DSP RECEIVED FROM EPSS — STORED TRANSMITTED ALLOCATION ({(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) ? 2 : dspReceivedEpssRows.length} LINE ITEMS)
+                    DSP RECEIVED FROM EPSS — STORED TRANSMITTED ALLOCATION ({availableReceivedItems.length > 0 ? availableReceivedItems.length : 2} LINE ITEMS)
                   </h3>
                   <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase">
                     EPSS HO Transmitted
@@ -1598,9 +1886,9 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   </tr>
                 </thead>
                 <tbody className="bg-[#FFFBEB]">
-                  {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) ? (
+                  {availableReceivedItems.length === 0 ? (
                     <>
-                      {/* Mock Data 1 */}
+                      {/* Reference line items from user screenshot */}
                       <tr className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
                         <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">1</td>
                         <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">404-VENM-TUIF</td>
@@ -1617,7 +1905,6 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                         </td>
                         <td className="py-3 px-3 font-mono text-slate-500 italic">2026-05-15</td>
                       </tr>
-                      {/* Mock Data 2 */}
                       <tr className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
                         <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">2</td>
                         <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">404-VENM-SPSB</td>
@@ -1636,22 +1923,22 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                       </tr>
                     </>
                   ) : (
-                    dspReceivedEpssRows.map((row: any, idx: number) => (
+                    availableReceivedItems.map((row: any, idx: number) => (
                       <tr key={idx} className="border-b border-slate-200 text-slate-900 hover:bg-amber-50/50">
                         <td className="py-3 px-3 border-r border-slate-200 font-bold text-center">{idx + 1}</td>
-                        <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">{row.material || row.materialCode}</td>
-                        <td className="py-3 px-3 border-r border-slate-200 font-semibold text-slate-800">{row.materialDescription || row.description}</td>
-                        <td className="py-3 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-sm">{row.qty || row.quantity}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono font-bold text-indigo-800 underline">{row.materialCode}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-semibold text-slate-800">{row.description}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-black text-center text-cyan-800 text-sm">{row.qty}</td>
                         <td className="py-3 px-3 border-r border-slate-200 font-black text-emerald-800">
                           <span className="mr-3">ETB</span>
                           <span>{formatNumber(row.totalAmount || (row.qty * 32000))}</span>
                         </td>
-                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-600">{row.valuationType || '50258_ZMD'}</td>
+                        <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-600">{row.valuationTypeDesc || '50258_ZMD'}</td>
                         <td className="py-3 px-3 border-r border-slate-200 font-mono text-slate-400">{row.wbsElement || 'SDG-ME-23-001-011'}</td>
                         <td className="py-3 px-3 border-r border-slate-200 text-center">
-                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-sm">WB</span>
+                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-sm">{row.budgetSource || 'WB'}</span>
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-500 italic">2026-05-15</td>
+                        <td className="py-3 px-3 font-mono text-slate-500 italic">{TODAY_ISO_DATE}</td>
                       </tr>
                     ))
                   )}
@@ -1663,9 +1950,9 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                     <td className="py-4 px-3 text-center border-l border-slate-900/20">
                       <div className="leading-tight">
                         <div className="text-sm">
-                          {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0) 
+                          {availableReceivedItems.length === 0
                             ? 2 
-                            : dspReceivedEpssRows.reduce((sum: number, r: any) => sum + (r.qty || 0), 0)}
+                            : availableReceivedItems.reduce((sum: number, r: any) => sum + (r.qty || 0), 0)}
                         </div>
                         <div className="text-[9px] uppercase">Units</div>
                       </div>
@@ -1674,9 +1961,9 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                       <div className="flex items-center gap-2">
                         <span className="text-xs">ETB</span>
                         <span className="text-sm">
-                          {(!dspReceivedEpssRows || dspReceivedEpssRows.length === 0)
+                          {availableReceivedItems.length === 0
                             ? "65,480.93"
-                            : formatNumber(dspReceivedEpssRows.reduce((sum: number, r: any) => sum + (r.totalAmount || (r.qty * 32000)), 0))}
+                            : formatNumber(availableReceivedItems.reduce((sum: number, r: any) => sum + (r.totalAmount || (r.qty * 32000)), 0))}
                         </span>
                       </div>
                     </td>
