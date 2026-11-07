@@ -210,12 +210,10 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       return currentDossier.stage4MatrixData.columns;
     }
     return [
-      { id: 'col-1', code: '403-XRRD-0101', name: 'Anesthesia machine' },
-      { id: 'col-2', code: '403-XRRD-0101', name: 'Anesthesia machine' },
-      { id: 'col-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless' },
-      { id: 'col-4', code: '403-XRRD-0101-001', name: 'Cold box' },
-      { id: 'col-5', code: '401-WICU-0101N', name: 'Couch - Delivery' },
-      { id: 'col-6', code: '401-WICU-0101N', name: 'Couch - Examination' }
+      { id: 'col-1', code: '403-XRRD-0101', name: 'Anesthesia machine - with Patient monitor' },
+      { id: 'col-2', code: '403-XRRD-0101', name: 'Bed - Patient, Fowler, Adult' },
+      { id: 'col-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless Steel.' },
+      { id: 'col-4', code: '403-XRRD-0101-001', name: 'Cold box' }
     ];
   }, [currentDossier]);
 
@@ -252,7 +250,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       });
     }
 
-    // Default sample allocations matching user screenshot (Plants AA01, AD01, DI01)
+    // Default sample allocations matching user screenshot (Plants AA01, AD01, DI01 with exact 4 columns)
     return [
       {
         id: 'alloc-aa01-1',
@@ -267,11 +265,9 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
           'col-1': 6,
           'col-2': 6,
           'col-3': 2,
-          'col-4': 2,
-          'col-5': 2,
-          'col-6': 2
+          'col-4': 2
         },
-        totalQty: 20
+        totalQty: 16
       },
       {
         id: 'alloc-ad01-1',
@@ -286,11 +282,9 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
           'col-1': 2,
           'col-2': 2,
           'col-3': 2,
-          'col-4': 2,
-          'col-5': 2,
-          'col-6': 2
+          'col-4': 2
         },
-        totalQty: 12
+        totalQty: 8
       },
       {
         id: 'alloc-di01-1',
@@ -305,11 +299,9 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
           'col-1': 2,
           'col-2': 2,
           'col-3': 2,
-          'col-4': 2,
-          'col-5': 2,
-          'col-6': 2
+          'col-4': 2
         },
-        totalQty: 12
+        totalQty: 8
       }
     ];
   }, [currentDossier, hfListItems]);
