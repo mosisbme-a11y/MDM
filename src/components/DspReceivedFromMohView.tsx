@@ -995,8 +995,8 @@ Notes: ${folder.notes || 'N/A'}`;
             </div>
           </div>
 
-      {/* Dossier Table Section (Visible if is21 and dossier selected, or if not is21 and data exists) */}
-      {(!is21 || selectedDossier) && receivedRows.length > 0 && (
+      {/* Dossier Table Section (Visible if is21 and dossier selected, or if not is21) */}
+      {(!is21 || selectedDossier) && (
         <div className="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-500">
           <div className="bg-[#0B1527] p-6 text-white">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1116,7 +1116,7 @@ Notes: ${folder.notes || 'N/A'}`;
       )}
 
       {/* PIPELINE FOOTER */}
-      {((is21 && selectedDossier) || (!is21 && receivedRows.length > 0)) && (
+      {(!is21 || (is21 && selectedDossier)) && (
         <div className="bg-gradient-to-r from-[#0B1527] to-[#1E3A5F] text-white p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800 shadow-xl animate-in fade-in zoom-in-95 duration-500 mt-4">
           <div className="flex items-center gap-4">
             <div className="p-3.5 rounded-2xl bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20 animate-pulse">

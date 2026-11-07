@@ -97,6 +97,7 @@ interface Stage5EpssHoAggregationViewProps {
   setRecords: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   hfListItems: HealthFacilityRecord[];
   setHfListItems?: React.Dispatch<React.SetStateAction<HealthFacilityRecord[]>>;
+  initialTab?: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch';
   onTriggerCloudSync?: (
     successMsg: string,
     mutation: {
@@ -112,6 +113,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   setRecords,
   hfListItems = [],
   setHfListItems,
+  initialTab = 'aggregated-matrix',
   onTriggerCloudSync
 }) => {
   // Stage 5 dossiers
@@ -140,7 +142,13 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   }, [stage5Dossiers, selectedDossierId]);
 
   // View Mode: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'
-  const [viewTab, setViewTab] = useState<'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'>('aggregated-matrix');
+  const [viewTab, setViewTab] = useState<'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'>(initialTab);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setViewTab(initialTab);
+    }
+  }, [initialTab]);
   const [dispatchHubModal, setDispatchHubModal] = useState<{
     hubCode: string;
     hubName: string;

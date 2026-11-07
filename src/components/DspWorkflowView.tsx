@@ -78,6 +78,7 @@ import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
 import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
 import { DspReceivedFromMohView } from './DspReceivedFromMohView';
 import { DspBreakdownMohToRhbView } from './DspBreakdownMohToRhbView';
+import { MappingBreakdownView } from './MappingBreakdownView';
 import { StageSourceDataModal } from './StageSourceDataModal';
 import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
 import { 
@@ -1745,31 +1746,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
           subtitle="Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers"
         />
-      ) : currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation' ? (
-        <Stage5EpssHoAggregationView
-          records={records}
-          setRecords={setRecords}
-          hfListItems={hfListItems}
-          setHfListItems={setHfListItems}
-          onTriggerCloudSync={onTriggerCloudSync}
-        />
-      ) : currentStage === 'epss-to-branch' ? (
-        <Stage6EpssBranchDispatchView
-          records={records}
-          setRecords={setRecords}
-          hfListItems={hfListItems}
-          onTriggerCloudSync={onTriggerCloudSync}
-        />
-      ) : (currentSubStep === '1.1' || currentSubTab === 'dsp-ho-1-1' || currentSubTab === 'dsp-request-moh-epss') ? (
-        <DspRequestMohTemplateView
-          multipleStockItems={multipleStockItems}
-          records={records}
-          setRecords={setRecords}
-          hfListItems={hfListItems}
-          onTriggerCloudSync={onTriggerCloudSync}
-          onOpenDspRequestModal={() => setIsCreateModalOpen(true)}
-          onSelectSubTab={onSelectSubTab}
-        />
       ) : (currentSubStep === '1.2' || currentSubTab === 'dsp-ho-1-2') ? (
         <DspReceivedFromMohView
           records={records}
@@ -1777,6 +1753,48 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           multipleStockItems={multipleStockItems}
           subStageTarget="1.2"
           onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '1.3.1' || (currentSubTab as string) === 'dsp-ho-1-3-1' || (currentSubTab as string) === 'map-hf-hub') ? (
+        <MappingBreakdownView hfListItems={hfListItems} />
+      ) : (currentSubStep === '1.3.2' || (currentSubTab as string) === 'dsp-ho-1-3-2' || (currentSubTab as string) === 'send-dsp-hub') ? (
+        <Stage6EpssBranchDispatchView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '1.3.3' || (currentSubTab as string) === 'dsp-ho-1-3-3' || (currentSubTab as string) === 'item-aggregation' || (currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation')) ? (
+        <Stage5EpssHoAggregationView
+          initialTab="aggregated-matrix"
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          setHfListItems={setHfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '1.3.4' || (currentSubTab as string) === 'dsp-ho-1-3-4' || (currentSubTab as string) === 'order-process') ? (
+        <Stage5EpssHoAggregationView
+          initialTab="order-process"
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          setHfListItems={setHfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation') ? (
+        <Stage5EpssHoAggregationView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          setHfListItems={setHfListItems}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentStage === 'epss-to-branch') ? (
+        <Stage6EpssBranchDispatchView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '2.1' || currentSubTab === 'dsp-moh-2-1') ? (
