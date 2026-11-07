@@ -234,7 +234,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '1.3.1': {
-    title: 'Map HF to Hubs',
+    title: 'Map HF to Hub',
     sender: 'EPSS Head Office Technical Operations',
     recipient: 'EPSS Regional Distribution Hubs',
     criteria: [
@@ -244,7 +244,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '1.3.2': {
-    title: 'Send DSP to Hubs / Submit',
+    title: 'Send DSP to Hub',
     sender: 'EPSS Head Office Logistics',
     recipient: 'Regional Distribution Hubs / Plants',
     criteria: [
@@ -264,7 +264,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '1.3.4': {
-    title: 'Order Process',
+    title: 'Order process',
     sender: 'Procurement & Logistics Directorate',
     recipient: 'EPSS Central Dispatch & Warehouses',
     criteria: [
@@ -284,7 +284,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '2.2': {
-    title: 'DSP Breakdown Request to RHB',
+    title: 'DSP Request to RHB',
     sender: 'Ministry of Health (PMD Directorate)',
     recipient: 'Regional Health Bureaus (RHBs)',
     criteria: [
@@ -304,7 +304,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '2.4': {
-    title: 'Breakdown Aggregation by RHB',
+    title: 'Breakdown Aggregation by hub',
     sender: 'MOH Technical Aggregation Team',
     recipient: 'MOH Executive Council',
     criteria: [
@@ -314,7 +314,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '2.5': {
-    title: 'DSP Agr. DSP Submitted to EPSS',
+    title: 'DSP Aggr. Submitted to EPSS',
     sender: 'Ministry of Health (PMD Directorate)',
     recipient: 'EPSS Head Office',
     criteria: [
@@ -354,7 +354,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '4.2': {
-    title: 'Analysis and Comparing with DSP',
+    title: 'Analysis & compare with DSP',
     sender: 'EPSS Branch Hub Operations',
     recipient: 'EPSS Quality & Logistics Division',
     criteria: [
@@ -716,10 +716,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       subSteps: [
         { id: '1.1', label: 'DSP Request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
         { id: '1.2', label: 'DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
-        { id: '1.3.1', label: 'MAP HF TO HUBS', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
-        { id: '1.3.2', label: 'SEND DSP TO HUBS / SUBMIT', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
-        { id: '1.3.3', label: 'ITEM AGGREGATION', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
-        { id: '1.3.4', label: 'ORDER PROCESS', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
+        { id: '1.3.1', label: 'Map HF to Hub', subTab: 'dsp-ho-1-3-1' as EpssSubTab },
+        { id: '1.3.2', label: 'Send DSP to Hub', subTab: 'dsp-ho-1-3-2' as EpssSubTab },
+        { id: '1.3.3', label: 'Item Aggregation', subTab: 'dsp-ho-1-3-3' as EpssSubTab },
+        { id: '1.3.4', label: 'Order process', subTab: 'dsp-ho-1-3-4' as EpssSubTab },
       ]
     },
     { 
@@ -730,10 +730,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       count: records.filter(r => r.stage === 'moh-osp-management').length,
       subSteps: [
         { id: '2.1', label: 'DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
-        { id: '2.2', label: 'DSP Breakdown Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
+        { id: '2.2', label: 'DSP Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
         { id: '2.3', label: 'Breakdown Received from RHB', subTab: 'dsp-moh-2-3' as EpssSubTab },
-        { id: '2.4', label: 'Breakdown Aggregation by RHB', subTab: 'dsp-moh-2-4' as EpssSubTab },
-        { id: '2.5', label: 'DSP Agr. DSP Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
+        { id: '2.4', label: 'Breakdown Aggregation by hub', subTab: 'dsp-moh-2-4' as EpssSubTab },
+        { id: '2.5', label: 'DSP Aggr. Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
       ]
     },
     { 
@@ -755,7 +755,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       count: records.filter(r => r.stage === 'branches-dsp-management').length,
       subSteps: [
         { id: '4.1', label: 'Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
-        { id: '4.2', label: 'Analysis and Comparing with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
+        { id: '4.2', label: 'Analysis & compare with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
       ]
     },
   ];
@@ -1842,7 +1842,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
-          title="2.4 Breakdown Aggregation by RHB - Multi-Regional Matrix"
+          title="2.4 Breakdown Aggregation by hub - Multi-Regional Matrix"
           subtitle="Official two-tier matrix aggregating health facility breakdowns across all Ethiopian regions submitted to MOH"
         />
       ) : (currentSubStep === '2.5' || currentSubTab === 'dsp-moh-2-5' || currentSubTab === 'dsp-submitted-moh-epss-ho') ? (
@@ -1886,7 +1886,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
-          title="2.5 DSP Agr. DSP Submitted to EPSS - Health Facility Matrix"
+          title="2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix"
           subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"
         />
       ) : (

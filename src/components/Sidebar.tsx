@@ -742,7 +742,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Send className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span className="truncate">Head Office DSP Mgmt</span>
+                            <span className="truncate">Head Office DSP Management</span>
                           </button>
 
 
@@ -775,7 +775,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Building2 className="w-3 h-3 text-orange-400 shrink-0" />
-                            <span className="truncate">RHB Breakdown Mgmt</span>
+                            <span className="truncate">RHB Breakdown Management</span>
                           </button>
 
                           {/* Branches DSP management */}
@@ -791,7 +791,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <Warehouse className="w-3 h-3 text-purple-400 shrink-0" />
-                            <span className="truncate">Branches DSP Mgmt</span>
+                            <span className="truncate">Branches DSP Management</span>
                           </button>
                         </div>
                       )}

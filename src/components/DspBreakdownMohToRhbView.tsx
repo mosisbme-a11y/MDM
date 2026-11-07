@@ -576,7 +576,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: targetedActiveRegions.join(', ') + ' Regional Health Bureaus',
       dspName: activeDspName,
-      subject: `DSP [${activeDspName}]: Authorized Regional Breakdown Request to RHB (${columns.length} Materials)`,
+      subject: `DSP [${activeDspName}]: Authorized DSP Request to RHB (${columns.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: columns.length,
@@ -628,7 +628,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#1E3A5F] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
-                DSP Breakdown Request to RHB
+                DSP Request to RHB
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-900">
                 {rows.length} Regions
