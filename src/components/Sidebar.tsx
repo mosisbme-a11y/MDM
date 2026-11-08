@@ -746,7 +746,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </button>
 
 
-                          {/* MOH OSP management */}
+                          {/* MOH DSP management */}
                           <button
                             onClick={() => {
                               setActiveTab('inventory');
@@ -759,7 +759,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }`}
                           >
                             <FileText className="w-3 h-3 text-cyan-400 shrink-0" />
-                            <span className="truncate">MOH OSP Management</span>
+                            <span className="truncate">MOH DSP Management</span>
                           </button>
 
                           {/* RHB Break down management */}

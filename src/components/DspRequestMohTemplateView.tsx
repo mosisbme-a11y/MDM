@@ -32,7 +32,11 @@ import {
   Sparkles,
   ArrowLeft,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ClipboardCheck,
+  CheckSquare,
+  Square,
+  ArrowUpRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -207,7 +211,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
-  const [isTransmitModalFullView, setIsTransmitModalFullView] = useState(false);
+  const [isTransmitModalFullView, setIsTransmitModalFullView] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isStockImportModalOpen, setIsStockImportModalOpen] = useState(false);
@@ -272,6 +276,98 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     // Prevent dumping all 1,871 stock items; default to the top 5 priority items
     return templateRows.slice(0, 5);
   }, [templateRows, selectedRowIds]);
+
+  const sentTotals = useMemo(() => ({
+    lineItemsCount: itemsToSend.length,
+    totalQty: itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0),
+    totalValuation: itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0)
+  }), [itemsToSend]);
+
+  // Confirmation Criteria State for Institutional Transmission Gate
+  const [criteriaAcknowledge, setCriteriaAcknowledge] = useState<Record<string, boolean>>({
+    dspName: true,
+    signatory: true,
+    stockMatch: true,
+    dossier10Col: true,
+    valuation: true,
+    letter: true
+  });
+
+  const criteriaList = useMemo(() => [
+    {
+      id: 'dspName',
+      title: 'DSP Project Name Identifier',
+      desc: 'Official project identifier designated by EPSS team without dates or routing symbols',
+      isVerified: dspName.trim().length > 0,
+      details: dspName.trim() ? `Registered: "${dspName.trim()}"` : 'Missing project name',
+      required: true
+    },
+    {
+      id: 'signatory',
+      title: 'Authorized Institutional Signatory',
+      desc: 'Official authorized person name and institutional leadership role filled',
+      isVerified: manualSignatoryName.trim().length > 0 && manualSignatoryRole.trim().length > 0,
+      details: manualSignatoryName.trim() && manualSignatoryRole.trim() 
+        ? `${manualSignatoryName} (${manualSignatoryRole})` 
+        : 'Signatory Name & Role required',
+      required: true
+    },
+    {
+      id: 'stockMatch',
+      title: 'Stock Verification & Program (HP) Match',
+      desc: 'Verified against unrestricted stock ledger and catalog specifications',
+      isVerified: itemsToSend.length > 0 && (criteriaAcknowledge.stockMatch ?? true),
+      details: `${itemsToSend.length} Priority Program (HP) materials verified`,
+      required: true
+    },
+    {
+      id: 'dossier10Col',
+      title: '10-Column Request Dossier Schema',
+      desc: 'Standardized 10-column layout validated for direct storage in Sub-step 2.1 (MOH)',
+      isVerified: criteriaAcknowledge.dossier10Col ?? true,
+      details: 'S/N, Material, Description, Qty, Valuation, ValType, WBS, Budget, Date, Target',
+      required: true
+    },
+    {
+      id: 'valuation',
+      title: 'Executive Quota & Budgetary Valuation',
+      desc: 'Total units count and ETB financial valuation reconciled with budget source',
+      isVerified: criteriaAcknowledge.valuation ?? true,
+      details: `${formatCurrency(sentTotals.totalValuation)} • ${formatNumber(sentTotals.totalQty)} Units`,
+      required: true
+    },
+    {
+      id: 'letter',
+      title: 'Official Covering Transmittal Memo',
+      desc: 'Official signed transmittal letter with institutional seal attached',
+      isVerified: uploadedLetterFile !== null || (criteriaAcknowledge.letter ?? false),
+      details: uploadedLetterFile ? `Attached: ${uploadedLetterFile.name}` : 'Institutional covering letter acknowledged',
+      required: false
+    }
+  ], [dspName, manualSignatoryName, manualSignatoryRole, itemsToSend, sentTotals, criteriaAcknowledge, uploadedLetterFile]);
+
+  const verifiedCriteriaCount = useMemo(() => {
+    return criteriaList.filter(c => c.isVerified).length;
+  }, [criteriaList]);
+
+  const handleToggleCriterion = (key: string) => {
+    setCriteriaAcknowledge(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const handleVerifyAllCriteria = () => {
+    setCriteriaAcknowledge({
+      dspName: true,
+      signatory: true,
+      stockMatch: true,
+      dossier10Col: true,
+      valuation: true,
+      letter: true
+    });
+    showToast('✓ All confirmation criteria marked as verified');
+  };
 
   // New Row Form State with auto-filled date and MOH
   const [newRowData, setNewRowData] = useState<Omit<DspRequestTemplateRow, 'id' | 'srNo'>>({
@@ -1855,220 +1951,651 @@ Authorized Directorate Desk`;
         </div>
       )}
 
-      {/* MODAL 3: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) */}
+      {/* MODAL 3: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) WITH FULL SCREEN & CONFIRMATION CRITERIA */}
       {isTransmitModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`bg-white rounded-2xl ${isTransmitModalFullView ? 'max-w-5xl h-[92vh]' : 'max-w-lg'} w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in flex flex-col transition-all duration-300`}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-0 md:p-3 overflow-hidden">
+          <div className={`bg-white shadow-2xl border border-slate-200 flex flex-col transition-all duration-200 overflow-hidden ${
+            isTransmitModalFullView 
+              ? 'fixed inset-0 w-screen h-screen rounded-none z-50 p-4 md:p-6' 
+              : 'w-full max-w-4xl max-h-[92vh] rounded-2xl p-5 md:p-6 animate-scale-in'
+          }`}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsTransmitModalOpen(false)}
-                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition mr-1"
-                  title="Back"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
+                  title="Back to Request Template"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
                 </button>
-                <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
+                <div className="p-2.5 rounded-xl bg-slate-900 text-amber-400 shrink-0">
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">Send DSP Request to MOH</h3>
-                  <p className="text-[11px] text-slate-400">Institutional quota submission to Ministry of Health PMD Directorate</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
+                      Send DSP Request to MOH
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                      Sub-step 1.1 ➔ 2.1
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      EPSS Head Office
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Official Institutional Quota Allocation & Transmittal to MOH PMD Directorate
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              <div className="flex items-center gap-2">
+                {/* Confirmation Criteria Summary Badge */}
+                <div className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                  verifiedCriteriaCount === criteriaList.length 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}>
+                  <ShieldCheck className={`w-3.5 h-3.5 ${verifiedCriteriaCount === criteriaList.length ? 'text-emerald-600' : 'text-amber-600'}`} />
+                  <span>{verifiedCriteriaCount} of {criteriaList.length} Criteria Met</span>
+                </div>
+
+                {/* Full Screen Toggle Button */}
                 <button
                   type="button"
                   onClick={() => setIsTransmitModalFullView(prev => !prev)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
-                  title={isTransmitModalFullView ? "Restore normal view" : "Full View (Maximize)"}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-black flex items-center gap-1.5 cursor-pointer transition border border-indigo-200"
+                  title={isTransmitModalFullView ? "Restore normal dialog window" : "Maximize to full screen workstation"}
                 >
-                  {isTransmitModalFullView ? <Minimize2 className="w-3.5 h-3.5 text-indigo-600" /> : <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />}
-                  <span className="text-[10px] uppercase font-black">{isTransmitModalFullView ? 'Normal' : 'Full View'}</span>
+                  {isTransmitModalFullView ? (
+                    <>
+                      <Minimize2 className="w-4 h-4 text-indigo-600" />
+                      <span className="uppercase text-[11px]">Normal View</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-4 h-4 text-indigo-600" />
+                      <span className="uppercase text-[11px]">Full Screen</span>
+                    </>
+                  )}
                 </button>
+
+                {/* Close Button */}
                 <button
                   type="button"
                   onClick={() => setIsTransmitModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition"
+                  title="Close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-              <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                DSP Name (Mandatory - EPSS Team Only)
-              </label>
-              <input 
-                type="text"
-                placeholder="Enter Official DSP Project Name (e.g. MCH Support 2026)"
-                value={dspName}
-                onChange={(e) => {
-                  setDspName(e.target.value);
-                }}
-                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-amber-900/30"
-              />
-              <p className="text-[10px] text-amber-700/70 italic leading-tight">
-                This identifier will be used by both EPSS and MOH to track the institutional allocation throughout the workflow.
-              </p>
-            </div>
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto pr-1 my-2 space-y-4">
+              {isTransmitModalFullView ? (
+                /* FULL SCREEN DUAL-COLUMN WORKSTATION LAYOUT */
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full">
+                  {/* LEFT / MAIN COLUMN (8 cols): DSP Name, Stats, Table, Letter */}
+                  <div className="lg:col-span-8 flex flex-col gap-4 overflow-y-auto pr-1">
+                    {/* DSP Name Input Card */}
+                    <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
+                          <ShieldCheck className="w-4 h-4 text-amber-600" />
+                          <span>DSP Name (Mandatory - EPSS Team Only)</span>
+                        </label>
+                        {dspName.trim() ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Registered Clean Name
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 animate-pulse">
+                            <AlertCircle className="w-3 h-3 text-rose-600" />
+                            Required
+                          </span>
+                        )}
+                      </div>
+                      <input 
+                        type="text"
+                        placeholder="Enter Official DSP Project Name (e.g. MCH Support 2026)"
+                        value={dspName}
+                        onChange={(e) => setDspName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-amber-900/40 shadow-xs"
+                      />
+                      <p className="text-[11px] text-amber-800/80 italic leading-tight">
+                        This identifier will be used by both EPSS and MOH to track the institutional allocation throughout the workflow without extra dates or routing arrows.
+                      </p>
+                    </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
-                  <span>Payload Details</span>
-                  <span className="text-amber-600 font-mono font-bold">PROGRAM (HP) DEDICATED</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TOTAL ITEMS</span>
-                    <span className="font-bold text-slate-900">{itemsToSend.length} Materials</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">REQUESTED UNITS</span>
-                    <span className="font-bold text-cyan-800">{formatNumber(itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0))} Units</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TOTAL VALUATION</span>
-                    <span className="font-black text-emerald-700">{formatCurrency(itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0))}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">DESTINATION</span>
-                    <span className="font-bold text-slate-900">MOH PMD Directorate</span>
-                  </div>
-                </div>
-              </div>
+                    {/* Payload Details Cards */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 shadow-xs">
+                      <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[11px]">
+                        <span className="tracking-wide">Payload Overview</span>
+                        <span className="text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-full font-mono font-bold text-[10px] border border-amber-200">
+                          PROGRAM (HP) DEDICATED
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">TOTAL ITEMS</span>
+                          <span className="text-sm font-black text-slate-900">{itemsToSend.length} Materials</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">REQUESTED UNITS</span>
+                          <span className="text-sm font-black text-cyan-800">{formatNumber(sentTotals.totalQty)} Units</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">TOTAL VALUATION</span>
+                          <span className="text-sm font-black text-emerald-700">{formatCurrency(sentTotals.totalValuation)}</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">DESTINATION</span>
+                          <span className="text-sm font-black text-slate-900">MOH PMD Directorate</span>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-3">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
+                    {/* Exact Storage in Sub-step 2.1 Banner & Full 10-Column Spreadsheet Table */}
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 space-y-3 shadow-xs flex-1 flex flex-col">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 font-bold text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800">
+                          10-Column Standard Schema Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
+                      </p>
+
+                      <div className="max-h-96 overflow-y-auto overflow-x-auto border border-emerald-200 rounded-xl shadow-inner bg-white">
+                        <table className="w-full text-[10px] text-left border-collapse min-w-[780px]">
+                          <thead className="bg-emerald-100/90 text-emerald-950 uppercase font-black sticky top-0 z-10 shadow-xs text-[9px] tracking-wider">
+                            <tr>
+                              <th className="p-2 border-r border-emerald-200 w-8 text-center">#</th>
+                              <th className="p-2 border-r border-emerald-200 w-28">Material</th>
+                              <th className="p-2 border-r border-emerald-200 min-w-[160px]">Material Description</th>
+                              <th className="p-2 border-r border-emerald-200 w-20 text-center">Qty</th>
+                              <th className="p-2 border-r border-emerald-200 w-24 text-right">Unit Price</th>
+                              <th className="p-2 border-r border-emerald-200 w-28 text-right">Total Amount (ETB)</th>
+                              <th className="p-2 border-r border-emerald-200 w-28">Valuation Type</th>
+                              <th className="p-2 border-r border-emerald-200 w-24">WBS Element</th>
+                              <th className="p-2 border-r border-emerald-200 w-20">Budget</th>
+                              <th className="p-2 w-16 text-center">Target</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-emerald-100">
+                            {itemsToSend.map((r, idx) => (
+                              <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="p-2 border-r border-emerald-100 font-mono font-bold text-slate-800">{r.material}</td>
+                                <td className="p-2 border-r border-emerald-100">
+                                  <input 
+                                    type="text"
+                                    value={r.materialDescription}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, materialDescription: val } : row));
+                                    }}
+                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-medium focus:outline-none focus:border-amber-400"
+                                  />
+                                </td>
+                                <td className="p-2 border-r border-emerald-100 text-center">
+                                  <input 
+                                    type="number"
+                                    value={r.qty}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      setTemplateRows(prev => prev.map(row => {
+                                        if (row.id === r.id) {
+                                          const unitPrice = row.qty > 0 ? row.totalAmount / row.qty : 350000;
+                                          return { ...row, qty: val, totalAmount: val * unitPrice };
+                                        }
+                                        return row;
+                                      }));
+                                    }}
+                                    className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-center text-cyan-900 focus:outline-none focus:border-amber-400"
+                                  />
+                                </td>
+                                <td className="p-2 border-r border-emerald-100 text-right font-mono text-slate-600">
+                                  {formatCurrency(r.qty > 0 ? r.totalAmount / r.qty : 0)}
+                                </td>
+                                <td className="p-2 border-r border-emerald-100 text-right">
+                                  <input 
+                                    type="number"
+                                    value={r.totalAmount}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, totalAmount: val } : row));
+                                    }}
+                                    className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-right text-emerald-700 focus:outline-none focus:border-amber-400"
+                                  />
+                                </td>
+                                <td className="p-2 border-r border-emerald-100 text-slate-600 text-[9px]">{r.valuationTypeDesc}</td>
+                                <td className="p-2 border-r border-emerald-100 font-mono text-slate-600 text-[9px]">{r.wbsElement}</td>
+                                <td className="p-2 border-r border-emerald-100 text-slate-800 font-bold text-[9px]">{r.budgetSource}</td>
+                                <td className="p-2 text-center text-emerald-800 font-black text-[9px]">{r.dspRequestTo || 'MOH'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Official Covering Letter Status */}
+                    <div className="p-3.5 bg-white border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl ${uploadedLetterFile ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                          <Paperclip className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            {uploadedLetterFile ? `Attached: ${uploadedLetterFile.name}` : 'Official Covering Letter (Optional / Recommended)'}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {uploadedLetterFile ? `${Math.round(uploadedLetterFile.size / 1024)} KB • Attached to DSP Transmittal` : 'Attach signed PDF or DOC official request transmittal memo'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => letterInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer shrink-0"
+                      >
+                        {uploadedLetterFile ? 'Replace Letter' : 'Upload Letter'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* RIGHT / SIDEBAR COLUMN (4 cols): Confirmation Criteria, Signatory, Transmit Action */}
+                  <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto pr-1">
+                    {/* CONFIRMATION CRITERIA SECTION (CORE USER REQUIREMENT) */}
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                            <ClipboardCheck className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">Confirmation Criteria</h4>
+                            <p className="text-[10px] text-slate-400">Institutional Submission Quality Gate</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleVerifyAllCriteria}
+                          className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition cursor-pointer border border-indigo-100"
+                        >
+                          Verify All
+                        </button>
+                      </div>
+
+                      {/* Criteria Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-black">
+                          <span className="text-slate-500 uppercase tracking-wider">Compliance Status</span>
+                          <span className={verifiedCriteriaCount === criteriaList.length ? 'text-emerald-700' : 'text-amber-700'}>
+                            {verifiedCriteriaCount} of {criteriaList.length} Verified ({Math.round((verifiedCriteriaCount / criteriaList.length) * 100)}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 rounded-full ${
+                              verifiedCriteriaCount === criteriaList.length ? 'bg-emerald-500' : 'bg-amber-500'
+                            }`}
+                            style={{ width: `${(verifiedCriteriaCount / criteriaList.length) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* List of Confirmation Criteria */}
+                      <div className="space-y-2">
+                        {criteriaList.map((crit) => (
+                          <div 
+                            key={crit.id}
+                            onClick={() => handleToggleCriterion(crit.id)}
+                            className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                              crit.isVerified 
+                                ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-amber-300'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {crit.isVerified ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-black text-[11px] truncate">{crit.title}</span>
+                                  {crit.required && (
+                                    <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-100/70 px-1.5 py-0.2 rounded shrink-0">
+                                      Required
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{crit.desc}</p>
+                                <div className="mt-1 flex items-center gap-1 font-mono text-[9px] text-slate-600 font-bold truncate">
+                                  <span>•</span>
+                                  <span className={crit.isVerified ? 'text-emerald-700' : 'text-slate-500'}>
+                                    {crit.details}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Authorized Institutional Signatory Card */}
+                    <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                        <div>
+                          <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">
+                            Authorized Institutional Signatory
+                          </h4>
+                          <p className="text-[10px] text-slate-500">Official Person & Role Required Before Transmittal</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2.5">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider ml-1">
+                            Authorized Person Name *
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. Dr. Solomon Abebe"
+                            value={manualSignatoryName}
+                            onChange={(e) => setManualSignatoryName(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition shadow-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider ml-1">
+                            Official Role / Title *
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. Director General"
+                            value={manualSignatoryRole}
+                            onChange={(e) => setManualSignatoryRole(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition shadow-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Transmittal Action Box */}
+                    <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 shadow-xl">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-400">Destination</span>
+                        <span className="text-amber-300">MOH PMD Directorate</span>
+                      </div>
+                      <div className="text-[11px] text-slate-300 leading-tight">
+                        Transmits official quota dossier to Ministry of Health and records incoming entry in Sub-step 2.1 (DSP Received from EPSS).
+                      </div>
+
+                      {(!dspName.trim() || !manualSignatoryName.trim() || !manualSignatoryRole.trim()) && (
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold space-y-0.5">
+                          <div>Mandatory fields missing:</div>
+                          {!dspName.trim() && <div>• DSP Project Name</div>}
+                          {(!manualSignatoryName.trim() || !manualSignatoryRole.trim()) && <div>• Authorized Person & Role</div>}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsTransmitModalOpen(false)}
+                          className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer text-center"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTransmitDspRequest}
+                          disabled={!dspName.trim() || !manualSignatoryName.trim() || !manualSignatoryRole.trim()}
+                          className={`flex-2 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md ${
+                            dspName.trim() && manualSignatoryName.trim() && manualSignatoryRole.trim()
+                              ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer' 
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed grayscale'
+                          }`}
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Confirm Transmittal</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
-                </p>
-                <div className="max-h-64 overflow-y-auto border border-emerald-200 rounded-lg shadow-inner">
-                  <table className="w-full text-[10px] text-left border-collapse bg-white">
-                    <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0 z-10 shadow-sm">
-                      <tr>
-                        <th className="p-2 border-r border-emerald-200 w-8">#</th>
-                        <th className="p-2 border-r border-emerald-200 min-w-[120px]">Description & Qty</th>
-                        <th className="p-2 text-right">Valuation (ETB)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-emerald-100">
-                      {itemsToSend.map((r, idx) => (
-                        <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2 border-r border-emerald-100 space-y-1.5">
-                            <input 
-                              type="text"
-                              value={r.materialDescription}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, materialDescription: val } : row));
-                              }}
-                              className="w-full px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-medium focus:outline-none focus:border-amber-400"
-                            />
-                            <div className="flex items-center gap-2">
-                              <span className="text-slate-400 font-bold uppercase text-[9px]">QTY:</span>
-                              <input 
-                                type="number"
-                                value={r.qty}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  setTemplateRows(prev => prev.map(row => {
-                                    if (row.id === r.id) {
-                                      const unitPrice = row.qty > 0 ? row.totalAmount / row.qty : 350000;
-                                      return { ...row, qty: val, totalAmount: val * unitPrice };
-                                    }
-                                    return row;
-                                  }));
-                                }}
-                                className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-bold focus:outline-none focus:border-amber-400"
-                              />
-                            </div>
-                          </td>
-                          <td className="p-2">
-                            <div className="flex flex-col items-end gap-1">
-                              <input 
-                                type="number"
-                                value={r.totalAmount}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, totalAmount: val } : row));
-                                }}
-                                className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-right text-emerald-700 focus:outline-none focus:border-amber-400"
-                              />
-                              <span className="text-[9px] text-slate-400 font-mono">
-                                (Unit: {formatCurrency(r.qty > 0 ? r.totalAmount / r.qty : 0)})
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
+              ) : (
+                /* NORMAL DIALOG LAYOUT */
+                <div className="space-y-4 text-xs">
+                  {/* DSP Name Input Card */}
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                    <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      DSP Name (Mandatory - EPSS Team Only)
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder="Enter Official DSP Project Name (e.g. MCH Support 2026)"
+                      value={dspName}
+                      onChange={(e) => setDspName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder-amber-900/30"
+                    />
+                    <p className="text-[10px] text-amber-700/70 italic leading-tight">
+                      This identifier will be used by both EPSS and MOH to track the institutional allocation throughout the workflow.
+                    </p>
+                  </div>
+
+                  {/* Payload Details */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
+                      <span>Payload Details</span>
+                      <span className="text-amber-600 font-mono font-bold">PROGRAM (HP) DEDICATED</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">TOTAL ITEMS</span>
+                        <span className="font-bold text-slate-900">{itemsToSend.length} Materials</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">REQUESTED UNITS</span>
+                        <span className="font-bold text-cyan-800">{formatNumber(sentTotals.totalQty)} Units</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">TOTAL VALUATION</span>
+                        <span className="font-black text-emerald-700">{formatCurrency(sentTotals.totalValuation)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">DESTINATION</span>
+                        <span className="font-bold text-slate-900">MOH PMD Directorate</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Confirmation Criteria Section in Normal View */}
+                  <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+                        <h4 className="text-[11px] font-black text-slate-900 uppercase">Confirmation Criteria</h4>
+                        <span className="text-[10px] text-slate-500">({verifiedCriteriaCount}/{criteriaList.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleVerifyAllCriteria}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                      >
+                        Verify All
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {criteriaList.map((crit) => (
+                        <div 
+                          key={crit.id}
+                          onClick={() => handleToggleCriterion(crit.id)}
+                          className={`p-2 rounded-lg border text-xs cursor-pointer flex items-center gap-2 ${
+                            crit.isVerified 
+                              ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950 font-bold' 
+                              : 'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {crit.isVerified ? (
+                            <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          )}
+                          <span className="text-[11px] truncate">{crit.title}</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Manual Signatory Input Section (Added per user request) */}
-              <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3 mx-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Authorized Institutional Signatory</h4>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Dr. Solomon Abebe"
-                      value={manualSignatoryName}
-                      onChange={(e) => setManualSignatoryName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
-                    />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role / Title</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Director General"
-                      value={manualSignatoryRole}
-                      onChange={(e) => setManualSignatoryRole(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
-                    />
+
+                  {/* Exact Storage in Sub-step 2.1 & Previous Default Cleared */}
+                  <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-3">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed">
+                      Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
+                    </p>
+                    <div className="max-h-64 overflow-y-auto border border-emerald-200 rounded-lg shadow-inner bg-white">
+                      <table className="w-full text-[10px] text-left border-collapse">
+                        <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0 z-10 shadow-xs">
+                          <tr>
+                            <th className="p-2 border-r border-emerald-200 w-8">#</th>
+                            <th className="p-2 border-r border-emerald-200 min-w-[120px]">Description & Qty</th>
+                            <th className="p-2 text-right">Valuation (ETB)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-100">
+                          {itemsToSend.map((r, idx) => (
+                            <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-400">{idx + 1}</td>
+                              <td className="p-2 border-r border-emerald-100 space-y-1.5">
+                                <input 
+                                  type="text"
+                                  value={r.materialDescription}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, materialDescription: val } : row));
+                                  }}
+                                  className="w-full px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-medium focus:outline-none focus:border-amber-400"
+                                />
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400 font-bold uppercase text-[9px]">QTY:</span>
+                                  <input 
+                                    type="number"
+                                    value={r.qty}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      setTemplateRows(prev => prev.map(row => {
+                                        if (row.id === r.id) {
+                                          const unitPrice = row.qty > 0 ? row.totalAmount / row.qty : 350000;
+                                          return { ...row, qty: val, totalAmount: val * unitPrice };
+                                        }
+                                        return row;
+                                      }));
+                                    }}
+                                    className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-bold focus:outline-none focus:border-amber-400"
+                                  />
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                <div className="flex flex-col items-end gap-1">
+                                  <input 
+                                    type="number"
+                                    value={r.totalAmount}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setTemplateRows(prev => prev.map(row => row.id === r.id ? { ...row, totalAmount: val } : row));
+                                    }}
+                                    className="w-24 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-right text-emerald-700 focus:outline-none focus:border-amber-400"
+                                  />
+                                  <span className="text-[9px] text-slate-400 font-mono">
+                                    (Unit: {formatCurrency(r.qty > 0 ? r.totalAmount / r.qty : 0)})
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Manual Signatory Input Section */}
+                  <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                      <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Authorized Institutional Signatory</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name *</label>
+                        <input 
+                          type="text"
+                          placeholder="e.g. Dr. Solomon Abebe"
+                          value={manualSignatoryName}
+                          onChange={(e) => setManualSignatoryName(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role / Title *</label>
+                        <input 
+                          type="text"
+                          placeholder="e.g. Director General"
+                          value={manualSignatoryRole}
+                          onChange={(e) => setManualSignatoryRole(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Buttons in Normal View */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsTransmitModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTransmitDspRequest}
+                      disabled={!dspName.trim() || !manualSignatoryName.trim() || !manualSignatoryRole.trim()}
+                      className={`px-5 py-2 rounded-xl font-black transition-all flex items-center gap-1.5 shadow-md ${
+                        dspName.trim() && manualSignatoryName.trim() && manualSignatoryRole.trim()
+                          ? 'bg-slate-900 hover:bg-black text-amber-300 cursor-pointer' 
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'
+                      }`}
+                    >
+                      <Send className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Confirm Transmittal to MOH</span>
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsTransmitModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTransmitDspRequest}
-                  disabled={!dspName.trim()}
-                  className={`px-5 py-2 rounded-xl font-black transition-all flex items-center gap-1.5 shadow-md ${
-                    dspName.trim() 
-                      ? 'bg-slate-900 hover:bg-black text-amber-300 cursor-pointer' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'
-                  }`}
-                >
-                  <Send className={`w-3.5 h-3.5 ${dspName.trim() ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span>Confirm Transmittal to MOH</span>
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>

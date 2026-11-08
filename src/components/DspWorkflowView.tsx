@@ -212,6 +212,12 @@ export function computeDateCount(
   }
 }
 
+import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
+export { getDossierDisplayInfo };
+export type { DossierDisplayInfo } from '../utils/dspDisplayUtils';
+
+
+
 export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: string; recipient: string; criteria: string[] }> = {
   '1.1': {
     title: 'DSP Request to MOH',
@@ -726,7 +732,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     { 
       id: 'moh-osp-management', 
       stageKey: 'moh-osp-management', 
-      label: 'MOH OSP Management', 
+      label: 'MOH DSP Management', 
       color: 'from-cyan-600 to-teal-600', 
       count: records.filter(r => r.stage === 'moh-osp-management').length,
       subSteps: [
@@ -2053,14 +2059,19 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     }));
                     downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
                   } else {
-                    const csv = filteredRecords.map((r, idx) => ({
-                      'S/N': idx + 1,
-                      'Date': r.dateSubmitted,
-                      'DSP Name': r.subject,
-                      'Authorized person': r.signatory,
-                      'Status': r.status,
-                      'Reference': r.dspRefNumber
-                    }));
+                    const csv = filteredRecords.map((r, idx) => {
+                      const dspInfo = getDossierDisplayInfo(r, idx);
+                      return {
+                        'S/N': idx + 1,
+                        'Date': r.dateSubmitted,
+                        'DSP Name': dspInfo.dspName,
+                        'Authorized person': dspInfo.authorizedPerson,
+                        'Organazation': dspInfo.organization,
+                        'Role': dspInfo.role,
+                        'Status': dspInfo.status,
+                        'Reference': r.dspRefNumber
+                      };
+                    });
                     downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
                   }
                 }}
@@ -2192,19 +2203,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               /* User-Requested Summary Template (Image 2) */
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 text-[11px] font-bold text-slate-800 uppercase tracking-tight select-none">
-                    <th className="py-3 px-4 border-r border-slate-200 w-12 text-center">S/N</th>
-                    <th className="py-3 px-4 border-r border-slate-200 w-32">Date</th>
-                    <th className="py-3 px-4 border-r border-slate-200">DSP Name</th>
-                    <th className="py-3 px-4 border-r border-slate-200">Authorized person</th>
-                    <th className="py-3 px-4 border-r border-slate-200 text-center w-28">Status</th>
-                    <th className="py-3 px-4 text-center w-24">View</th>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
+                    <th className="py-2.5 px-3 text-center w-20 italic">View</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700">
+                <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
                   {filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center bg-slate-50/30">
+                      <td colSpan={8} className="py-12 text-center bg-slate-50/30">
                         <div className="flex flex-col items-center gap-2">
                           <FileText className="w-8 h-8 text-slate-200" />
                           <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2212,52 +2225,51 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       </td>
                     </tr>
                   ) : (
-                    filteredRecords.map((rec, idx) => (
-                      <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group">
-                        <td className="py-3 px-4 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20">
-                          {idx + 1}
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100 font-semibold text-slate-600">
-                          {rec.dateSubmitted}
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span className="font-extrabold text-slate-900 group-hover:text-amber-700 transition-colors text-xs font-mono">
-                                {rec.dspRefNumber} — {rec.dspName || rec.subject} ({formatNumber(rec.totalQuantity || rec.itemsIncluded?.reduce((s, i) => s + (i.quantity || 0), 0) || 0)} Units)
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                              <UserCheck className="w-3 h-3 text-slate-500" />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-800">{rec.signatory}</span>
-                              <span className="text-[10px] text-slate-400 leading-tight">{rec.signatoryRole || 'Official Representative'}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 border-r border-slate-100 text-center">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {rec.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecord(rec)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
-                          >
-                            <Eye className="w-3 h-3" />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredRecords.map((rec, idx) => {
+                      const dspInfo = getDossierDisplayInfo(rec, idx);
+                      return (
+                        <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
+                            {rec.dateSubmitted}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                            {dspInfo.dspName}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                            {dspInfo.authorizedPerson}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                            {dspInfo.organization}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                            {dspInfo.role}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              dspInfo.status === 'Approved' 
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}>
+                              {dspInfo.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRecord(rec)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                              title="View dossier details"
+                            >
+                              <Eye className="w-3 h-3 text-amber-600" />
+                              <span>View</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

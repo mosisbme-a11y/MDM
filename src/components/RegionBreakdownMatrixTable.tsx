@@ -24,12 +24,16 @@ import {
   MessageCircle,
   ShieldCheck,
   Paperclip,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  ArrowLeft,
+  ChevronDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
+import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
 
 export interface RegionBreakdownColumn {
   id: string;
@@ -135,6 +139,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
   // Breakdown Request Selector & Column Configurator State
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState<boolean>(false);
+  const [isRequestModalFullScreen, setIsRequestModalFullScreen] = useState<boolean>(false);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState<boolean>(false);
   const [newColumnName, setNewColumnName] = useState<string>('');
   const [newColumnCode, setNewColumnCode] = useState<string>('');
@@ -873,22 +879,28 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Breakdown Request Dropdown (Only shown if not unlinked) */}
+            {/* Breakdown Request Selector - Clean button opening 8-column Table Modal */}
             {!disableBreakdownLink && breakdownRequests && breakdownRequests.length > 0 && (
               <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-amber-300 shadow-2xs">
                 <span className="text-xs font-bold text-slate-700 pl-1">Request:</span>
-                <select
-                  value={selectedRequestId}
-                  onChange={(e) => handleSelectBreakdownRequest(e.target.value)}
-                  className="bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 text-xs text-amber-900 font-bold cursor-pointer focus:outline-none focus:border-amber-500 max-w-xs truncate"
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(true)}
+                  className="bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg px-2.5 py-1 text-xs text-amber-950 font-bold cursor-pointer transition flex items-center gap-1.5 max-w-xs truncate shadow-2xs"
+                  title="Open Institutional Request Selection Table"
                 >
-                  <option value="">-- Select Breakdown Request --</option>
-                  {breakdownRequests.map((req) => (
-                    <option key={req.id} value={req.id}>
-                      {req.dspRefNumber || 'Request'} — {req.subject || req.senderOrg} ({req.totalQuantity || 0} Units)
-                    </option>
-                  ))}
-                </select>
+                  <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="truncate">
+                    {selectedRequestId
+                      ? (() => {
+                          const sel = breakdownRequests.find(r => r.id === selectedRequestId);
+                          if (!sel) return 'Selected Request';
+                          return getDossierDisplayInfo(sel).dspName || sel.dspName || sel.dspRefNumber;
+                        })()
+                      : '-- Select Breakdown Request --'}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-amber-700 shrink-0" />
+                </button>
               </div>
             )}
 
@@ -1894,6 +1906,165 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
         </div>
       )}
+      {/* 8-Column Institutional Request Selection Modal */}
+      {isRequestModalOpen && (
+        <div className={`fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 transition-all duration-300 ${
+          isRequestModalFullScreen ? 'p-0' : ''
+        }`}>
+          <div className={`bg-white shadow-2xl border border-slate-200 animate-scale-in flex flex-col transition-all duration-300 ${
+            isRequestModalFullScreen 
+              ? 'w-full h-full rounded-none max-w-none max-h-none p-5' 
+              : 'rounded-3xl max-w-5xl w-full p-6 max-h-[90vh]'
+          }`}>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                  title="Go back / close"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Back</span>
+                </button>
+                <div className="p-2.5 rounded-2xl bg-amber-500 text-slate-950 shadow-sm">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Select Breakdown Request Source Data</h3>
+                  <p className="text-xs text-slate-500">Choose an official request dossier from the institutional table below</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalFullScreen(!isRequestModalFullScreen)}
+                  className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer transition flex items-center gap-1.5 text-xs font-bold border border-slate-200"
+                  title={isRequestModalFullScreen ? 'Exit Full Screen' : 'Full Screen View'}
+                >
+                  {isRequestModalFullScreen ? (
+                    <>
+                      <Minimize2 className="w-4 h-4 text-amber-600" />
+                      <span className="hidden md:inline">Exit Full Screen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-4 h-4 text-amber-600" />
+                      <span className="hidden md:inline">Full Screen</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition"
+                  title="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto overflow-y-auto flex-1 border border-slate-200 rounded-2xl shadow-inner mt-4 bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
+                    <th className="py-2.5 px-3 text-center w-28 italic">View</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+                  {breakdownRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400 font-medium italic">
+                        No breakdown requests available.
+                      </td>
+                    </tr>
+                  ) : (
+                    breakdownRequests.map((rec, idx) => {
+                      const dspInfo = getDossierDisplayInfo(rec, idx);
+                      const isSelected = selectedRequestId === rec.id;
+                      return (
+                        <tr 
+                          key={rec.id} 
+                          className={`hover:bg-amber-50/40 transition-colors group border-b border-slate-100 ${
+                            isSelected ? 'bg-amber-50/60 font-bold' : ''
+                          }`}
+                        >
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
+                            {rec.dateSubmitted}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                            {dspInfo.dspName}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                            {dspInfo.authorizedPerson}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                            {dspInfo.organization}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                            {dspInfo.role}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              dspInfo.status === 'Approved'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}>
+                              {dspInfo.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleSelectBreakdownRequest(rec.id);
+                                setIsRequestModalOpen(false);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs active:scale-95"
+                              title="Select this breakdown request"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{isSelected ? 'Selected' : 'View'}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
+              <span className="text-xs text-slate-500">
+                Total Requests Available: <strong className="text-slate-800">{breakdownRequests.length}</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
