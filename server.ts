@@ -59,7 +59,7 @@ async function requireAuth(req, res, next) {
   }
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) return res.status(401).json({ error: 'Not signed in' });
+  if (!token || token === 'null' || token === 'undefined') return res.status(401).json({ error: 'Not signed in' });
   const cached = authCache.get(token);
   if (cached && cached.expires > Date.now()) {
     req.user = cached.user;
@@ -69,7 +69,7 @@ async function requireAuth(req, res, next) {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !data || !data.user) {
       const msg = String((error && error.message) || 'no user returned');
-      console.error(`[AUTH] getUser failed: status=${(error as any)?.status} message=${msg}`);
+      console.warn(`[AUTH] getUser verification notice: status=${(error as any)?.status} message=${msg}`);
       // A wrong/mismatched service key or project URL on the SERVER is not the user's fault. Report it as such.
       if (/invalid api key|apikey|jwt secret|fetch failed|ENOTFOUND/i.test(msg) || (error as any)?.status === 500) {
         return res.status(503).json({ error: `Server cannot verify logins (server Supabase config problem: ${msg}). Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.` });

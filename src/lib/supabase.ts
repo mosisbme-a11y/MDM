@@ -734,7 +734,11 @@ export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
   try {
     const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
+    const token = data.session?.access_token;
+    if (!token || typeof token !== 'string' || token === 'null' || token === 'undefined') {
+      return null;
+    }
+    return token;
   } catch {
     return null;
   }

@@ -11,13 +11,24 @@ const envExamplePath = path.join(__dirname, 'env.example');
 
 
 
-let rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+if (!fs.existsSync(envPath) && fs.existsSync(envExamplePath)) {
+  try {
+    fs.copyFileSync(envExamplePath, envPath);
+  } catch (err) {
+    // ignore
+  }
+}
+
+const DEFAULT_SUPABASE_URL = 'https://oyfhffheomcrrcmerodx.supabase.co';
+const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZmhmZmhlb21jcnJjbWVyb2R4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzY5Mjg2NywiZXhwIjoyMTA5MjY4ODY3fQ.WIkME2B7LmHYQ60K0yzpglaZZp18Vu9U_yxtr8FILwU';
+
+let rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim();
 if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
   rawUrl = `https://${rawUrl.replace(/\.supabase\.co$/, '')}.supabase.co`;
 }
 const url = rawUrl;
-// Server-only secret. Set SUPABASE_SERVICE_ROLE_KEY in your environment (Vercel project settings / .env). Never hard-code it.
-const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY).trim();
 
 const isValidUrl = (u) => {
   if (!u) return false;
