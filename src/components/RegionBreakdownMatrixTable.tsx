@@ -184,6 +184,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'epss' | 'rhb'>('epss');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
 
@@ -649,26 +650,41 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     notifyChange(internalDate, columns, updated);
   };
 
-  // Export to Excel in exact 2-tier format
+  // Export to Excel in exact 2-tier format matching active template (EPSS or RHB)
   const handleExportExcel = () => {
     const aoa: any[][] = [];
+    const isEpssFormat = matrixTemplateFormat === 'epss';
 
     // Row 1: Date
     aoa.push(['Date', internalDate]);
 
     // Row 2: Top Tier Headers
-    aoa.push([
+    aoa.push(isEpssFormat ? [
+      'Region',
+      'Zone',
+      'Woreda',
+      'Name of health facility',
+      'List of Packeges',
+      ...columns.map(c => c.name)
+    ] : [
       'Region',
       'Zone',
       'Woreda',
       'Customer Description',
-      'HUB',
       'List of Packeges',
+      'Hub',
       ...columns.map(c => c.name)
     ]);
 
     // Row 3: Bottom Tier Headers (Item Codes)
-    aoa.push([
+    aoa.push(isEpssFormat ? [
+      '',
+      '',
+      '',
+      '',
+      'List of Packeges',
+      ...columns.map(c => c.code)
+    ] : [
       '',
       '',
       '',
@@ -680,22 +696,43 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     // Data rows
     filteredRows.forEach(r => {
-      aoa.push([
-        r.region,
-        r.zone,
-        r.woreda,
-        r.customerDescription || r.healthFacility,
-        r.hub || 'HO01',
-        r.packages,
-        ...columns.map(c => {
-          const val = r.quantities[c.id];
-          return val === 0 ? '' : (val ?? '');
-        })
-      ]);
+      if (isEpssFormat) {
+        aoa.push([
+          r.region,
+          r.zone,
+          r.woreda,
+          r.healthFacility || r.customerDescription,
+          r.packages,
+          ...columns.map(c => {
+            const val = r.quantities[c.id];
+            return val === 0 ? '' : (val ?? '');
+          })
+        ]);
+      } else {
+        aoa.push([
+          r.region,
+          r.zone,
+          r.woreda,
+          r.customerDescription || r.healthFacility,
+          r.packages,
+          r.hub || 'HO01',
+          ...columns.map(c => {
+            const val = r.quantities[c.id];
+            return val === 0 ? '' : (val ?? '');
+          })
+        ]);
+      }
     });
 
     // Totals row
-    aoa.push([
+    aoa.push(isEpssFormat ? [
+      'TOTAL',
+      '',
+      '',
+      `${filteredRows.length} Facilities`,
+      '',
+      ...columns.map(c => columnTotals[c.id] || 0)
+    ] : [
       'TOTAL',
       '',
       '',
@@ -707,33 +744,40 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    ws['!cols'] = [
+    ws['!cols'] = isEpssFormat ? [
       { wch: 14 },
       { wch: 16 },
       { wch: 10 },
       { wch: 32 },
-      { wch: 14 },
       { wch: 18 },
+      ...columns.map(() => ({ wch: 22 }))
+    ] : [
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 32 },
+      { wch: 18 },
+      { wch: 14 },
       ...columns.map(() => ({ wch: 22 }))
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Facility Breakdown');
-    const filename = `DSP_Region_To_MOH_Breakdown_${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.xlsx`;
+    const filename = `DSP_${isEpssFormat ? 'EPSS_Submission' : 'RHB_Breakdown'}_${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.xlsx`;
     XLSX.writeFile(wb, filename);
     showToast(`✓ Exported ${filename}`);
   };
 
   // Download official blank template
   const handleDownloadTemplate = () => {
+    const isEpssFormat = matrixTemplateFormat === 'epss';
     const aoa: any[][] = [
       ['Date', new Date().toISOString().split('T')[0]],
-      [
+      isEpssFormat ? [
         'Region',
         'Zone',
         'Woreda',
-        'Customer Description',
-        'HUB',
+        'Name of health facility',
         'List of Packeges',
         'Anesthesia machine - with Patient mon',
         'Bed - Patient, Fowler, Adult',
@@ -741,8 +785,33 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'Cold box',
         'Couch - Delivery',
         'Couch - Examination'
+      ] : [
+        'Region',
+        'Zone',
+        'Woreda',
+        'Customer Description',
+        'List of Packeges',
+        'Hub',
+        'Anesthesia machine - with Patient mon',
+        'Bed - Patient, Fowler, Adult',
+        'Bowel - With Stand, Stainless Steel.',
+        'Cold box',
+        'Couch - Delivery',
+        'Couch - Examination'
       ],
-      [
+      isEpssFormat ? [
+        '',
+        '',
+        '',
+        '',
+        'List of Packeges',
+        '403-XRRD-0101',
+        '403-XRRD-0101',
+        '403-XRRB-0101N',
+        '403-XRRD-0101-001',
+        '401-WICU-0101N',
+        '401-WICU-0101N'
+      ] : [
         '',
         '',
         '',
@@ -756,11 +825,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         '401-WICU-0101N',
         '401-WICU-0101N'
       ],
-      ['Oromia', 'Addis ketema', '1', 'Abeshige Woreda Health Office', 'AD01', 'MCH', 2, 3, 3, 2, 2, 2],
-      ['Oromia', 'Addis ketema', '1', 'Addis Hiwot Health Center', 'AD01', 'OR', 2, 3, 3, 2, 2, 2],
-      ['Oromia', 'Addis ketema', '1', 'Adama Health Center', 'AD01', 'ICU', 2, 1, 1, 2, 2, 2],
-      ['Oromia', 'kirkose', '3', 'Addis Hiwot Health Center', 'AD01', 'MCH', 2, '', '', 2, 2, 2],
-      ['Oromia', 'kirkose', '3', 'Abala Primary Hospital', 'AD01', 'OR', 2, 3, 3, 2, 2, 2]
+      isEpssFormat ? ['Oromia', 'Addis ketema', '1', 'Abeshige Woreda Health Office', 'MCH', 2, 2, 2, 2, 2, 2] : ['Oromia', 'Addis ketema', '1', 'Abeshige Woreda Health Office', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
+      isEpssFormat ? ['Oromia', 'Addis ketema', '1', 'Addis Hiwot Health Center', 'MCH', 2, 2, 2, 2, 2, 2] : ['Oromia', 'Addis ketema', '1', 'Addis Hiwot Health Center', 'OR', 'AD01', 2, 2, 2, 2, 2, 2],
+      isEpssFormat ? ['Oromia', 'Addis ketema', '1', 'Adama Health Center', 'MCH', 2, 2, 2, 2, 2, 2] : ['Oromia', 'Addis ketema', '1', 'Adama Health Center', 'ICU', 'AD01', 2, 2, 2, 2, 2, 2],
+      isEpssFormat ? ['Oromia', 'kirkose', '3', 'Addis Hiwot Health Center', 'MCH', 2, 2, 2, 2, 2, 2] : ['Oromia', 'kirkose', '3', 'Addis Hiwot Health Center', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
+      isEpssFormat ? ['Oromia', 'kirkose', '3', 'Abala Primary Hospital', 'MCH', 2, 2, 2, 2, 2, 2] : ['Oromia', 'kirkose', '3', 'Abala Primary Hospital', 'OR', 'AD01', 2, 2, 2, 2, 2, 2]
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [
@@ -768,7 +837,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       { wch: 16 },
       { wch: 10 },
       { wch: 32 },
-      { wch: 14 },
+      { wch: 18 },
       { wch: 18 },
       { wch: 22 },
       { wch: 22 },
@@ -779,8 +848,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'EPSS_DSP_Region_To_MOH_Template.xlsx');
-    showToast('✓ Downloaded EPSS_DSP_Region_To_MOH_Template.xlsx');
+    const templateName = `EPSS_DSP_${isEpssFormat ? 'Submitted_To_EPSS' : 'Breakdown_Aggregation'}_Template.xlsx`;
+    XLSX.writeFile(wb, templateName);
+    showToast(`✓ Downloaded ${templateName}`);
   };
 
   // Auto map facilities to hub using mapFacilityToHub algorithm
@@ -836,15 +906,40 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* MAP HF TO HUB Button: Matching Attachment _934BEC08-52E7-4FD6-A65C-9515C885B146__e489e3df.png */}
+          {/* DSP AGGR. SUBMITTED TO EPSS Button: Matching Attachment _C69F641D-56A8-4E6A-BC48-B6D52520142C__8e784b80.png */}
           <button
             type="button"
-            onClick={handleMapHfToHub}
-            className="px-4 py-1.5 rounded-full bg-[#0a0f1d] hover:bg-black text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md border border-slate-800 active:scale-95 transition-all"
-            title="Automatically map Health Facilities to designated EPSS Distribution Hubs"
+            onClick={() => {
+              setMatrixTemplateFormat('epss');
+              showToast('⚡ Switched to Official EPSS Submission Format (Name of health facility)');
+            }}
+            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+              matrixTemplateFormat === 'epss'
+                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Switch to Official EPSS Submission Format (Name of health facility, List of Packages)"
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-wide text-white">MAP HF TO HUB</span>
+            <span className="uppercase font-black tracking-wide text-white">DSP AGGR. SUBMITTED TO EPSS</span>
+          </button>
+
+          {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png */}
+          <button
+            type="button"
+            onClick={() => {
+              setMatrixTemplateFormat('rhb');
+              handleMapHfToHub();
+            }}
+            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+              matrixTemplateFormat === 'rhb'
+                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Automatically aggregate breakdown by RHB and map Health Facilities to designated EPSS Distribution Hubs"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
+            <span className="uppercase font-black tracking-wide text-white">BREAKDOWN AGGREGATION BY RHB</span>
           </button>
 
           {/* Send TO MOH Button */}
@@ -1190,7 +1285,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </th>
                 <th 
-                  colSpan={columns.length + 5} 
+                  colSpan={columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4)} 
                   className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
                 >
                   Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
@@ -1208,18 +1303,26 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[70px] text-center">
                   Woreda
                 </th>
-                <th className="p-2.5 bg-[#fed7aa] text-[#78350f] border-r border-slate-300 font-semibold min-w-[240px]">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#fef08a] border border-[#fde047] text-[#854d0e] font-bold shadow-2xs not-italic">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                    <span>Customer Description</span>
-                  </div>
-                </th>
+                {matrixTemplateFormat === 'epss' ? (
+                  <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[240px]">
+                    Name of health facility
+                  </th>
+                ) : (
+                  <th className="p-2.5 bg-[#fed7aa] text-[#78350f] border-r border-slate-300 font-semibold min-w-[240px]">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#fef08a] border border-[#fde047] text-[#854d0e] font-bold shadow-2xs not-italic">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span>Customer Description</span>
+                    </div>
+                  </th>
+                )}
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                   List of Packeges
                 </th>
-                <th className="p-2.5 italic bg-white text-slate-900 border-r border-slate-300 font-semibold min-w-[110px] text-center">
-                  Hub
-                </th>
+                {matrixTemplateFormat === 'rhb' && (
+                  <th className="p-2.5 italic bg-white text-slate-900 border-r border-slate-300 font-semibold min-w-[110px] text-center">
+                    Hub
+                  </th>
+                )}
                 {columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1262,8 +1365,10 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
-                <th className="p-2 bg-[#eff6ff] border-r border-slate-300"></th>
-                <th className="p-2 bg-white border-r border-slate-300"></th>
+                <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
+                {matrixTemplateFormat === 'rhb' && (
+                  <th className="p-2 bg-white border-r border-slate-300"></th>
+                )}
                 {columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1293,7 +1398,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <tbody className="divide-y divide-slate-200">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 5 + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
+                  <td colSpan={columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4) + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
                     No facility rows matching the selected region or filter.
                   </td>
                 </tr>
@@ -1426,7 +1531,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
-                      {/* 4. Customer Description (STRICTLY FILTERED FOR SELECTED REGION ONLY) */}
+                      {/* 4. Customer Description / Name of health facility */}
                       <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[250px] bg-amber-50/20">
                         {isEditingMode ? (
                           <div className="space-y-1">
@@ -1471,7 +1576,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                                 type="button"
                                 onClick={() => setIsEditingMode(true)}
                                 className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
-                                title="Edit customer description"
+                                title="Edit facility name"
                               >
                                 <Edit3 size={11} />
                               </button>
@@ -1507,37 +1612,39 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
-                      {/* 6. Hub */}
-                      <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center">
-                        {isEditingMode ? (
-                          <select
-                            value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                            onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
-                            className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
-                            title="Select EPSS Distribution Hub"
-                          >
-                            {EPSS_HUBS_REGISTRY.map(h => (
-                              <option key={h.code} value={h.code}>
-                                {h.code} - {h.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1 group">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[11px] border border-slate-300">
-                              {row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setIsEditingMode(true)}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
-                              title="Edit hub"
+                      {/* 6. Hub (RHB template only) */}
+                      {matrixTemplateFormat === 'rhb' && (
+                        <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center">
+                          {isEditingMode ? (
+                            <select
+                              value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                              onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
+                              className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
+                              title="Select EPSS Distribution Hub"
                             >
-                              <Edit3 size={11} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                              {EPSS_HUBS_REGISTRY.map(h => (
+                                <option key={h.code} value={h.code}>
+                                  {h.code} - {h.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1 group">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[11px] border border-slate-300">
+                                {row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingMode(true)}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
+                                title="Edit hub"
+                              >
+                                <Edit3 size={11} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
 
                     {/* Equipment Quantity Cells */}
                     {columns.map(col => {
@@ -1589,7 +1696,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
               {/* Inline Add Facility Row Button Row */}
               <tr className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
-                <td colSpan={columns.length + 5 + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
+                <td colSpan={columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4) + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
                   <button
                     type="button"
                     onClick={handleAddRow}
@@ -1618,9 +1725,14 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 font-black text-slate-900">
                   {filteredRows.length} Health Facilities
                 </td>
-                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-amber-50/30 text-amber-800">
+                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
+                {matrixTemplateFormat === 'rhb' && (
+                  <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-amber-50/30 text-amber-800">
+                    -
+                  </td>
+                )}
                 {columns.map(col => (
                   <td 
                     key={col.id} 
