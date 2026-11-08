@@ -943,24 +943,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <span className="uppercase font-black tracking-wide text-white">MOH TO EPSS MATRIX (HUB MAPPED)</span>
           </button>
 
-          {/* DSP AGGR. SUBMITTED TO EPSS Button: Matching Attachment _C69F641D-56A8-4E6A-BC48-B6D52520142C__8e784b80.png */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('epss');
-              showToast('⚡ Switched to Official EPSS Submission Format (Name of health facility + Equipment Breakdown)');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'epss'
-                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Switch to Official EPSS Submission Format (Name of health facility, List of Packages)"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-wide text-white">DSP AGGR. SUBMITTED TO EPSS</span>
-          </button>
-
           {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png */}
           <button
             type="button"
