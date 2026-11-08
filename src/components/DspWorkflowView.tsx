@@ -311,7 +311,7 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
     ]
   },
   '2.4': {
-    title: 'Breakdown Aggregation by hub',
+    title: 'Breakdown Aggregation by RHB',
     sender: 'MOH Technical Aggregation Team',
     recipient: 'MOH Executive Council',
     criteria: [
@@ -739,7 +739,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         { id: '2.1', label: 'DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
         { id: '2.2', label: 'DSP Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
         { id: '2.3', label: 'Breakdown Received from RHB', subTab: 'dsp-moh-2-3' as EpssSubTab },
-        { id: '2.4', label: 'Breakdown Aggregation by hub', subTab: 'dsp-moh-2-4' as EpssSubTab },
+        { id: '2.4', label: 'Breakdown Aggregation by RHB', subTab: 'dsp-moh-2-4' as EpssSubTab },
         { id: '2.5', label: 'DSP Aggr. Submitted to EPSS', subTab: 'dsp-moh-2-5' as EpssSubTab },
       ]
     },
@@ -1892,7 +1892,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
-          title="2.4 Breakdown Aggregation by hub - Multi-Regional Matrix"
+          title="2.4 Breakdown Aggregation by RHB - Multi-Regional Matrix"
           subtitle="Official two-tier matrix aggregating health facility breakdowns across all Ethiopian regions submitted to MOH"
         />
       ) : (currentSubStep === '2.5' || currentSubTab === 'dsp-moh-2-5' || currentSubTab === 'dsp-submitted-moh-epss-ho') ? (

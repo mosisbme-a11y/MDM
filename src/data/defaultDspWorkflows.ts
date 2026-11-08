@@ -17,7 +17,7 @@ export const canonicalizeSubStage = (s?: string, stage?: string): string => {
   if (clean === '2.1' || clean.includes('2.1') || clean.includes('dsp received from epss')) return '2.1';
   if (clean === '2.2' || clean.includes('2.2') || clean.includes('dsp request to rhb')) return '2.2';
   if (clean === '2.3' || clean.includes('2.3') || clean.includes('breakdown received from rhb')) return '2.3';
-  if (clean === '2.4' || clean.includes('2.4') || clean.includes('breakdown aggregation by hub')) return '2.4';
+  if (clean === '2.4' || clean.includes('2.4') || clean.includes('breakdown aggregation by rhb')) return '2.4';
   if (clean === '2.5' || clean.includes('2.5') || clean.includes('dsp aggr. submitted to epss')) return '2.5';
 
   // RHB (Stage 3)

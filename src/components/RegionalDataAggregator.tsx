@@ -317,7 +317,7 @@ export const RegionalDataAggregator: React.FC<Props> = ({
                   <TrendingUp className="w-6 h-6 text-indigo-300" />
                </div>
                <div>
-                  <h2 className="text-xl font-black uppercase tracking-tight">Breakdown Aggregation by hub</h2>
+                  <h2 className="text-xl font-black uppercase tracking-tight">Breakdown Aggregation by RHB</h2>
                   <p className="text-xs text-indigo-200/80 font-medium">
                     {selectedRegions.length === 0 ? 'All 15 Regions' : `${selectedRegions.length} Selected Regions`} • 
                     {selectedFacilities.length === 0 ? 'All Registered Facilities' : `${selectedFacilities.length} Selected Facilities`}
