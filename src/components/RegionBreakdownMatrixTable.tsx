@@ -187,7 +187,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb'>('item');
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh'>('item');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
 
@@ -784,7 +784,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Facility Breakdown');
-    const filenameLabel = fmt === 'item' ? 'Item_Aggregation' : fmt === 'epss' ? 'EPSS_Submission' : 'RHB_Breakdown';
+    const filenameLabel = fmt === 'item' ? 'Item_Aggregation' : fmt === 'epss' ? 'EPSS_Submission' : fmt === 'dsp-received-from-moh' ? 'DSP_Received_From_MOH' : 'RHB_Breakdown';
     const filename = `DSP_${filenameLabel}_${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.xlsx`;
     XLSX.writeFile(wb, filename);
     showToast(`✓ Exported ${filename}`);
@@ -803,7 +803,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       aoa.push(['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH']);
       aoa.push(['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH']);
       aoa.push(['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH']);
-    } else if (fmt === 'epss') {
+    } else if (fmt === 'epss' || fmt === 'dsp-received-from-moh') {
       aoa.push([
         'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges',
         'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
@@ -831,7 +831,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    const templateName = `EPSS_DSP_${fmt === 'item' ? 'Item_Aggregation' : fmt === 'epss' ? 'Submitted_To_EPSS' : 'Breakdown_Aggregation'}_Template.xlsx`;
+    const templateName = `EPSS_DSP_${fmt === 'item' ? 'Item_Aggregation' : fmt === 'epss' ? 'Submitted_To_EPSS' : fmt === 'dsp-received-from-moh' ? 'Received_From_MOH' : 'Breakdown_Aggregation'}_Template.xlsx`;
     XLSX.writeFile(wb, templateName);
     showToast(`✓ Downloaded ${templateName}`);
   };
@@ -905,6 +905,24 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
             <span className="uppercase font-black tracking-wide text-white">ITEM AGGREGATION</span>
+          </button>
+
+          {/* DSP RECEIVED FROM MOH Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setMatrixTemplateFormat('dsp-received-from-moh');
+              showToast('⚡ Switched to DSP RECEIVED FROM MOH Format');
+            }}
+            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+              matrixTemplateFormat === 'dsp-received-from-moh'
+                ? 'bg-[#0a0f1d] text-white border-slate-400 ring-2 ring-slate-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Switch to DSP Received from MOH View"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
+            <span className="uppercase font-black tracking-wide text-white">DSP RECEIVED FROM MOH</span>
           </button>
 
           {/* DSP AGGR. SUBMITTED TO EPSS Button: Matching Attachment _C69F641D-56A8-4E6A-BC48-B6D52520142C__8e784b80.png */}
