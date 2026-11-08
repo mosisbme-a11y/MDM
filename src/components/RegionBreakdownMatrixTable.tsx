@@ -593,7 +593,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       'Region',
       'Zone',
       'Woreda',
-      'Name of health facility',
+      'Customer Description',
       'List of Packeges',
       ...columns.map(c => c.name)
     ]);
@@ -614,7 +614,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         r.region,
         r.zone,
         r.woreda,
-        r.healthFacility,
+        r.customerDescription || r.healthFacility,
         r.packages,
         ...columns.map(c => {
           const val = r.quantities[c.id];
@@ -659,7 +659,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'Region',
         'Zone',
         'Woreda',
-        'Name of health facility',
+        'Customer Description',
         'List of Packeges',
         'Anesthesia machine - with Patient mon',
         'Bed - Patient, Fowler, Adult',
@@ -1082,7 +1082,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </th>
                 <th 
-                  colSpan={columns.length + 6} 
+                  colSpan={columns.length + 4} 
                   className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
                 >
                   Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
@@ -1099,12 +1099,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </th>
                 <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[70px] text-center">
                   Woreda
-                </th>
-                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[180px]">
-                  Name of health facility
-                </th>
-                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px]">
-                  HUB
                 </th>
                 <th className="p-2.5 bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[240px]">
                   <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#fef08a] border border-[#fde047] text-[#854d0e] font-bold shadow-2xs not-italic">
@@ -1189,7 +1183,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <tbody className="divide-y divide-slate-200">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 6 + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
+                  <td colSpan={columns.length + 4 + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
                     No facility rows matching the selected region or filter.
                   </td>
                 </tr>
@@ -1322,29 +1316,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
-                      {/* 4. Name of health facility (Customer Code or Facility Short Name) */}
-                      <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[170px] font-mono">
-                        {isEditingMode ? (
-                          <input
-                            type="text"
-                            value={row.healthFacility}
-                            onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
-                            className="w-full p-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold text-cyan-800"
-                            placeholder="Facility / Customer ID..."
-                          />
-                        ) : (
-                          <div className="font-bold text-cyan-800 flex items-center justify-between">
-                            <span>{row.healthFacility}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* 5. HUB */}
-                      <td className="p-2 text-slate-800 border-r border-slate-200 min-w-[120px] font-bold">
-                        {row.hub}
-                      </td>
-
-                      {/* 6. Customer Description (STRICTLY FILTERED FOR SELECTED REGION ONLY) */}
+                      {/* 4. Customer Description (STRICTLY FILTERED FOR SELECTED REGION ONLY) */}
                       <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[250px] bg-amber-50/20">
                         {isEditingMode ? (
                           <div className="space-y-1">
@@ -1475,7 +1447,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
               {/* Inline Add Facility Row Button Row */}
               <tr className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
-                <td colSpan={columns.length + 6 + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
+                <td colSpan={columns.length + 4 + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
                   <button
                     type="button"
                     onClick={handleAddRow}
@@ -1503,9 +1475,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </td>
                 <td className="p-2.5 border-r border-slate-300 font-black text-slate-900">
                   {filteredRows.length} Health Facilities
-                </td>
-                <td className="p-2.5 border-r border-slate-300 text-center font-mono text-blue-700">
-                  -
                 </td>
                 {columns.map(col => (
                   <td 
