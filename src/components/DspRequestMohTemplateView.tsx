@@ -29,7 +29,10 @@ import {
   ShieldCheck,
   Printer,
   Paperclip,
-  Sparkles
+  Sparkles,
+  ArrowLeft,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -204,6 +207,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
+  const [isTransmitModalFullView, setIsTransmitModalFullView] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isStockImportModalOpen, setIsStockImportModalOpen] = useState(false);
@@ -1854,9 +1858,18 @@ Authorized Directorate Desk`;
       {/* MODAL 3: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) */}
       {isTransmitModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className={`bg-white rounded-2xl ${isTransmitModalFullView ? 'max-w-5xl h-[92vh]' : 'max-w-lg'} w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in flex flex-col transition-all duration-300`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition mr-1"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
+                </button>
                 <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
                   <Send className="w-5 h-5" />
                 </div>
@@ -1865,13 +1878,24 @@ Authorized Directorate Desk`;
                   <p className="text-[11px] text-slate-400">Institutional quota submission to Ministry of Health PMD Directorate</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsTransmitModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalFullView(prev => !prev)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                  title={isTransmitModalFullView ? "Restore normal view" : "Full View (Maximize)"}
+                >
+                  {isTransmitModalFullView ? <Minimize2 className="w-3.5 h-3.5 text-indigo-600" /> : <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />}
+                  <span className="text-[10px] uppercase font-black">{isTransmitModalFullView ? 'Normal' : 'Full View'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
