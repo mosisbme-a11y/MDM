@@ -187,7 +187,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh'>('item');
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss'>('item');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
 
@@ -923,6 +923,24 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           >
             <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
             <span className="uppercase font-black tracking-wide text-white">DSP RECEIVED FROM MOH</span>
+          </button>
+
+          {/* MOH TO EPSS MATRIX Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setMatrixTemplateFormat('moh-to-epss');
+              showToast('⚡ Switched to MOH TO EPSS MATRIX (Hub Mapped) Format');
+            }}
+            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+              matrixTemplateFormat === 'moh-to-epss'
+                ? 'bg-[#0a0f1d] text-white border-slate-400 ring-2 ring-slate-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Switch to MOH TO EPSS MATRIX (Hub Mapped) View"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
+            <span className="uppercase font-black tracking-wide text-white">MOH TO EPSS MATRIX (HUB MAPPED)</span>
           </button>
 
           {/* DSP AGGR. SUBMITTED TO EPSS Button: Matching Attachment _C69F641D-56A8-4E6A-BC48-B6D52520142C__8e784b80.png */}
@@ -1816,7 +1834,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       </div>
 
-      {/* MODAL 1: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL) */}
+              {/* MODAL 1: SEND TO EPSS (DIRECT INSTITUTIONAL TRANSMITTAL) */}
       {isTransmitModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
@@ -1826,8 +1844,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix to MOH</h3>
-                  <p className="text-[11px] text-slate-400">Official Health Facility breakdown transmittal to Ministry of Health</p>
+                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix to EPSS</h3>
+                  <p className="text-[11px] text-slate-400">Official Health Facility breakdown transmittal to EPSS</p>
                 </div>
               </div>
               <button
@@ -1884,7 +1902,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   <span>Linked with Health Facility Master Data</span>
                 </div>
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, and Equipment quantities directly to MOH PMD Directorate (Sub-step 3.2 & 2.3).
+                  Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, and Equipment quantities directly to EPSS (Sub-step 3.2 & 2.3).
                 </p>
               </div>
 
@@ -1936,18 +1954,18 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
                     const year = new Date().getFullYear();
                     const randNum = Math.floor(100 + Math.random() * 900);
-                    const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
+                    const brkRef = `RHB/EPSS-BRK/${year}/${randNum}`;
 
                     const rhbRecord: DspWorkflowRecord = {
-                      id: `dsp-rhb-moh-${Date.now()}`,
+                      id: `dsp-rhb-epss-${Date.now()}`,
                       dspRefNumber: brkRef,
                       stage: 'rhb-breakdown-management',
                       subStage: '3.2',
                       stageTitle: 'RHB Breakdown Management',
                       senderOrg: `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
-                      recipientOrg: 'Ministry of Health (PMD Directorate)',
+                      recipientOrg: 'EPSS',
                       dspName: cleanDspName,
-                      subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to MOH (${filteredRows.length} Facilities)`,
+                      subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to EPSS (${filteredRows.length} Facilities)`,
                       status: 'Endorsed & Approved',
                       dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
                       approvedDate: internalDate || new Date().toISOString().split('T')[0],
@@ -1971,25 +1989,25 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
                         plant: 'AA01 Central'
                       })),
-                      notes: `Official Regional Health Facility Breakdown Matrix submitted to MOH PMD Directorate (${filteredRows.length} Facilities).`
+                      notes: `Official Regional Health Facility Breakdown Matrix submitted to EPSS (${filteredRows.length} Facilities).`
                     };
 
                     try {
                       pushCentralMasterData({
                         dspReceivedMohRows: filteredRows,
                         updatedBy: 'RHB Regional Logistics',
-                        updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
+                        updateKind: `Transmit Region Breakdown Matrix to EPSS (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
                       });
                     } catch (e) {
                       console.warn(e);
                     }
                     setIsTransmitModalOpen(false);
-                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH as Dossier [${cleanDspName}]!`);
+                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to EPSS as Dossier [${cleanDspName}]!`);
                   }}
                   className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
                 >
                   <Send className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Confirm Transmit to MOH</span>
+                  <span>Confirm Transmit to EPSS</span>
                 </button>
               </div>
             </div>
