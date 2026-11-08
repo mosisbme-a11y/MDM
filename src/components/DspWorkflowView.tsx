@@ -1766,7 +1766,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '1.3.1' || (currentSubTab as string) === 'dsp-ho-1-3-1' || (currentSubTab as string) === 'map-hf-hub') ? (
-        <MappingBreakdownView hfListItems={hfListItems} />
+        <MappingBreakdownView 
+          hfListItems={hfListItems} 
+          onUploadHFData={(items, mode) => {
+            if (mode === 'replace') {
+              setHfListItems?.(items);
+            } else {
+              setHfListItems?.(prev => [...prev, ...items]);
+            }
+          }}
+          isAdmin={true}
+        />
       ) : (currentSubStep === '1.3.2' || (currentSubTab as string) === 'dsp-ho-1-3-2' || (currentSubTab as string) === 'send-dsp-hub') ? (
         <Stage6EpssBranchDispatchView
           records={records}
@@ -2221,8 +2231,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                               <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200">
                                 REF: {rec.dspRefNumber}
                               </span>
-                              <span className="text-[10px] font-semibold text-slate-600">
-                                {rec.senderOrg} ➔ {rec.recipientOrg}
+                              <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                                {rec.senderOrg}
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                {rec.recipientOrg}
                               </span>
                               <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                 {rec.stageTitle}

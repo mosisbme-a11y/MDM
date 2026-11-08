@@ -536,7 +536,7 @@ Notes: ${folder.notes || 'N/A'}`;
                 </span>
               </div>
               <div className="text-xs font-semibold text-slate-700">
-                {is21 ? 'EPSS Head Office ➔ Ministry of Health (PMD Directorate)' : 'Ministry of Health (PMD Directorate) ➔ EPSS Head Office'}
+                DSP Source: {selectedDossier?.dspName || "National Allocation Quota"}
               </div>
             </div>
           </div>

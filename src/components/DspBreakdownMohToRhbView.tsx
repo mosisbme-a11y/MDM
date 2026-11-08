@@ -887,7 +887,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             </div>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <span>MOH PMD Directorate ➔ Regional Health Bureaus</span>
+                <span>MOH PMD Directorate | Regional Health Bureaus</span>
                 <span className="text-emerald-400 font-mono font-bold">• All 15 Ethiopian Regions Active</span>
               </div>
               <div className="text-xs font-semibold text-slate-200">

@@ -78,6 +78,8 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
   const [selectedWaFileType, setSelectedWaFileType] = useState<'excel' | 'pdf' | 'both' | 'zip'>('both');
   const [waPreviewTab, setWaPreviewTab] = useState<'text' | 'files' | 'items'>('text');
   const [copiedWaText, setCopiedWaText] = useState(false);
+  const [manualSignatoryName, setManualSignatoryName] = useState('');
+  const [manualSignatoryRole, setManualSignatoryRole] = useState('');
 
   // Dedicated Dispatch Receipt & Dialog State
   const [showEmailDataPreview, setShowEmailDataPreview] = useState(false);
@@ -853,6 +855,14 @@ TRANSMISSION METRICS:
   // Submission Handler (STRICTLY NO AUTO-DOWNLOADS & ZERO TEXT CONVERSION)
   const handleSubmit = async (method: 'email' | 'whatsapp' | 'direct', asZipBatch: boolean = false, isImmediate: boolean = false, isDraft: boolean = false): Promise<boolean> => {
     if (selectedItems.length === 0) return false;
+    
+    // MANDATORY SIGNATORY VALIDATION (Added per user request)
+    if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
+      setNotification("⚠️ Authorized Person Name and Official Role are required before sending.");
+      setTimeout(() => setNotification(null), 4500);
+      return false;
+    }
+
     setIsSubmitting(true);
 
     const submissionData = selectedItems.map((item, idx) => ({
@@ -1073,8 +1083,10 @@ TRANSMISSION METRICS:
               recipient: officialEmail,
               subject: emailSubject,
               sender: fromEmail,
-              body: emailBody
-            });
+              body: emailBody,
+              signatory: manualSignatoryName,
+              signatoryRole: manualSignatoryRole
+            } as any);
             setSelectedItems([]);
           }
         }
@@ -1117,7 +1129,11 @@ TRANSMISSION METRICS:
       setDirectSendSuccess(true);
       setLifecycleState('Submitted');
 
-      onSubmit(submissionData);
+      onSubmit({
+        items: submissionData,
+        signatory: manualSignatoryName,
+        signatoryRole: manualSignatoryRole
+      });
 
       if (onSuccess) {
         onSuccess(selectedItems, {
@@ -1131,8 +1147,10 @@ TRANSMISSION METRICS:
           recipient: officialEmail || 'Ministry of Health (PMD Directorate)',
           subject: emailSubject || 'DSP Official Transmittal to MOH',
           sender: fromEmail || 'EPSS HO Directorate',
-          body: emailBody || 'Direct MOH Portal System Transmittal'
-        });
+          body: emailBody || 'Direct MOH Portal System Transmittal',
+          signatory: manualSignatoryName,
+          signatoryRole: manualSignatoryRole
+        } as any);
       }
 
       setSelectedItems([]);
@@ -1163,9 +1181,11 @@ TRANSMISSION METRICS:
           date: currentDate,
           recipient: officialPhone,
           subject: 'WhatsApp Dispatch',
-          sender: 'Mosisa (Authorized User)',
-          body: 'Transmitted via WhatsApp chat protocol'
-        });
+          sender: manualSignatoryName,
+          body: whatsAppMessageText,
+          signatory: manualSignatoryName,
+          signatoryRole: manualSignatoryRole
+        } as any);
       }
       setSelectedItems([]); // Clear local selection immediately
       
@@ -1178,7 +1198,11 @@ TRANSMISSION METRICS:
 
     // Advance lifecycle state to 'Pending MOH Approval'
     setLifecycleState('Pending MOH Approval');
-    onSubmit(submissionData);
+    onSubmit({
+      items: submissionData,
+      signatory: manualSignatoryName,
+      signatoryRole: manualSignatoryRole
+    });
 
     // Show the Dispatch Receipt Dialog (Confirms files are sent as exact binary attachments, NOT text)
     // Only show if NOT an immediate background send
@@ -1546,6 +1570,40 @@ TRANSMISSION METRICS:
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Manual Signatory Input Section (Added per user request) */}
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 space-y-4 mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                  <h4 className="text-sm font-black text-slate-900 uppercase">Authorized Institutional Signatory</h4>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                  Please fill in the details of the official authorizing this DSP transmittal. This data is mandatory for audit compliance.
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Dr. Solomon Abebe"
+                      value={manualSignatoryName}
+                      onChange={(e) => setManualSignatoryName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role / Title</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Director General"
+                      value={manualSignatoryRole}
+                      onChange={(e) => setManualSignatoryRole(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Explicit Confirmation Actions Bar */}

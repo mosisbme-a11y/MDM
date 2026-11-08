@@ -231,6 +231,8 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [stockSearchQuery, setStockSearchQuery] = useState('');
   const [selectedStockIds, setSelectedStockIds] = useState<string[]>([]);
   const [stockDefaultBudget, setStockDefaultBudget] = useState('WB');
+  const [manualSignatoryName, setManualSignatoryName] = useState('');
+  const [manualSignatoryRole, setManualSignatoryRole] = useState('');
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -775,6 +777,10 @@ Authorized Directorate Desk`;
       alert('DSP Name is mandatory and must be provided by the EPSS team.');
       return;
     }
+    if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
+      alert('Authorized Person Name and Role are required before transmitting.');
+      return;
+    }
     if (itemsToSend.length === 0) {
       alert('Please select at least one item to transmit to MOH');
       return;
@@ -812,8 +818,8 @@ Authorized Directorate Desk`;
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
       officialLetterRef: officialLetterRef,
-      signatory: 'Mosisa (Authorized User)',
-      signatoryRole: 'Directorate Technical Lead',
+      signatory: manualSignatoryName,
+      signatoryRole: manualSignatoryRole,
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
@@ -886,8 +892,8 @@ Authorized Directorate Desk`;
       targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
       targetedFacilitiesCount: 14,
       officialLetterRef: officialLetterRef,
-      signatory: 'Mosisa (Authorized User)',
-      signatoryRole: 'Directorate Technical Lead',
+      signatory: manualSignatoryName,
+      signatoryRole: manualSignatoryRole,
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
@@ -1036,7 +1042,7 @@ Authorized Directorate Desk`;
                 </span>
               </div>
               <div className="text-xs font-semibold text-slate-700">
-                EPSS Head Office ➔ Ministry of Health (PMD Directorate)
+                DSP Management: {dspName || "National Medical Equipment Allocation"}
               </div>
             </div>
           </div>
@@ -1983,6 +1989,37 @@ Authorized Directorate Desk`;
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* Manual Signatory Input Section (Added per user request) */}
+              <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3 mx-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Authorized Institutional Signatory</h4>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Dr. Solomon Abebe"
+                      value={manualSignatoryName}
+                      onChange={(e) => setManualSignatoryName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role / Title</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Director General"
+                      value={manualSignatoryRole}
+                      onChange={(e) => setManualSignatoryRole(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
                 </div>
               </div>
 

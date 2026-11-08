@@ -25,6 +25,8 @@ import { HealthFacilityRecord } from '../types';
 import { downloadCSV } from '../utils/formatters';
 import Papa from 'papaparse';
 
+import { mapFacilityToHub, EPSS_HUBS_REGISTRY } from '../data/epssHubs';
+
 interface MappingBreakdownViewProps {
   hfListItems: HealthFacilityRecord[];
   onUploadHFData?: (items: HealthFacilityRecord[], mode: 'replace' | 'append') => void;
@@ -36,23 +38,6 @@ const KNOWN_ETHIOPIAN_REGIONS = [
   'afar', 'somali', 'harari', 'dire dawa', 'gambella', 'benishangul', 
   'south ethiopia', 'central ethiopia', 'south west ethiopia', 'south west'
 ];
-
-const REGION_HUB_MAP: Record<string, string> = {
-  'Addis Ababa': 'Central Hub (Addis Ababa)',
-  'Oromia': 'Western Hub (Adama/Jimma)',
-  'Amhara': 'Northern Hub (Bahir Dar/Gondar)',
-  'Tigray': 'Northern Hub (Mekelle)',
-  'Sidama': 'Southern Hub (Hawassa)',
-  'SNNPR': 'Southern Hub (Hawassa)',
-  'Afar': 'Eastern Hub (Semera)',
-  'Somali': 'Eastern Hub (Jijiga)',
-  'Harari': 'Eastern Hub (Dire Dawa)',
-  'Dire Dawa': 'Eastern Hub (Dire Dawa)',
-  'Gambella': 'Western Hub (Gambella)',
-  'Benishangul-Gumuz': 'Western Hub (Asosa)',
-  'South Ethiopia': 'Southern Hub (Arba Minch)',
-  'Central Ethiopia': 'Central Hub (Butajira)'
-};
 
 /**
  * Universal Zero-Fail Analyzer for ANY Uploaded File (Excel, CSV, Text)
@@ -211,12 +196,20 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
         );
 
+        const officialMapping = mapFacilityToHub(
+          facilityName,
+          masterMatch ? masterMatch.region : String(row[regionCol!] || ''),
+          masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
+          masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
+          hfMasterData
+        );
+
         facilityGroups[facilityName] = {
           facility: masterMatch ? masterMatch.customerDescription : facilityName,
           region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
           zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
           woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : String(row[hubCol!] || 'General Regional Hub'),
+          hub: officialMapping.hubName,
           quantities: {}
         };
       }
@@ -284,12 +277,20 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
         );
 
+        const officialMapping = mapFacilityToHub(
+          facilityName,
+          masterMatch ? masterMatch.region : String(row[regionCol!] || ''),
+          masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
+          masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
+          hfMasterData
+        );
+
         facilityGroups[facilityName] = {
           facility: masterMatch ? masterMatch.customerDescription : facilityName,
           region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
           zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
           woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: masterMatch ? (masterMatch.hub || masterMatch.deliveringPlant || 'General Regional Hub') : String(row[hubCol!] || 'General Regional Hub'),
+          hub: officialMapping.hubName,
           quantities: {}
         };
       }
@@ -305,27 +306,12 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
 
   // Convert groups to final rows
   const finalRows: RegionBreakdownRow[] = Object.values(facilityGroups).map((g, i) => {
-    // Fill region/hub fallback if needed
-    let regVal = g.region;
-    if (!regVal || regVal.toLowerCase() === 'unassigned' || regVal === 'Auto Region') {
-      const matchReg = KNOWN_ETHIOPIAN_REGIONS.find(r => g.facility.toLowerCase().includes(r));
-      if (matchReg) regVal = matchReg.charAt(0).toUpperCase() + matchReg.slice(1);
-    }
-
-    let hubVal = g.hub;
-    if (!hubVal || hubVal === 'General Regional Hub') {
-      const matchedHub = Object.entries(REGION_HUB_MAP).find(([reg]) => 
-        regVal.toLowerCase().includes(reg.toLowerCase()) || reg.toLowerCase().includes(regVal.toLowerCase())
-      );
-      hubVal = matchedHub?.[1] || 'General Regional Hub';
-    }
-
     return {
       id: `row-up-${i}-${Date.now()}`,
-      region: regVal,
+      region: g.region,
       zone: g.zone,
       woreda: g.woreda,
-      hub: hubVal,
+      hub: g.hub,
       healthFacility: g.facility,
       customerDescription: g.facility,
       packages: 'P-1',
@@ -361,24 +347,25 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Region to Hub Dictionary is now top-level
-
   const handleMapWithHubs = () => {
     setIsAnalyzing(true);
-    setUploadFeedback({ message: 'Analyzing facilities and mapping to optimal regional hubs...', type: 'info' });
+    setUploadFeedback({ message: 'Analyzing facilities and mapping to official regional hubs...', type: 'info' });
     
     setTimeout(() => {
       if (adHocDataActive && matrixData) {
-        // Map Hubs for Ad-hoc Data while retaining exact uploaded item descriptions and codes
+        // Map Hubs for Ad-hoc Data using official registry
         const updatedRows = matrixData.rows.map(row => {
-          const region = row.region || '';
-          const matchedHub = Object.entries(REGION_HUB_MAP).find(([reg]) => 
-            region.toLowerCase().includes(reg.toLowerCase()) || reg.toLowerCase().includes(region.toLowerCase())
+          const mapping = mapFacilityToHub(
+            row.healthFacility,
+            row.region,
+            row.zone,
+            row.woreda,
+            hfListItems
           );
           
           return {
             ...row,
-            hub: matchedHub?.[1] || row.hub || 'General Regional Hub'
+            hub: mapping.hubName // Use the official name (e.g. "Adama Hub")
           };
         });
         
@@ -386,25 +373,28 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           ...matrixData,
           rows: updatedRows
         });
-        setUploadFeedback({ message: '✓ Analysis complete: Facilities mapped with exact uploaded item descriptions, codes, and correct Hubs based on region.', type: 'success' });
+        setUploadFeedback({ message: '✓ Analysis complete: Facilities mapped with official Hub names.', type: 'success' });
       } else {
-        // Map Hubs for Master Data
+        // Map Hubs for Master Data and persist the changes
         const updated = hfListItems.map(hf => {
-          const region = hf.region || '';
-          const matchedHub = Object.entries(REGION_HUB_MAP).find(([reg]) => 
-            region.toLowerCase().includes(reg.toLowerCase()) || reg.toLowerCase().includes(region.toLowerCase())
+          const mapping = mapFacilityToHub(
+            hf.customerDescription,
+            hf.region,
+            hf.zoneDescription,
+            hf.woredaDescription,
+            hfListItems
           );
           
           return {
             ...hf,
-            hub: matchedHub?.[1] || 'General Regional Hub'
+            hub: mapping.hubName // This writes the "official name" into the master data
           };
         });
 
         if (onUploadHFData) {
           onUploadHFData(updated, 'replace');
         }
-        setUploadFeedback({ message: '✓ Mapping analysis completed: All master facilities assigned to regional hubs.', type: 'success' });
+        setUploadFeedback({ message: '✓ Mapping analysis completed: All master facilities updated with official hub names.', type: 'success' });
       }
       setIsAnalyzing(false);
     }, 800);

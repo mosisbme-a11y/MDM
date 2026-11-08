@@ -639,7 +639,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       dspRefNumber: `EPSS/HO-AGG/2026/${Math.floor(100 + Math.random() * 900)}`,
       stage: 'epss-ho-aggregation',
       stageTitle: '5. DSP Aggregation (EPSS HO)',
-      senderOrg: 'Ministry of Health (PMD Directorate) ➔ EPSS Head Office',
+      senderOrg: 'Ministry of Health (PMD Directorate)',
       recipientOrg: 'EPSS Branch Hubs & Regional Warehouses',
       subject: `Aggregated Multi-Regional Health Facility Breakdown & EPSS Hub Allocation Manifest (${regionsList.join(', ')})`,
       status: 'Endorsed & Approved',
@@ -1147,7 +1147,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
               Map HF to Hub & Generate SAP Order Process
             </h2>
             <p className="text-xs text-blue-100/90 leading-relaxed">
-              Consolidated national breakdown sent from MOH to EPSS with two-tier equipment headers. Health facilities are mapped to designated EPSS Distribution Hubs, and summary quantities are compiled into SAP Stock Transport Order lines for branch warehouse fulfillment.
+              Consolidated national breakdown for {currentDossier?.dspName || "medical equipment allocation"} with two-tier equipment headers. Health facilities are mapped to designated EPSS Distribution Hubs, and summary quantities are compiled into SAP Stock Transport Order lines for branch warehouse fulfillment.
             </p>
           </div>
 
@@ -1971,7 +1971,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                                 <div className="space-y-1.5 bg-white p-3 rounded-xl border border-blue-200 text-xs">
                                   <div className="font-bold text-slate-900 flex items-center justify-between border-b border-slate-100 pb-1.5">
                                     <span>
-                                      Contributing Facilities for <strong>{item.materialDescription}</strong> ({item.material}) ➔ Plant <strong>{item.plant}</strong> ({item.plantName}):
+                                      Contributing Facilities for <strong>{item.materialDescription}</strong> ({item.material}) | Plant <strong>{item.plant}</strong> ({item.plantName}):
                                     </span>
                                     <span className="font-mono text-blue-700 font-black">
                                       Sum = {item.quantity} Units

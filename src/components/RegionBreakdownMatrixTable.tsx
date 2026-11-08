@@ -130,6 +130,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [emailSubject, setEmailSubject] = useState(`Official Regional Health Facility Breakdown Matrix - ${internalDate}`);
   const [waPhone, setWaPhone] = useState('+251911234567');
   const [waCopied, setWaCopied] = useState(false);
+  const [manualSignatoryName, setManualSignatoryName] = useState('');
+  const [manualSignatoryRole, setManualSignatoryRole] = useState('');
 
   // Breakdown Request Selector & Column Configurator State
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
@@ -1071,7 +1073,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   colSpan={columns.length + 6} 
                   className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
                 >
-                  Regional Health Bureau ➔ MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
+                  Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
                 </th>
               </tr>
 
@@ -1583,6 +1585,36 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </p>
               </div>
 
+              <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <h4 className="text-[11px] font-black text-slate-900 uppercase">Authorized Regional Signatory</h4>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person</label>
+                    <input 
+                      type="text"
+                      placeholder="Name"
+                      value={manualSignatoryName}
+                      onChange={(e) => setManualSignatoryName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role</label>
+                    <input 
+                      type="text"
+                      placeholder="Title"
+                      value={manualSignatoryRole}
+                      onChange={(e) => setManualSignatoryRole(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
@@ -1594,6 +1626,10 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <button
                   type="button"
                   onClick={() => {
+                    if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
+                      alert('Please fill in Authorized Person and Role before transmitting.');
+                      return;
+                    }
                     const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
                     const year = new Date().getFullYear();
                     const randNum = Math.floor(100 + Math.random() * 900);
@@ -1618,8 +1654,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       targetedRegions: selectedRegionFilter === 'all' ? ALL_ETHIOPIAN_REGIONS : [selectedRegionFilter],
                       targetedFacilitiesCount: filteredRows.length,
                       officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
-                      signatory: 'Regional Health Bureau Director',
-                      signatoryRole: 'Director, RHB Logistics & Medical Devices',
+                      signatory: manualSignatoryName,
+                      signatoryRole: manualSignatoryRole,
                       facilityMatrixData: {
                         date: internalDate,
                         region: selectedRegionFilter,

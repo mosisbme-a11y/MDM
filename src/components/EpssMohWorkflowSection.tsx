@@ -166,7 +166,7 @@ export const EpssMohWorkflowSection: React.FC<EpssMohWorkflowSectionProps> = ({ 
             <span>Official Multi-Agency Communication Pipeline</span>
           </div>
           <h3 className="text-base font-black text-slate-900">
-            EPSS ➔ MOH ➔ RHB ➔ Health Facility Interactive Distribution Loop
+            EPSS | MOH | RHB | Health Facility Interactive Distribution Loop
           </h3>
           <p className="text-xs text-slate-500">
             Real-time tracking of interlocked letters, regional facility splits, and simultaneous technical readiness reports
