@@ -241,6 +241,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   const [stockDefaultBudget, setStockDefaultBudget] = useState('WB');
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [manualSignatoryRole, setManualSignatoryRole] = useState('');
+  const [manualOrganization, setManualOrganization] = useState('EPSS');
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -920,6 +921,10 @@ Authorized Directorate Desk`;
       officialLetterRef: officialLetterRef,
       signatory: manualSignatoryName,
       signatoryRole: manualSignatoryRole,
+      dspName: dspName,
+      authorizedPerson: manualSignatoryName,
+      role: manualSignatoryRole,
+      organization: manualOrganization.trim() || 'EPSS',
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
@@ -957,6 +962,10 @@ Authorized Directorate Desk`;
       officialLetterRef: officialLetterRef,
       signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
       signatoryRole: 'Director, PMD Directorate',
+      dspName: dspName,
+      authorizedPerson: 'Dr. Bethlehem (MOH PMD Directorate)',
+      role: 'Director, PMD Directorate',
+      organization: 'MOH',
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
@@ -994,6 +1003,10 @@ Authorized Directorate Desk`;
       officialLetterRef: officialLetterRef,
       signatory: manualSignatoryName,
       signatoryRole: manualSignatoryRole,
+      dspName: dspName,
+      authorizedPerson: manualSignatoryName,
+      role: manualSignatoryRole,
+      organization: manualOrganization.trim() || 'EPSS',
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
       itemsIncluded: itemsToSend.map(r => ({
         material: r.material,
@@ -1008,8 +1021,7 @@ Authorized Directorate Desk`;
         dspRequestTo: r.dspRequestTo,
         totalAmount: r.totalAmount
       })),
-      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`,
-      dspName: dspName
+      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 4. Clear previous defaults and store exact transmitted records across all 3 steps (1.1, 1.2, 2.1)
@@ -2334,6 +2346,36 @@ Authorized Directorate Desk`;
                             className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition shadow-xs"
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider ml-1">
+                            Organization *
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input 
+                              type="text"
+                              placeholder="e.g. EPSS"
+                              value={manualOrganization}
+                              onChange={(e) => setManualOrganization(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition shadow-xs"
+                            />
+                            <div className="flex gap-1 shrink-0">
+                              {['EPSS', 'MOH', 'RHB'].map((org) => (
+                                <button
+                                  key={org}
+                                  type="button"
+                                  onClick={() => setManualOrganization(org)}
+                                  className={`px-2 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
+                                    manualOrganization === org
+                                      ? 'bg-indigo-600 text-white border-indigo-700'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {org}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -2547,7 +2589,7 @@ Authorized Directorate Desk`;
                       <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Authorized Institutional Signatory</h4>
                     </div>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name *</label>
                         <input 
@@ -2567,6 +2609,34 @@ Authorized Directorate Desk`;
                           onChange={(e) => setManualSignatoryRole(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
                         />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Organization *</label>
+                        <div className="flex items-center gap-1.5">
+                          <input 
+                            type="text"
+                            placeholder="e.g. EPSS"
+                            value={manualOrganization}
+                            onChange={(e) => setManualOrganization(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            {['EPSS', 'MOH', 'RHB'].map((org) => (
+                              <button
+                                key={org}
+                                type="button"
+                                onClick={() => setManualOrganization(org)}
+                                className={`px-1.5 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
+                                  manualOrganization === org
+                                    ? 'bg-indigo-600 text-white border-indigo-700'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {org}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

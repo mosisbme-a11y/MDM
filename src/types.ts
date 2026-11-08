@@ -706,4 +706,8 @@ export interface DspWorkflowRecord {
   stage4MatrixData?: any;
   hubAggregationData?: any;
   dspName?: string;
+  authorizedPerson?: string;
+  organization?: string;
+  role?: string;
 }
+

@@ -35,7 +35,8 @@ import {
   ChevronDown,
   Maximize2,
   Minimize2,
-  ArrowLeft
+  ArrowLeft,
+  UserCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
@@ -223,22 +224,38 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     setSelectedBreakdownRequestId(reqId);
     if (!reqId) return;
     const req = records.find(r => r.id === reqId);
-    if (req && Array.isArray(req.itemsIncluded) && req.itemsIncluded.length > 0) {
-      const newCols: MatrixColumn[] = req.itemsIncluded.map((it: any, idx: number) => ({
-        id: `mat-req-${req.id}-${idx}-${it.material || it.materialCode}`,
-        materialCode: it.material || it.materialCode || `MAT-${1000 + idx}`,
-        description: it.description || it.materialDescription || 'Medical Equipment Unit'
-      }));
-      setColumns(newCols);
-      try {
-        localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(newCols));
-      } catch {}
-      showToast(`✓ Loaded ${newCols.length} equipment items from selected request [${req.dspRefNumber}] into matrix columns!`);
+    if (req) {
+      const dspInfo = getDossierDisplayInfo(req);
+      if (dspInfo.dspName) setManualDspName(dspInfo.dspName);
+      if (dspInfo.authorizedPerson) setManualSignatoryName(dspInfo.authorizedPerson);
+      if (dspInfo.role) setManualSignatoryRole(dspInfo.role);
+      if (dspInfo.organization) setManualOrganization(dspInfo.organization);
+
+      if (Array.isArray(req.itemsIncluded) && req.itemsIncluded.length > 0) {
+        const newCols: MatrixColumn[] = req.itemsIncluded.map((it: any, idx: number) => ({
+          id: `mat-req-${req.id}-${idx}-${it.material || it.materialCode}`,
+          materialCode: it.material || it.materialCode || `MAT-${1000 + idx}`,
+          description: it.description || it.materialDescription || 'Medical Equipment Unit'
+        }));
+        setColumns(newCols);
+        try {
+          localStorage.setItem('epss_dsp_received_epss_cols', JSON.stringify(newCols));
+        } catch {}
+        showToast(`✓ Loaded ${newCols.length} equipment items from selected request [${dspInfo.dspName || req.dspRefNumber}] into matrix columns!`);
+      }
     }
   };
 
   const [isSelectRequestModalOpen, setIsSelectRequestModalOpen] = useState(false);
   const [isSelectModalFullScreen, setIsSelectModalFullScreen] = useState(false);
+
+  // Manual Signatory & Institutional Profile State (Directly saved and displayed per user request)
+  const [manualSignatoryName, setManualSignatoryName] = useState('Yechalew Sheferew');
+  const [manualSignatoryRole, setManualSignatoryRole] = useState('Team Leader');
+  const [manualOrganization, setManualOrganization] = useState('MOH');
+  const [manualDspName, setManualDspName] = useState('');
+  const [isTransmitModalFullScreen, setIsTransmitModalFullScreen] = useState(false);
+
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -845,7 +862,10 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
     const totalQty = Object.values(totals).reduce((sum, v) => sum + v, 0);
 
-    const activeDspName = 'DSP 2026 - MCH Equipment Allocation';
+    const finalSignatory = manualSignatoryName.trim() || 'Yechalew Sheferew';
+    const finalRole = manualSignatoryRole.trim() || 'Team Leader';
+    const finalOrg = manualOrganization.trim() || 'MOH';
+    const finalDspName = manualDspName.trim() || (selectedBreakdownRequestId ? (records.find(r => r.id === selectedBreakdownRequestId)?.dspName || 'Global Breakdown') : 'Global Breakdown');
 
     const newRecord: DspWorkflowRecord = {
       id: `dsp-brk-tx-${Date.now()}`,
@@ -853,10 +873,10 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       stage: 'moh-osp-management',
       subStage: '2.2',
       stageTitle: 'MOH OSP Management',
-      senderOrg: 'Ministry of Health (PMD Directorate)',
+      senderOrg: finalOrg === 'MOH' ? 'Ministry of Health (PMD Directorate)' : finalOrg === 'EPSS' ? 'EPSS Head Office' : finalOrg,
       recipientOrg: targetedActiveRegions.join(', ') + ' Regional Health Bureaus',
-      dspName: activeDspName,
-      subject: `DSP [${activeDspName}]: Authorized DSP Request to RHB (${columns.length} Materials)`,
+      dspName: finalDspName,
+      subject: `DSP [${finalDspName}]: Authorized DSP Request to RHB (${columns.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: columns.length,
@@ -865,16 +885,20 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       targetedRegions: targetedActiveRegions,
       targetedFacilitiesCount: rows.length,
       officialLetterRef: officialLetterRef,
-      signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
-      signatoryRole: 'Director, PMD Directorate',
+      signatory: finalSignatory,
+      authorizedPerson: finalSignatory,
+      signatoryRole: finalRole,
+      role: finalRole,
+      organization: finalOrg,
       itemsIncluded: columns.map(c => ({
         material: c.materialCode,
         description: c.description,
         quantity: totals[c.id] || 0,
         plant: 'AA01 Central'
       })),
-      notes: `Secured & Authorized Transmission via Horizontal Matrix. Verified for ${targetedActiveRegions.length} Ethiopian Regions.${uploadedLetter ? ` Official Letter: ${uploadedLetter.name}` : ''}`
+      notes: `Secured & Authorized Transmission via Horizontal Matrix. Authorized by ${finalSignatory} (${finalRole}, ${finalOrg}). Verified for ${targetedActiveRegions.length} Ethiopian Regions.${uploadedLetter ? ` Official Letter: ${uploadedLetter.name}` : ''}`
     };
+
 
     setRecords(prev => [newRecord, ...prev]);
     
@@ -1804,12 +1828,27 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
       {/* MODAL 4: TRANSMIT TO RHBs WITH SECURITY & ETHIOPIAN REGIONS VERIFICATION */}
       {isTransmitModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className={`fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto transition-all duration-300 ${
+          isTransmitModalFullScreen ? 'p-0' : ''
+        }`}>
+          <div className={`bg-white shadow-2xl border border-slate-200 animate-scale-in flex flex-col transition-all duration-300 my-auto ${
+            isTransmitModalFullScreen 
+              ? 'w-full h-full rounded-none max-w-none max-h-none p-6 overflow-y-auto' 
+              : 'rounded-2xl max-w-2xl w-full p-5 space-y-4 max-h-[92vh] overflow-y-auto'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-slate-900 text-amber-400">
-                  <ShieldCheck className="w-6 h-6" />
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Back</span>
+                </button>
+                <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
@@ -1820,13 +1859,35 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsTransmitModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalFullScreen(!isTransmitModalFullScreen)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer transition flex items-center gap-1 text-xs font-bold border border-slate-200"
+                  title={isTransmitModalFullScreen ? 'Exit Full Screen' : 'Full Screen View'}
+                >
+                  {isTransmitModalFullScreen ? (
+                    <>
+                      <Minimize2 className="w-4 h-4 text-amber-600" />
+                      <span className="hidden md:inline text-[11px]">Exit Full</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-4 h-4 text-amber-600" />
+                      <span className="hidden md:inline text-[11px]">Full Screen</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTransmitModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Security Verification Protocol Banner */}
@@ -1843,6 +1904,107 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               <p className="text-[11px] text-indigo-800 leading-relaxed font-medium">
                 For security and audit purposes, please verify all 15 Ethiopian Regions authorized to receive this breakdown quota letter. Only checked regions will be granted access in Stage 3.
               </p>
+            </div>
+
+            {/* MANUAL AUTHORIZED SIGNATORY & INSTITUTIONAL PROFILE (USER REQUIREMENT) */}
+            <div className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500 text-slate-950 shadow-2xs">
+                    <UserCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                      Authorized Signatory & Institutional Profile
+                    </h4>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      Enter what you write manually for Authorized person, role, and organization
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                  Manual Entry
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Authorized Person */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                    Authorized Person *
+                  </label>
+                  <input
+                    type="text"
+                    value={manualSignatoryName}
+                    onChange={(e) => setManualSignatoryName(e.target.value)}
+                    placeholder="e.g. Ayeru Fekedu"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                  />
+                </div>
+
+                {/* 2. Role */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                    Role / Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={manualSignatoryRole}
+                    onChange={(e) => setManualSignatoryRole(e.target.value)}
+                    placeholder="e.g. Team Leader"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                  />
+                </div>
+
+                {/* 3. Organization */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                    Organization *
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={manualOrganization}
+                      onChange={(e) => setManualOrganization(e.target.value)}
+                      placeholder="e.g. MOH"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                    />
+                    <div className="flex gap-1 shrink-0">
+                      {['MOH', 'EPSS', 'RHB'].map((org) => (
+                        <button
+                          key={org}
+                          type="button"
+                          onClick={() => setManualOrganization(org)}
+                          className={`px-1.5 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
+                            manualOrganization === org
+                              ? 'bg-amber-500 text-slate-950 border-amber-600 font-extrabold'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {org}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DSP Name Input */}
+              <div className="space-y-1 pt-1 border-t border-amber-200/60">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                    DSP Project Name
+                  </label>
+                  <span className="text-[10px] text-slate-500">Stored in master ledger and displayed in 8-column tables</span>
+                </div>
+                <input
+                  type="text"
+                  value={manualDspName}
+                  onChange={(e) => setManualDspName(e.target.value)}
+                  placeholder="e.g. SDG Breakdown, Global Breakdown, World Bank BkD"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                />
+              </div>
             </div>
 
             {/* ALL 15 ETHIOPIAN REGIONS VERIFICATION GRID */}
@@ -1879,7 +2041,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 max-h-44 overflow-y-auto">
                 {ETHIOPIAN_REGIONS.map((reg) => {
                   const isApproved = approvedRegions[reg] !== false;
                   const isPresentInTable = rows.some(r => r.region.toLowerCase() === reg.toLowerCase());
@@ -1963,7 +2125,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             </div>
 
             {/* Action Footer */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsTransmitModalOpen(false)}
