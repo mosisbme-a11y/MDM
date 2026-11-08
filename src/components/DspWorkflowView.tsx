@@ -2197,13 +2197,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     <th className="py-3 px-4 border-r border-slate-200 w-32">Date</th>
                     <th className="py-3 px-4 border-r border-slate-200">DSP Name</th>
                     <th className="py-3 px-4 border-r border-slate-200">Authorized person</th>
+                    <th className="py-3 px-4 border-r border-slate-200 text-center w-28">Status</th>
                     <th className="py-3 px-4 text-center w-24">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-700">
                   {filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center bg-slate-50/30">
+                      <td colSpan={6} className="py-12 text-center bg-slate-50/30">
                         <div className="flex flex-col items-center gap-2">
                           <FileText className="w-8 h-8 text-slate-200" />
                           <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2223,12 +2224,9 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span className="font-extrabold text-slate-900 group-hover:text-amber-700 transition-colors text-xs">
-                                {rec.dspName || rec.subject.match(/DSP \[(.*?)\]/)?.[1] || rec.subject}
+                              <span className="font-extrabold text-slate-900 group-hover:text-amber-700 transition-colors text-xs font-mono">
+                                {rec.dspRefNumber} — {rec.dspName || rec.subject} ({formatNumber(rec.totalQuantity || rec.itemsIncluded?.reduce((s, i) => s + (i.quantity || 0), 0) || 0)} Units)
                               </span>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Metadata hidden as requested */}
                             </div>
                           </div>
                         </td>
@@ -2242,6 +2240,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                               <span className="text-[10px] text-slate-400 leading-tight">{rec.signatoryRole || 'Official Representative'}</span>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3 px-4 border-r border-slate-100 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {rec.status}
+                          </span>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <button
