@@ -1013,7 +1013,7 @@ Authorized Directorate Desk`;
             <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0B1527] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] ring-1 ring-amber-400/20">
               <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
-                DSP Request to MOH
+                Request to MOH
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-[#F59E0B] text-slate-950">
                 {templateRows.length}
@@ -1025,10 +1025,10 @@ Authorized Directorate Desk`;
               type="button"
               onClick={() => onSelectSubTab?.('dsp-ho-1-2')}
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#EBF1F6] hover:bg-[#DEE7EF] border-b-4 border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] text-[#1E3A5F] transition cursor-pointer font-black text-xs uppercase"
-              title="Click to view Sub-step 1.2: DSP Received from MOH"
+              title="Click to view Received from MOH"
             >
               <span className="w-2 h-2 rounded-full bg-[#8292A2]" />
-              <span className="tracking-tight">DSP Received from MOH</span>
+              <span className="tracking-tight">Received from MOH</span>
             </button>
 
             <div>

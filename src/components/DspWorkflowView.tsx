@@ -2228,17 +2228,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                               </span>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200">
-                                REF: {rec.dspRefNumber}
-                              </span>
-                              <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
-                                {rec.senderOrg}
-                                <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                {rec.recipientOrg}
-                              </span>
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                {rec.stageTitle}
-                              </span>
+                              {/* Metadata hidden as requested */}
                             </div>
                           </div>
                         </td>
@@ -2282,12 +2272,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold text-amber-600 tracking-widest uppercase">
-                    • {selectedRecord.dspRefNumber}
-                  </span>
-                  <span className="text-xs font-bold text-slate-900">{selectedRecord.stageTitle}</span>
+                  <span className="text-xs font-bold text-slate-900">Dossier Details</span>
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 mt-1">{selectedRecord.subject}</h3>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">
+                  {selectedRecord.dspName || selectedRecord.subject.match(/DSP \[(.*?)\]/)?.[1] || selectedRecord.subject}
+                </h3>
               </div>
               <button
                 onClick={() => setSelectedRecord(null)}
@@ -2299,19 +2288,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
             {/* Official Letter Routing Card */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">ISSUING SENDER</span>
-                  <span className="text-slate-900 font-semibold">{selectedRecord.senderOrg}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">RECIPIENT BODY</span>
-                  <span className="text-slate-900 font-semibold">{selectedRecord.recipientOrg}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">OFFICIAL LETTER REFERENCE</span>
-                  <span className="text-cyan-700 font-mono font-black">{selectedRecord.officialLetterRef}</span>
-                </div>
+              <div className="grid grid-cols-1 gap-2">
                 <div>
                   <span className="text-slate-500 text-[10px] block font-bold uppercase tracking-tight">SUBMISSION DATE</span>
                   <span className="text-slate-700 font-medium">{selectedRecord.dateSubmitted}</span>
@@ -2352,11 +2329,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                         {dateInfo.isActionTaken ? (
                           <>
                             Action Decision: <span className="font-bold text-slate-900">{selectedRecord.actionType || 'Endorsed & Approved'}</span> on <span className="font-mono font-bold text-slate-900">{selectedRecord.actionTakenDate || selectedRecord.dateSubmitted}</span> by <span className="font-semibold text-slate-900">{selectedRecord.actionTakenBy || 'Authorized Officer'}</span>
-                            {selectedRecord.actionLetterRef && (
-                              <div className="text-[11px] font-mono text-cyan-800 mt-0.5">
-                                Memo/Ref: {selectedRecord.actionLetterRef}
-                              </div>
-                            )}
                             {selectedRecord.actionNotes && (
                               <div className="text-[11px] text-slate-600 italic mt-0.5">
                                 &ldquo;{selectedRecord.actionNotes}&rdquo;
@@ -2751,7 +2723,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  Ref: <span className="font-mono font-bold text-indigo-600">{actionTargetRecord.dspRefNumber}</span> • Letter: <span className="font-mono text-slate-700">{actionTargetRecord.officialLetterRef}</span>
+                  Submission Date: <span className="font-mono font-bold text-slate-700">{actionTargetRecord.dateSubmitted}</span>
                 </div>
               </div>
               <button
@@ -2822,7 +2794,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             })()}
 
             {/* Allocation Overview */}
-            <div className="grid grid-cols-3 gap-2 bg-slate-50 border border-slate-100 p-2.5 rounded-xl text-xs">
+            <div className="grid grid-cols-2 gap-2 bg-slate-50 border border-slate-100 p-2.5 rounded-xl text-xs">
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block uppercase">TOTAL UNITS</span>
                 <span className="font-mono font-black text-cyan-700">{actionTargetRecord.totalQuantity.toLocaleString()} Units</span>
@@ -2830,10 +2802,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block uppercase">VALUATION</span>
                 <span className="font-mono font-black text-emerald-700">{formatCurrency(actionTargetRecord.totalValuationETB)}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold block uppercase">RECIPIENT BODY</span>
-                <span className="font-semibold text-slate-800 truncate block">{actionTargetRecord.recipientOrg}</span>
               </div>
             </div>
 
@@ -2969,18 +2937,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   </span>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    MOH Action / Letter Ref Number
-                  </label>
-                  <input
-                    type="text"
-                    value={actionFormLetterRef}
-                    onChange={(e) => setActionFormLetterRef(e.target.value)}
-                    placeholder="e.g. MOH/PMD/ACT/2026/044"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+
               </div>
 
               <div>
@@ -3048,7 +3005,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">WhatsApp Regional Breakdown Dispatch</h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Ref: <span className="font-mono font-bold text-indigo-600">{quickWhatsAppModal.record.dspRefNumber}</span> • {quickWhatsAppModal.record.targetedRegions.join(', ')}
+                    {quickWhatsAppModal.record.targetedRegions.join(', ')}
                   </p>
                 </div>
               </div>

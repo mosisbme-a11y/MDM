@@ -518,7 +518,7 @@ Notes: ${folder.notes || 'N/A'}`;
             <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#0B1527] text-white shadow-md border border-slate-800">
               <span className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_10px_#f59e0b] shrink-0" />
               <span className="text-xs md:text-sm font-black tracking-wide uppercase text-white">
-                {is21 ? 'DSP RECEIVED FROM EPSS' : 'DSP RECEIVED FROM MOH'}
+                {is21 ? 'RECEIVED FROM EPSS' : 'RECEIVED FROM MOH'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-amber-400 text-slate-950">
                 {is21 ? receivedRecords.length : receivedRows.length}
@@ -528,7 +528,7 @@ Notes: ${folder.notes || 'N/A'}`;
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  {is21 ? 'Sub-step 2.1: DSP Received from EPSS' : 'Sub-step 1.2: DSP Received from MOH'}
+                  {is21 ? 'Received from EPSS' : 'Received from MOH'}
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -655,10 +655,7 @@ Notes: ${folder.notes || 'N/A'}`;
                           </div>
                           <div className="flex flex-col">
                             <span className="font-black uppercase text-slate-900 leading-tight tracking-tight">
-                              {rec.dspName || "Unnamed DSP Request"}
-                            </span>
-                            <span className="text-[9px] font-mono font-bold text-indigo-500 uppercase tracking-widest mt-0.5">
-                              {rec.dspRefNumber}
+                              {rec.dspName || "Unnamed Request"}
                             </span>
                           </div>
                         </div>
@@ -749,10 +746,10 @@ Notes: ${folder.notes || 'N/A'}`;
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[10px] font-mono font-bold text-indigo-600 tracking-widest uppercase">
-                  📁 Official Letter Folder Envelope • {selectedFolderModal.dspRefNumber}
+                  📁 Official Letter Folder Envelope
                 </span>
                 <h3 className="text-base font-bold text-slate-900 mt-0.5">
-                  Official Letter Ref: {selectedFolderModal.officialLetterRef}
+                  Dossier Details
                 </h3>
               </div>
               <button
@@ -766,12 +763,10 @@ Notes: ${folder.notes || 'N/A'}`;
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">ISSUING SENDER</span>
-                  <span className="text-slate-900 font-bold">{selectedFolderModal.senderOrg}</span>
+                  {/* Institutional routing hidden */}
                 </div>
                 <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">RECIPIENT BODY</span>
-                  <span className="text-slate-900 font-bold">{selectedFolderModal.recipientOrg}</span>
+                  {/* Institutional routing hidden */}
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] uppercase font-bold block">TRANSMITTAL DATE</span>

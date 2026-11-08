@@ -639,8 +639,8 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       dspRefNumber: `EPSS/HO-AGG/2026/${Math.floor(100 + Math.random() * 900)}`,
       stage: 'epss-ho-aggregation',
       stageTitle: '5. DSP Aggregation (EPSS HO)',
-      senderOrg: 'Ministry of Health (PMD Directorate)',
-      recipientOrg: 'EPSS Branch Hubs & Regional Warehouses',
+      senderOrg: 'EPSS Head Office',
+      recipientOrg: 'EPSS Branch Hubs',
       subject: `Aggregated Multi-Regional Health Facility Breakdown & EPSS Hub Allocation Manifest (${regionsList.join(', ')})`,
       status: 'Endorsed & Approved',
       dateSubmitted: new Date().toISOString().split('T')[0],
@@ -1134,7 +1134,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/30 text-blue-200 border border-blue-400/30 flex items-center gap-1.5">
                 <Truck className="w-3 h-3 text-blue-300" />
-                Stage 5: EPSS Aggregation & Order Process (SAP STO)
+                Item Aggregation & Order Process
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-slate-200">
                 HF Master: {hfListItems.length > 0 ? `${hfListItems.length} Records Connected` : '20 Official EPSS Hubs'}
@@ -1144,10 +1144,10 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
               </span>
             </div>
             <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-              Map HF to Hub & Generate SAP Order Process
+              {currentDossier?.dspName || "medical equipment allocation"}
             </h2>
             <p className="text-xs text-blue-100/90 leading-relaxed">
-              Consolidated national breakdown for {currentDossier?.dspName || "medical equipment allocation"} with two-tier equipment headers. Health facilities are mapped to designated EPSS Distribution Hubs, and summary quantities are compiled into SAP Stock Transport Order lines for branch warehouse fulfillment.
+              Consolidated national breakdown for medical equipment allocation with two-tier equipment headers. Health facilities are mapped to designated EPSS Distribution Hubs, and summary quantities are compiled into SAP Stock Transport Order lines for branch warehouse fulfillment.
             </p>
           </div>
 
@@ -1400,7 +1400,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                 title="Convert this aggregated matrix into SAP Stock Transport Order (STO) format"
               >
                 <Truck className="w-3.5 h-3.5 text-blue-600" />
-                <span>Open Order Process (SAP STO) ➔</span>
+                <span>Open Order Process (SAP STO)</span>
               </button>
             </div>
 
@@ -2137,7 +2137,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
               <span>EPSS National Supply Chain Catchment & Logistics Routing</span>
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Hierarchical flow: Ministry of Health (MOH) allocates equipment to health facilities across regional states. EPSS Head Office aggregates and maps each facility to its designated EPSS branch hub for transport packing and release order dispatch.
+              Hierarchical flow: EPSS Head Office aggregates and maps each facility to its designated EPSS branch hub for transport packing and release order dispatch.
             </p>
           </div>
 
