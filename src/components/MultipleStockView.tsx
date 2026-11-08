@@ -123,6 +123,7 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
   const [selectedStockType, setSelectedStockType] = useState('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showKpiCards, setShowKpiCards] = useState<boolean>(false);
 
   // Column Sorting State
   const [sortField, setSortField] = useState<string>('material');
@@ -1049,6 +1050,15 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
               </button>
             )}
 
+            <button
+              type="button"
+              onClick={() => setShowKpiCards(!showKpiCards)}
+              className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition cursor-pointer shadow-2xs"
+              title="Toggle Summary KPI Cards View"
+            >
+              {showKpiCards ? 'Hide Summary Cards' : 'Show Summary Cards'}
+            </button>
+
             {(searchQuery || selectedPlant !== 'all' || selectedStockType !== 'all') && (
               <button
                 type="button"
@@ -1501,51 +1511,53 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
       {/* ========================================================================= */}
       {/* 2. KPI METRIC SUMMARY CARDS                                               */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Total Unrestricted Stock</div>
-            <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">{formatNumber(totalUnrestrictedStock)}</div>
-            <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Units Ready for Distribution</div>
+      {showKpiCards && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Total Unrestricted Stock</div>
+              <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">{formatNumber(totalUnrestrictedStock)}</div>
+              <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Units Ready for Distribution</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600">
+              <Package className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600">
-            <Package className="w-5 h-5" />
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Quality Inspection</div>
-            <div className="text-xl font-black text-indigo-600 mt-0.5 font-mono">{formatNumber(totalInspectionStock)}</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Units Under Testing</div>
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Quality Inspection</div>
+              <div className="text-xl font-black text-indigo-600 mt-0.5 font-mono">{formatNumber(totalInspectionStock)}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Units Under Testing</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600">
+              <Split className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600">
-            <Split className="w-5 h-5" />
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Blocked Stock</div>
-            <div className="text-xl font-black text-rose-600 mt-0.5 font-mono">{formatNumber(totalBlockedStock)}</div>
-            <div className="text-[10px] text-rose-600/80 mt-0.5">Quarantined / Restricted</div>
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Blocked Stock</div>
+              <div className="text-xl font-black text-rose-600 mt-0.5 font-mono">{formatNumber(totalBlockedStock)}</div>
+              <div className="text-[10px] text-rose-600/80 mt-0.5">Quarantined / Restricted</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Total Valuation (ETB)</div>
-            <div className="text-xl font-black text-emerald-700 mt-0.5 font-mono">{formatCurrency(totalValuationAll)}</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Across All Plant Locations</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
-            <Warehouse className="w-5 h-5" />
+          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-xs flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Total Valuation (ETB)</div>
+              <div className="text-xl font-black text-emerald-700 mt-0.5 font-mono">{formatCurrency(totalValuationAll)}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Across All Plant Locations</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+              <Warehouse className="w-5 h-5" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
       </>
       )}
 

@@ -33,7 +33,9 @@ import {
   CircleDot,
   Percent,
   ArrowRight,
-  Coins
+  Coins,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MultipleStockRecord } from '../types';
@@ -143,6 +145,13 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
   const [rdfCircleMetric, setRdfCircleMetric] = useState<'valuation' | 'units'>('valuation');
   const [hoveredSlice, setHoveredSlice] = useState<'RDF' | 'HP' | null>(null);
   const [selectedPlantForModal, setSelectedPlantForModal] = useState<PlantBreakdownMetrics | null>(null);
+  const [hiddenChartIds, setHiddenChartIds] = useState<string[]>([]);
+
+  const toggleHideChart = (id: string) => {
+    setHiddenChartIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const handleOpenPlantSourceData = (plantData: PlantBreakdownMetrics) => {
     setSelectedPlantForModal(plantData);
@@ -974,44 +983,53 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
       {/* Prominently visible on Dashboard view with interactive donut, metrics,   */}
       {/* and comparative balance stream analysis                                  */}
       {/* ========================================================================= */}
-      <div
-        id="multiple-stock-rdf-hp-circle-graph"
-        onDoubleClick={() => handleOpenSourceDataModal({
-          title: 'Source Data: Total Value of RDF & HP',
-          subtitle: 'Granular Multiple Stock inventory records classified across Revolving Drug Fund (RDF) and Health Program (HP).'
-        })}
-        title="Double-click to view underlying source data records"
-        className={`bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 border-2 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5 w-full min-w-0 transition-all cursor-pointer ${
-          activeChartTab === 'rdf-hp' ? 'border-emerald-400 ring-4 ring-emerald-100 shadow-md' : 'border-indigo-200/90'
-        }`}
-      >
-        {/* Card Header & Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-600 to-indigo-600 text-white shadow-xs shrink-0">
-              <PieChartIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono">
-                  ● Circle Graph
-                </span>
-                <h4 className="text-sm sm:text-base font-black uppercase tracking-wide text-slate-900">
-                  Total Value of RDF and HP for Multiple Stock
-                </h4>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 font-mono">
-                  {formatCurrency(msRdfHpCircleData.totalValuation)}
-                </span>
+      {!hiddenChartIds.includes('multiple-stock-rdf-hp-circle-graph') && (
+        <div
+          id="multiple-stock-rdf-hp-circle-graph"
+          onDoubleClick={() => handleOpenSourceDataModal({
+            title: 'Source Data: Total Value of RDF & HP',
+            subtitle: 'Granular Multiple Stock inventory records classified across Revolving Drug Fund (RDF) and Health Program (HP).'
+          })}
+          title="Double-click to view underlying source data records"
+          className={`bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 border-2 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5 w-full min-w-0 transition-all cursor-pointer ${
+            activeChartTab === 'rdf-hp' ? 'border-emerald-400 ring-4 ring-emerald-100 shadow-md' : 'border-indigo-200/90'
+          }`}
+        >
+          {/* Card Header & Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-600 to-indigo-600 text-white shadow-xs shrink-0">
+                <PieChartIcon className="w-5 h-5" />
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Comparative monetary valuation and inventory distribution between Revolving Drug Fund (RDF) and Health Program (HP) stocks.
-              </p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono">
+                    ● Circle Graph
+                  </span>
+                  <h4 className="text-sm sm:text-base font-black uppercase tracking-wide text-slate-900">
+                    Total Value of RDF and HP for Multiple Stock
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 font-mono">
+                    {formatCurrency(msRdfHpCircleData.totalValuation)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Comparative monetary valuation and inventory distribution between Revolving Drug Fund (RDF) and Health Program (HP) stocks.
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Metric Selector & Filter Status */}
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+            {/* Metric Selector & Filter Status */}
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggleHideChart('multiple-stock-rdf-hp-circle-graph'); }}
+                className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                title="Hide component from view"
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
               <button
                 type="button"
                 onClick={() => setRdfCircleMetric('valuation')}
@@ -1306,6 +1324,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
           </div>
         </div>
       </div>
+      )}
 
       {/* Visual Analytics Chart Navigation Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
@@ -1314,6 +1333,17 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
           <h4 className="text-xs font-black uppercase text-slate-900 tracking-wider">
             Visual Analytics Portfolio
           </h4>
+          {hiddenChartIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setHiddenChartIds([])}
+              className="px-2.5 py-1 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Restore all hidden chart components"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Restore Hidden Components ({hiddenChartIds.length})</span>
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs">
           <button
@@ -1380,7 +1410,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
       {/* Visual Analytics Charts Grid (xl:grid-cols-2 ensures stability on collapse and expand) */}
       <div id="multiple-stock-charts-container" className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full min-w-0">
         {/* Chart 1: Valuation by Material Group */}
-        {(activeChartTab === 'all' || activeChartTab === 'group') && (
+        {(activeChartTab === 'all' || activeChartTab === 'group') && !hiddenChartIds.includes('ms-pie-chart-card') && (
           <div
             id="ms-pie-chart-card"
             onDoubleClick={() => handleOpenSourceDataModal({
@@ -1397,7 +1427,17 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
                   Total Stock Valuation by Material Group
                 </h4>
               </div>
-              <span className="text-[11px] font-bold text-slate-500 font-mono">{msValueCircleChartData.length} Groups</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-500 font-mono">{msValueCircleChartData.length} Groups</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleHideChart('ms-pie-chart-card'); }}
+                  className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                  title="Hide component from view"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
             
             <div className="h-64 sm:h-72 w-full min-w-0 relative">
@@ -1461,7 +1501,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
         )}
 
         {/* Chart 2: Stock Status Distribution */}
-        {(activeChartTab === 'all' || activeChartTab === 'status') && (
+        {(activeChartTab === 'all' || activeChartTab === 'status') && !hiddenChartIds.includes('ms-bar-chart-card') && (
           <div
             id="ms-bar-chart-card"
             onDoubleClick={() => handleOpenSourceDataModal({
@@ -1478,7 +1518,17 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
                   Stock Status Quantity (Physical Units)
                 </h4>
               </div>
-              <span className="text-[11px] font-mono font-bold text-emerald-700">{formatNumber(msTotalQuantity)} Total</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold text-emerald-700">{formatNumber(msTotalQuantity)} Total</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleHideChart('ms-bar-chart-card'); }}
+                  className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                  title="Hide component from view"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <div className="h-64 sm:h-72 w-full min-w-0 relative">
@@ -1537,8 +1587,9 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
 
         
         {/* Chart 5: Stock Analysis per Plant (Stacked Valuation Bars + Unique Materials Line Overlay) */}
-        {(activeChartTab === 'all' || activeChartTab === 'plant-metrics') && (
+        {(activeChartTab === 'all' || activeChartTab === 'plant-metrics') && !hiddenChartIds.includes('ms-plant-chart-card') && (
           <div 
+            id="ms-plant-chart-card"
             onDoubleClick={() => {
               if (msPlantBarChartData.length > 0) {
                 handleOpenPlantSourceData(msPlantBarChartData[0]);
@@ -1570,9 +1621,19 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs font-mono bg-indigo-900/80 px-3 py-1.5 rounded-xl border border-indigo-700/60">
-                <span className="text-indigo-300">Total Plants:</span>
-                <span className="font-bold text-white">{msPlantBarChartData.length} Hubs</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-xs font-mono bg-indigo-900/80 px-3 py-1.5 rounded-xl border border-indigo-700/60">
+                  <span className="text-indigo-300">Total Plants:</span>
+                  <span className="font-bold text-white">{msPlantBarChartData.length} Hubs</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleHideChart('ms-plant-chart-card'); }}
+                  className="p-1.5 rounded-xl bg-indigo-900/80 hover:bg-indigo-800 text-indigo-300 hover:text-white border border-indigo-700/60 transition cursor-pointer"
+                  title="Hide component from view"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
