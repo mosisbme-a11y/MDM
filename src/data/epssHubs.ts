@@ -329,26 +329,26 @@ export function mapFacilityToHub(
   // Step 3: Regional Fallback Rules based on Ethiopian logistics structure
   if (normRegion.includes('oromia')) {
     if (normZone.includes('jimma') || normZone.includes('bedele') || normZone.includes('bor')) {
-      return { hubCode: 'JM01', hubName: 'Jimma Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+      return { hubCode: 'JI01', hubName: 'Jimma Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
     if (normZone.includes('wollega') || normZone.includes('nekemte')) {
       return { hubCode: 'NK01', hubName: 'Nekemte Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
     if (normZone.includes('guji') || normZone.includes('borena') || normZone.includes('negele')) {
-      return { hubCode: 'NG01', hubName: 'Negele Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+      return { hubCode: 'NB01', hubName: 'Negele Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
     return { hubCode: 'AD01', hubName: 'Adama Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
   }
 
   if (normRegion.includes('addis ababa')) {
     if (normZone.includes('gullele') || normZone.includes('kolfe') || normZone.includes('yeka')) {
-      return { hubCode: 'AA02', hubName: 'Addis Ababa (Hub 2)', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'AA02', hubName: 'Addis Ababa Hub 2', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
-    return { hubCode: 'AA01', hubName: 'Addis Ababa (Hub 1)', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'AA01', hubName: 'Addis Ababa Hub 1', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('sidama') || normRegion.includes('snnpr') || normRegion.includes('central ethiopia')) {
-    return { hubCode: 'HW01', hubName: 'Hawassa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'HA01', hubName: 'Hawassa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('south ethiopia') || normRegion.includes('south omo') || normRegion.includes('gamo')) {
@@ -357,34 +357,34 @@ export function mapFacilityToHub(
 
   if (normRegion.includes('amhara')) {
     if (normZone.includes('gondar')) {
-      return { hubCode: 'GD01', hubName: 'Gondar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'GO01', hubName: 'Gondar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
     if (normZone.includes('wollo') || normZone.includes('dessie')) {
-      return { hubCode: 'DS01', hubName: 'Dessie Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'DE01', hubName: 'Dessie Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
     return { hubCode: 'BD01', hubName: 'Bahir Dar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('tigray')) {
     if (normZone.includes('shire') || normZone.includes('north western')) {
-      return { hubCode: 'SH02', hubName: 'Shire Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'SH01', hubName: 'Shire Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
     return { hubCode: 'MK01', hubName: 'Mekelle Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('somali')) {
     if (normZone.includes('korahe') || normZone.includes('doollo') || normZone.includes('shabelle') || normZone.includes('kebridahar')) {
-      return { hubCode: 'KB01', hubName: 'Kebri-Dehar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'KD01', hubName: 'Kebri-Dehar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
     return { hubCode: 'JJ01', hubName: 'Jijiga Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('dire dawa') || normRegion.includes('harari') || normRegion.includes('harar')) {
-    return { hubCode: 'DD01', hubName: 'Dire Dawa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'DI01', hubName: 'Dire Dawa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('afar')) {
-    return { hubCode: 'SM01', hubName: 'Semera Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'SE01', hubName: 'Semera Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('benishangul')) {
@@ -392,7 +392,7 @@ export function mapFacilityToHub(
   }
 
   if (normRegion.includes('gambella')) {
-    return { hubCode: 'GB01', hubName: 'Gambella Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'GA01', hubName: 'Gambella Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   // Default fallback: Head Office Central
