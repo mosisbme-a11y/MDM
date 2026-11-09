@@ -479,8 +479,8 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
             }
         })();
 
-        // 3. Delivering Plant
-        const deliveringPlant = masterRecord ? masterRecord.deliveringPlant : String(
+        // 3. Delivering Plant (validate against valid hubs if needed)
+        let deliveringPlant = masterRecord ? masterRecord.deliveringPlant : String(
           rowMap['deliveringplant'] ||
           rowMap['delivering_plant'] ||
           rowMap['deliveryplant'] ||

@@ -653,7 +653,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     notifyChange(internalDate, columns, updated);
   };
 
-  // Export to Excel in exact format matching active template (Item Aggregation, EPSS, or RHB)
+  // Export to Excel in exact format matching active template (Item Aggregation by Hub, EPSS, or RHB)
   const handleExportExcel = () => {
     const aoa: any[][] = [];
     const fmt = matrixTemplateFormat;
@@ -663,18 +663,30 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     // Row 2: Top Tier Headers
     if (fmt === 'item') {
-      aoa.push(['Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges']);
-      aoa.push(['', '', '', '', 'List of Packeges']);
+      aoa.push(['Hub', ...columns.map(c => c.name)]);
+      aoa.push(['Hub', ...columns.map(c => c.code)]);
+      
+      // Calculate Hub Aggregations
+      const hubAgg: Record<string, Record<string, number>> = {};
       filteredRows.forEach(r => {
+        const hubCode = r.hub || 'HO01';
+        if (!hubAgg[hubCode]) hubAgg[hubCode] = {};
+        columns.forEach(c => {
+          hubAgg[hubCode][c.id] = (hubAgg[hubCode][c.id] || 0) + (Number(r.quantities[c.id]) || 0);
+        });
+      });
+
+      Object.keys(hubAgg).forEach(hCode => {
         aoa.push([
-          r.region,
-          r.zone,
-          r.woreda,
-          r.healthFacility || r.customerDescription,
-          r.packages
+          hCode,
+          ...columns.map(c => hubAgg[hCode][c.id] || 0)
         ]);
       });
-      aoa.push(['TOTAL', '', '', `${filteredRows.length} Facilities`, '']);
+
+      aoa.push([
+        'TOTAL',
+        ...columns.map(c => columnTotals[c.id] || 0)
+      ]);
     } else if (fmt === 'epss') {
       aoa.push([
         'Region',
@@ -760,11 +772,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
     ws['!cols'] = fmt === 'item' ? [
-      { wch: 16 },
-      { wch: 18 },
       { wch: 14 },
-      { wch: 36 },
-      { wch: 18 }
+      ...columns.map(() => ({ wch: 24 }))
     ] : fmt === 'epss' ? [
       { wch: 14 },
       { wch: 16 },
@@ -793,39 +802,38 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   // Download official blank template
   const handleDownloadTemplate = () => {
     const fmt = matrixTemplateFormat;
-    const aoa: any[][] = [
-      ['Date', new Date().toISOString().split('T')[0]]
+    const aoa: any[][] = fmt === 'item' ? [
+      [
+        'Hub',
+        'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
+      ],
+      [
+        'Hub',
+        '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
+      ],
+      ['AA01', 6, 6, 2, 2, 2, 2],
+      ['AD01', 2, 2, 2, 2, 2, 2],
+      ['DI01', 2, 2, 2, 2, 2, 2],
+      ['BD01', 2, 2, 2, 2, 2, 2],
+      ['HW01', 2, 2, 2, 2, 2, 2],
+      ['DD01', 2, 2, 2, 2, 2, 2]
+    ] : [
+      [
+        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges', 'Hub',
+        'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
+      ],
+      [
+        '', '', '', '', 'List of Packeges', '',
+        '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
+      ],
+      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'HO01', 2, 2, 2, 2, 2, 2],
+      ['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
+      ['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
     ];
-
-    if (fmt === 'item') {
-      aoa.push(['Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges']);
-      aoa.push(['', '', '', '', 'List of Packeges']);
-      aoa.push(['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH']);
-      aoa.push(['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH']);
-      aoa.push(['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH']);
-    } else if (fmt === 'epss' || fmt === 'dsp-received-from-moh') {
-      aoa.push([
-        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges',
-        'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
-      ]);
-      aoa.push(['', '', '', '', 'List of Packeges', '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N']);
-      aoa.push(['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 2, 2, 2, 2, 2, 2]);
-      aoa.push(['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College', 'MCH', 2, 2, 2, 2, 2, 2]);
-      aoa.push(['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital', 'MCH', 2, 2, 2, 2, 2, 2]);
-    } else {
-      aoa.push([
-        'Region', 'Zone', 'Woreda', 'Customer Description', 'List of Packeges', 'Hub',
-        'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
-      ]);
-      aoa.push(['', '', '', '', '', '', '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N']);
-      aoa.push(['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'HO01', 2, 2, 2, 2, 2, 2]);
-      aoa.push(['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2]);
-      aoa.push(['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]);
-    }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = fmt === 'item' ? [
-      { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 36 }, { wch: 18 }
+      { wch: 14 }, { wch: 32 }, { wch: 24 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
     ] : [
       { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 14 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 }
     ];
@@ -1366,11 +1374,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                   List of Packeges
                 </th>
-                {matrixTemplateFormat === 'rhb' && (
-                  <th className="p-2.5 italic bg-white text-slate-900 border-r border-slate-300 font-semibold min-w-[110px] text-center">
-                    Hub
-                  </th>
-                )}
+                <th className="p-2.5 bg-yellow-300 text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center uppercase tracking-wide">
+                  Hub
+                </th>
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1416,9 +1422,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
-                {matrixTemplateFormat === 'rhb' && (
-                  <th className="p-2 bg-white border-r border-slate-300"></th>
-                )}
+                <th className="p-2 bg-yellow-100 border-r border-slate-300"></th>
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1672,39 +1676,37 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
-                      {/* 6. Hub (RHB template only) */}
-                      {matrixTemplateFormat === 'rhb' && (
-                        <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center">
-                          {isEditingMode ? (
-                            <select
-                              value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                              onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
-                              className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
-                              title="Select EPSS Distribution Hub"
+                      {/* 6. Hub (Always visible, highlighted in yellow matching image 94FE6776) */}
+                      <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center bg-yellow-50/50">
+                        {isEditingMode ? (
+                          <select
+                            value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                            onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
+                            className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
+                            title="Select EPSS Distribution Hub"
+                          >
+                            {EPSS_HUBS_REGISTRY.map(h => (
+                              <option key={h.code} value={h.code}>
+                                {h.code} - {h.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 group">
+                            <span className="px-2 py-0.5 rounded bg-yellow-200/90 text-yellow-950 font-mono font-black text-[11px] border border-yellow-300 shadow-2xs">
+                              {row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingMode(true)}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
+                              title="Edit hub"
                             >
-                              {EPSS_HUBS_REGISTRY.map(h => (
-                                <option key={h.code} value={h.code}>
-                                  {h.code} - {h.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="flex items-center justify-center gap-1 group">
-                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[11px] border border-slate-300">
-                                {row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingMode(true)}
-                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
-                                title="Edit hub"
-                              >
-                                <Edit3 size={11} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      )}
+                              <Edit3 size={11} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
 
                       {/* Equipment Quantity Cells (Only if not ITEM AGGREGATION mode) */}
                       {matrixTemplateFormat !== 'item' && columns.map(col => {

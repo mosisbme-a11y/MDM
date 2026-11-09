@@ -90,7 +90,8 @@ import {
     DspWorkflowRecord,
     RegionBreakdownMatrixData,
     RegionBreakdownColumn,
-    RegionBreakdownRow
+    RegionBreakdownRow,
+    AuthUser
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
@@ -395,6 +396,7 @@ export interface DspWorkflowViewProps {
       payload?: any;
     }
   ) => void;
+  currentUser?: AuthUser;
 }
 
 export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
@@ -412,7 +414,8 @@ export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
   setDspRecords,
   dsp22Columns = [],
   dsp22Rows = [],
-  onTriggerCloudSync
+  onTriggerCloudSync,
+  currentUser
 }) => {
 const ALL_ETHIOPIAN_REGIONS = [
   'Oromia',
@@ -1129,6 +1132,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         onClose={() => setIsBreakdownModalOpen(false)}
         items={multipleStockItems || []}
         epssToMohRecords={records.filter(r => r.stage === 'moh-to-epss')}
+        currentUser={currentUser}
         onSaveDraft={(data) => {
           const refNum = `DRAFT-BRK-${Date.now().toString().slice(-6)}`;
           const draftRecord: DspWorkflowRecord = {

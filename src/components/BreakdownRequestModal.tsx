@@ -34,7 +34,7 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { MultipleStockRecord } from '../types';
+import { MultipleStockRecord, AuthUser } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { loadGmailTemplates, formatGmailSubject, formatGmailBody } from '../utils/gmailTemplates';
 import { getAccessToken, googleSignIn, clearCachedAccessToken } from '../utils/googleWorkspace';
@@ -121,6 +121,7 @@ interface BreakdownRequestModalProps {
   onSubmit: (data: any) => void;
   onSaveDraft?: (data: any) => void;
   onSuccess?: (removedItems: MultipleStockRecord[], metadata: any) => void;
+  currentUser?: AuthUser;
 }
 
 export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({ 
@@ -130,8 +131,10 @@ export const BreakdownRequestModal: React.FC<BreakdownRequestModalProps> = ({
   epssToMohRecords = [],
   onSubmit,
   onSaveDraft,
-  onSuccess 
+  onSuccess,
+  currentUser
 }) => {
+  const isMoh = currentUser?.role === 'MOH';
   const currentDate = new Date().toISOString().split('T')[0];
 
   // Active Navigation Tab: 'data-view' | 'matrix-editor' | 'pre-send-preview'
@@ -970,6 +973,10 @@ TRANSMISSION METRICS:
 
   // Submission Handler for Direct Protocol, Email and WhatsApp
   const handleSubmit = async (method: 'email' | 'whatsapp' | 'direct', asZipBatch: boolean = false) => {
+    if (!isMoh) {
+      setNotification("Only MOH users can initiate breakdown requests.");
+      return false;
+    }
     if (selectedDevices.length === 0 || filteredRegionRows.length === 0) {
       setNotification("Please ensure at least 1 device and 1 active filtered region row are available.");
       setTimeout(() => setNotification(null), 3500);

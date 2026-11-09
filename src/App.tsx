@@ -3286,6 +3286,7 @@ export function App() {
                 hfListItems={hfListItems}
                 multipleStockItems={multipleStockItems}
                 dspRecords={dspRecords}
+                currentUser={currentUser}
               />
             ) : (
               <NoBkdView

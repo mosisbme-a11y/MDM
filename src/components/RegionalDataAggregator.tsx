@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { HealthFacilityRecord, MultipleStockRecord, DspWorkflowRecord } from '../types';
+import { HealthFacilityRecord, MultipleStockRecord, DspWorkflowRecord, AuthUser } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { 
   Layers, 
@@ -40,12 +40,14 @@ interface Props {
   hfListItems: HealthFacilityRecord[];
   multipleStockItems: MultipleStockRecord[];
   dspRecords: DspWorkflowRecord[];
+  currentUser?: AuthUser | null;
 }
 
 export const RegionalDataAggregator: React.FC<Props> = ({
   hfListItems,
   multipleStockItems,
-  dspRecords
+  dspRecords,
+  currentUser
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);

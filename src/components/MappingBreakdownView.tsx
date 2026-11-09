@@ -521,7 +521,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     downloadCSV(`Mismatched_Mappings_${new Date().toISOString().split('T')[0]}.csv`, exportData);
     setUploadFeedback({ message: `Exported ${mismatched.length} facilities with missing regional mappings.`, type: 'success' });
   };
-  
+
   const handleDownloadMappedData = () => {
     if (adHocDataActive && matrixData) {
       // Export the current Matrix (Aggregated)
@@ -560,32 +560,190 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       setUploadFeedback({ message: `Exported ${hfListItems.length} records from Master HF Data.`, type: 'success' });
     }
   };
-  
+
+  const handleDownloadItemAggregationTemplate = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const headersRow1 = [
+      'Hub',
+      'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult',
+      'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
+    ];
+    const headersRow2 = [
+      '',
+      '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
+    ];
+
+    const hubRows = [
+      ['AA01', 6, 6, 2, 2, 2, 2],
+      ['AD01', 2, 2, 2, 2, 2, 2],
+      ['DI01', 2, 2, 2, 2, 2, 2],
+      ['BD01', 2, 2, 2, 2, 2, 2],
+      ['HW01', 2, 2, 2, 2, 2, 2],
+      ['DD01', 2, 2, 2, 2, 2, 2]
+    ];
+
+    if (format === 'csv') {
+      const csvData = [
+        headersRow1,
+        headersRow2,
+        ...hubRows
+      ].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Item_Aggregation_By_Hub_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setUploadFeedback({ message: '✓ Downloaded Item Aggregation CSV template matching Hub layout!', type: 'success' });
+      return;
+    }
+
+    const aoa = [
+      headersRow1,
+      headersRow2,
+      ...hubRows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 32 }, { wch: 24 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Item Aggregation');
+    XLSX.writeFile(wb, `Item_Aggregation_By_Hub_Matrix_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setUploadFeedback({ message: '✓ Downloaded Item Aggregation Excel (.xlsx) template matching Hub layout!', type: 'success' });
+  };
+
+  const handleDownloadExactTemplate = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const headersRow1 = [
+      '', '', '', '', 'List of Packeges', '',
+      'Anesthesia machine - with Patient mon', 'Anesthesia machine - with Patient mon',
+      'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
+    ];
+    const headersRow2 = [
+      'Region', 'Zone', 'Woreda', 'Name of health facility', '', 'HUB',
+      '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
+    ];
+
+    const sampleRows = [
+      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'HO01', 2, 2, 2, 2, 2, 2],
+      ['Oromia', 'East Shewa', 'Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
+      ['Dire Dawa', 'Dire Dawa', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
+    ];
+
+    if (format === 'csv') {
+      const csvData = [
+        headersRow1,
+        headersRow2,
+        ...sampleRows
+      ].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Health_Facility_Allocation_Matrix_Template_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setUploadFeedback({ message: '✓ Downloaded Health Facility Matrix CSV template!', type: 'success' });
+      return;
+    }
+
+    const aoa = [
+      headersRow1,
+      headersRow2,
+      ...sampleRows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [
+      { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 10 }, { wch: 10 },
+      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'HF Allocation Matrix');
+    XLSX.writeFile(wb, `Health_Facility_Allocation_Matrix_Template_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setUploadFeedback({ message: '✓ Downloaded Health Facility Matrix Excel (.xlsx) template!', type: 'success' });
+  };
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [activeTemplateTab, setActiveTemplateTab] = useState<'item-agg' | 'hf-matrix'>('item-agg');
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-cyan-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-cyan-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-cyan-500/30">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <MapIcon size={160} />
         </div>
         
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 backdrop-blur-md rounded-xl border border-white/30">
-                <Layers className="w-6 h-6 text-white" />
+              <div className="p-2.5 bg-cyan-500/20 backdrop-blur-md rounded-2xl border border-cyan-400/30 text-cyan-400">
+                <Layers className="w-6 h-6" />
               </div>
-              <h2 className="text-2xl font-black tracking-tight uppercase">Mapping Breakdown System</h2>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight uppercase flex items-center gap-2">
+                  <span>Mapping Breakdown System</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-cyan-400/20 text-cyan-300 font-mono border border-cyan-400/40">
+                    Official Template Engine
+                  </span>
+                </h2>
+                <p className="text-cyan-100/80 text-xs sm:text-sm font-medium max-w-2xl mt-0.5">
+                  Analyze health facility distribution, map hubs, and generate/upload standard EPSS breakdown matrix templates.
+                </p>
+              </div>
             </div>
-            <p className="text-cyan-100 text-sm font-medium max-w-2xl">
-              Upload any file (Excel, CSV, Word, text) to analyze health facility distribution. 
-              Universal zero-fail engine automatically detects equipment columns and maps facilities to regional hubs for decision support.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* ITEM AGGREGATION Pill Button Matching attachment _0D7D8109-E684-41CC-9BFC-B6A88FAA19BD__7f931cf6.png */}
+            <button
+              onClick={() => {
+                setActiveTemplateTab('item-agg');
+                setShowTemplateModal(true);
+              }}
+              className="flex items-center gap-3 px-6 py-3 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-sm shadow-2xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
+              title="View and download Item Aggregation Template by Hub matching official specification"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
+              <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
+                ITEM AGGREGATION
+              </span>
+            </button>
+
+            {/* MAP HF TO HUB Pill Button Matching attachment _E4BE8B7E-0C62-4157-8AA7-5F3B2A9919DC__0001f039.png */}
+            <button
+              onClick={handleMapWithHubs}
+              disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
+              className="flex items-center gap-3 px-6 py-3 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-sm shadow-2xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 disabled:opacity-50 cursor-pointer tracking-wider uppercase group"
+              title="Map Health Facilities to official regional EPSS hubs"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
+              <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
+                {isAnalyzing ? 'MAPPING...' : 'MAP HF TO HUB'}
+              </span>
+            </button>
+
+            {/* GET TEMPLATE Button Matching attachment _94FE6776-C928-45B7-9B5E-5EABF286140A__4ab74c57.png */}
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full font-black text-sm shadow-xl transition-all active:scale-95 cursor-pointer uppercase tracking-wider"
+              title="View and download official Matrix Template matching exact specification"
+            >
+              <FileSpreadsheet size={18} className="text-slate-950" />
+              <span>GET TEMPLATE</span>
+            </button>
+
             {isAdmin && (
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {adHocDataActive && (
                   <button
                     onClick={handleResetToMaster}
@@ -595,41 +753,21 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                     <span>Reset to Master</span>
                   </button>
                 )}
-                  <button
-                    onClick={handleMapWithHubs}
-                    disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-emerald-500 transition active:scale-95 disabled:opacity-50 cursor-pointer"
-                    title="Analyze and map currently viewed facilities to regional hubs"
-                  >
-                    <MapIcon size={16} />
-                    <span>{isAnalyzing ? 'Analyzing...' : 'Map with Hubs'}</span>
-                  </button>
 
                 <button
-                  onClick={handleDownloadMismatched}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-slate-700 transition active:scale-95 cursor-pointer"
-                  title="Download CSV of facilities missing regional mappings"
-                >
-                  <Download size={16} />
-                  <span>Download Mismatched Mappings</span>
-                </button>
-                
-                <button
                   onClick={handleDownloadMappedData}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-indigo-500 transition active:scale-95 cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer"
                   title="Download CSV of all mapped facilities"
                 >
                   <Download size={16} />
                   <span>Download Mapped Data</span>
                 </button>
 
-
-                
                 <div className="flex flex-col items-end">
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 rounded-xl font-bold text-xs shadow-lg hover:bg-cyan-50 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-900 rounded-xl font-bold text-xs shadow-lg hover:bg-cyan-50 transition active:scale-95 disabled:opacity-50 cursor-pointer"
                     title="Upload any Excel or CSV file for ad-hoc mapping analysis"
                   >
                     <Upload size={16} />
@@ -645,13 +783,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                 </div>
               </div>
             )}
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2.5">
-              <div className="text-[10px] font-bold text-cyan-200 uppercase tracking-wider">Analysis Mode</div>
-              <div className="flex items-center gap-2 mt-0.5">
-                {adHocDataActive ? <FileText className="w-4 h-4 text-amber-400" /> : <ShieldCheck className="w-4 h-4 text-emerald-400" />}
-                <span className="text-sm font-bold">{adHocDataActive ? 'Ad-hoc File Data' : 'Master Registry'}</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -748,6 +879,264 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Official Matrix Template Preview & Download Modal matching {94FE6776-C928-45B7-9B5E-5EABF286140A}.png */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 space-y-6 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl border border-amber-200">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                    <span>Equipment Breakdown Matrix Template</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-mono font-bold">
+                      Standard EPSS Format
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Official 2-tier matrix structure with item codes, package designations, and highlighted Hub column
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Tab Selector in Modal */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+              <button
+                type="button"
+                onClick={() => setActiveTemplateTab('item-agg')}
+                className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer border ${
+                  activeTemplateTab === 'item-agg'
+                    ? 'bg-slate-900 text-white border-amber-400 ring-2 ring-amber-400/30'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
+                <span>Item Aggregation Template (by Hub)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTemplateTab('hf-matrix')}
+                className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer border ${
+                  activeTemplateTab === 'hf-matrix'
+                    ? 'bg-slate-900 text-white border-amber-400 ring-2 ring-amber-400/30'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Health Facility Allocation Matrix Template</span>
+              </button>
+            </div>
+
+            {/* Visual Table Preview Matching Screenshot _9598E1A0-64C7-499C-AB8E-E07C5E3430AB__68d203a0.png or {94FE6776-C928-45B7-9B5E-5EABF286140A}.png */}
+            {activeTemplateTab === 'item-agg' ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>Item Aggregation Layout (by EPSS Distribution Hub):</span>
+                  <span className="text-[11px] font-mono text-slate-500">Hub column + Equipment columns with catalog codes</span>
+                </div>
+
+                <div className="border border-slate-300 rounded-xl overflow-x-auto shadow-inner bg-slate-50 max-h-80">
+                  <table className="w-full text-left text-xs border-collapse font-sans min-w-[700px]">
+                    <thead>
+                      {/* Header Row 1 */}
+                      <tr className="border-b border-slate-300">
+                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 min-w-[90px]">Hub</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Anesthesia machine - with Patient mon</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bed - Patient, Fowler, Adult</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bowel - With Stand, Stainless Steel.</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Cold box</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Couch - Delivery</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold">Couch - Examination</th>
+                      </tr>
+
+                      {/* Header Row 2 (Material Codes) */}
+                      <tr className="border-b border-slate-300 bg-white font-mono text-[11px] text-slate-700">
+                        <td className="p-2 border-r border-slate-300 bg-yellow-100 font-bold text-yellow-950">Hub</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRB-0101N</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101-001</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">401-WICU-0101N</td>
+                        <td className="p-2 font-bold">401-WICU-0101N</td>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white font-mono text-xs">
+                      <tr>
+                        <td className="p-2 border-r border-slate-200 font-black bg-yellow-300 text-slate-950">AA01</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">6</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">6</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 text-right font-bold pr-6">2</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-r border-slate-200 font-black bg-yellow-300 text-slate-950">AD01</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 text-right font-bold pr-6">2</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-r border-slate-200 font-black bg-yellow-300 text-slate-950">DI01</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-bold pr-6">2</td>
+                        <td className="p-2 text-right font-bold pr-6">2</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>Health Facility Allocation Layout:</span>
+                  <span className="text-[11px] font-mono text-slate-500">6 Equipment Columns & 6 Location Attributes</span>
+                </div>
+
+                <div className="border border-slate-300 rounded-xl overflow-x-auto shadow-inner bg-slate-50 max-h-80">
+                  <table className="w-full text-left text-xs border-collapse font-sans min-w-[900px]">
+                    <thead>
+                      {/* Header Row 1 */}
+                      <tr className="border-b border-slate-300">
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Region</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Zone</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Woreda</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Name of health facility</th>
+                        <th className="p-2.5 bg-[#dbeafe] text-slate-900 font-semibold italic border-r border-slate-300 text-center">List of Packeges</th>
+                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 text-center">Hub</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Anesthesia machine - with Patient mon</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bed - Patient, Fowler, Adult</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bowel - With Stand, Stainless Steel.</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Cold box</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Couch - Delivery</th>
+                        <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold">Couch - Examination</th>
+                      </tr>
+
+                      {/* Header Row 2 (Material Codes) */}
+                      <tr className="border-b border-slate-300 bg-white font-mono text-[11px] text-slate-700">
+                        <td className="p-2 border-r border-slate-300"></td>
+                        <td className="p-2 border-r border-slate-300"></td>
+                        <td className="p-2 border-r border-slate-300"></td>
+                        <td className="p-2 border-r border-slate-300"></td>
+                        <td className="p-2 border-r border-slate-300 bg-[#eff6ff] italic text-slate-500 text-[10px] text-center">List of Packeges</td>
+                        <td className="p-2 border-r border-slate-300 bg-yellow-100"></td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRB-0101N</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101-001</td>
+                        <td className="p-2 border-r border-slate-300 font-bold">401-WICU-0101N</td>
+                        <td className="p-2 font-bold">401-WICU-0101N</td>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white font-mono text-xs">
+                      <tr>
+                        <td className="p-2 border-r border-slate-200">Addis Ababa</td>
+                        <td className="p-2 border-r border-slate-200">Addis Ketema</td>
+                        <td className="p-2 border-r border-slate-200">Woreda 01</td>
+                        <td className="p-2 border-r border-slate-200 font-sans font-medium">Tikur Anbessa Specialized Hospital</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">HO01</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 text-center font-bold">2</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-r border-slate-200">Oromia</td>
+                        <td className="p-2 border-r border-slate-200">East Shewa</td>
+                        <td className="p-2 border-r border-slate-200">Woreda 01</td>
+                        <td className="p-2 border-r border-slate-200 font-sans font-medium">Adama Hospital Medical College #40002328</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">AD01</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 text-center font-bold">2</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-r border-slate-200">Dire Dawa</td>
+                        <td className="p-2 border-r border-slate-200">Dire Dawa</td>
+                        <td className="p-2 border-r border-slate-200">Woreda 01</td>
+                        <td className="p-2 border-r border-slate-200 font-sans font-medium">Dire Dawa Dil Chora Hospital #40002962</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">DD01</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
+                        <td className="p-2 text-center font-bold">2</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Action Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100">
+              <div className="text-xs text-slate-500">
+                Select format to download active template:
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (activeTemplateTab === 'item-agg') {
+                      handleDownloadItemAggregationTemplate('csv');
+                    } else {
+                      handleDownloadExactTemplate('csv');
+                    }
+                    setShowTemplateModal(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition cursor-pointer flex items-center gap-2"
+                >
+                  <Download size={15} />
+                  <span>Download CSV</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (activeTemplateTab === 'item-agg') {
+                      handleDownloadItemAggregationTemplate('xlsx');
+                    } else {
+                      handleDownloadExactTemplate('xlsx');
+                    }
+                    setShowTemplateModal(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-lg cursor-pointer flex items-center gap-2"
+                >
+                  <FileSpreadsheet size={16} />
+                  <span>Download Excel (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
