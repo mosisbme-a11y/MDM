@@ -240,7 +240,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss'>('item');
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh'>('submit-breakdown-to-moh');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
 
@@ -267,6 +267,22 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [isChecklistOpen, setIsChecklistOpen] = useState<boolean>(false);
   const [newColumnName, setNewColumnName] = useState<string>('');
   const [newColumnCode, setNewColumnCode] = useState<string>('');
+  const [batchQtyInputs, setBatchQtyInputs] = useState<Record<string, string>>({});
+
+  const handleBatchApplyQtyToAllRows = (colId: string, customQty?: number) => {
+    const valToApply = customQty !== undefined ? customQty : (Number(batchQtyInputs[colId]) || 0);
+    setRows(prevRows =>
+      prevRows.map(row => ({
+        ...row,
+        quantities: {
+          ...row.quantities,
+          [colId]: valToApply
+        }
+      }))
+    );
+    const targetCol = columns.find(c => c.id === colId);
+    showToast(`✓ Applied ${valToApply} units of "${targetCol?.name || 'Equipment'}" across all ${rows.length} health facility rows!`);
+  };
 
   // RHB Summary Table (Attachment 1 Format: S/N | Region | DSP Name | Date | View)
   const [rhbSubViewMode, setRhbSubViewMode] = useState<'summary-table' | 'detailed-matrix'>('summary-table');
@@ -787,7 +803,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'TOTAL',
         ...columns.map(c => columnTotals[c.id] || 0)
       ]);
-    } else if (fmt === 'epss') {
+    } else if (fmt === 'epss' || fmt === 'submit-breakdown-to-moh') {
       aoa.push([
         'Region',
         'Zone',
@@ -874,7 +890,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     ws['!cols'] = fmt === 'item' ? [
       { wch: 14 },
       ...columns.map(() => ({ wch: 24 }))
-    ] : fmt === 'epss' ? [
+    ] : (fmt === 'epss' || fmt === 'submit-breakdown-to-moh') ? [
       { wch: 14 },
       { wch: 16 },
       { wch: 10 },
@@ -893,7 +909,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Facility Breakdown');
-    const filenameLabel = fmt === 'item' ? 'Item_Aggregation' : fmt === 'epss' ? 'EPSS_Submission' : fmt === 'dsp-received-from-moh' ? 'DSP_Received_From_MOH' : 'RHB_Breakdown';
+    const filenameLabel = fmt === 'item' ? 'Item_Aggregation' : fmt === 'submit-breakdown-to-moh' ? 'Submit_Breakdown_To_MOH' : fmt === 'epss' ? 'EPSS_Submission' : fmt === 'dsp-received-from-moh' ? 'DSP_Received_From_MOH' : 'RHB_Breakdown';
     const filename = `DSP_${filenameLabel}_${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.xlsx`;
     XLSX.writeFile(wb, filename);
     showToast(`✓ Exported ${filename}`);
@@ -917,6 +933,20 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       ['BD01', 2, 2, 2, 2, 2, 2],
       ['HW01', 2, 2, 2, 2, 2, 2],
       ['DD01', 2, 2, 2, 2, 2, 2]
+    ] : fmt === 'submit-breakdown-to-moh' ? [
+      [
+        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges',
+        'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
+      ],
+      [
+        '', '', '', '', 'List of Packeges',
+        '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
+      ],
+      ['Oromia', 'Gurage', 'Abeshige', 'Abeshige Woreda Health Office', 'MCH', 2, 3, 3, 2, 2, 2],
+      ['Oromia', 'East Shewa', 'Adama', 'Addis Hiwot Health Center', 'MCH', 2, 3, 3, 2, 2, 2],
+      ['Oromia', 'East Shewa', 'Adama', 'Adama Health Center', 'MCH', 2, 1, 1, 2, 2, 2],
+      ['Oromia', 'East Shewa', 'Adama', 'Addis Hiwot Health Center', 'MCH', 2, '', '', 2, 2, 2],
+      ['Afar', 'Kilbati', 'Abala', 'Abala Primary Hospital', 'MCH', 2, 3, 3, 2, 2, 2]
     ] : [
       [
         'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges', 'Hub',
@@ -1062,6 +1092,24 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           >
             <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
             <span className="uppercase font-black tracking-wide text-white">MOH TO EPSS MATRIX (HUB MAPPED)</span>
+          </button>
+
+          {/* SUBMIT BREAKDOWN TO MOH Button: Matching Attachment _EDC0FB35-30FB-4A2A-96D7-97541BD8563B__fa240c1f.png */}
+          <button
+            type="button"
+            onClick={() => {
+              setMatrixTemplateFormat('submit-breakdown-to-moh');
+              showToast('⚡ Switched to SUBMIT BREAKDOWN TO MOH Format (No Delivery Hubs Included)');
+            }}
+            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+              matrixTemplateFormat === 'submit-breakdown-to-moh'
+                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Switch to SUBMIT BREAKDOWN TO MOH View (Region, Zone, Woreda, Facility, Packages & Equipment - Excludes Delivery Hubs)"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
+            <span className="uppercase font-black tracking-wide text-white">SUBMIT BREAKDOWN TO MOH</span>
           </button>
 
           {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png & Attachment _3FAC7472 */}
@@ -1367,6 +1415,100 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </div>
               ))}
             </div>
+
+            {/* APPLIED SELECTED ITEMS EXACT QUANTITIES SUMMARY TABLE */}
+            {columns.length > 0 && (
+              <div className="mt-2 border border-amber-300 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <div className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide">
+                    <Sparkles className="w-4 h-4 text-yellow-200" />
+                    <span>Applied Equipment Quantities Table ({columns.length} Selected Items)</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold bg-amber-950/40 text-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300/40">
+                    Total Earmarked: {formatNumber(grandTotalUnits)} Units
+                  </span>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-amber-50/80 text-amber-950 font-bold text-[11px] sticky top-0 border-b border-amber-200">
+                      <tr>
+                        <th className="py-2 px-3 w-10 text-center">#</th>
+                        <th className="py-2 px-3">Equipment Item Description</th>
+                        <th className="py-2 px-3">SAP Material Code</th>
+                        <th className="py-2 px-3 text-center">Allocated Facilities</th>
+                        <th className="py-2 px-3 text-right">Applied Total Quantity</th>
+                        <th className="py-2 px-3 text-center">Batch Set Qty to All Rows</th>
+                        <th className="py-2 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                      {columns.map((col, idx) => {
+                        const totalQty = rows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+                        const facCount = rows.filter(r => (Number(r.quantities[col.id]) || 0) > 0).length;
+                        return (
+                          <tr key={`applied-sum-${col.id}`} className="hover:bg-amber-50/50 transition-colors">
+                            <td className="py-2 px-3 text-center text-slate-400 font-sans text-xs">{idx + 1}</td>
+                            <td className="py-2 px-3 font-sans font-bold text-slate-900">
+                              {col.name}
+                            </td>
+                            <td className="py-2 px-3 text-amber-800 font-bold">
+                              {col.code || 'N/A'}
+                            </td>
+                            <td className="py-2 px-3 text-center font-sans">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">
+                                {facCount} / {rows.length} Rows
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right font-black text-emerald-700 text-xs">
+                              {formatNumber(totalQty)} units
+                            </td>
+                            <td className="py-2 px-3 text-center font-sans">
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="Qty"
+                                  value={batchQtyInputs[col.id] || ''}
+                                  onChange={(e) => setBatchQtyInputs(prev => ({ ...prev, [col.id]: e.target.value }))}
+                                  className="w-16 px-2 py-1 bg-white border border-amber-300 rounded text-xs font-mono font-bold text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleBatchApplyQtyToAllRows(col.id)}
+                                  className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] transition cursor-pointer whitespace-nowrap"
+                                  title={`Apply specified quantity to all ${rows.length} facility rows`}
+                                >
+                                  Apply All
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBatchApplyQtyToAllRows(col.id, 2)}
+                                  className="px-1.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px] border border-slate-200 cursor-pointer"
+                                  title="Set 2 units to all rows"
+                                >
+                                  Set 2
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEquipmentColumn(col.id)}
+                                className="p-1 hover:bg-rose-100 text-rose-600 rounded transition cursor-pointer"
+                                title="Remove item column"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Add Custom Equipment Column Inputs */}
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-100">
@@ -1726,9 +1868,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                   List of Packeges
                 </th>
-                <th className="p-2.5 bg-yellow-300 text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center uppercase tracking-wide">
-                  Hub
-                </th>
+                {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
+                  <th className="p-2.5 bg-yellow-300 text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center uppercase tracking-wide">
+                    Hub
+                  </th>
+                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1774,7 +1918,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
-                <th className="p-2 bg-yellow-100 border-r border-slate-300"></th>
+                {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
+                  <th className="p-2 bg-yellow-100 border-r border-slate-300"></th>
+                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -2028,37 +2174,39 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
-                      {/* 6. Hub (Always visible, highlighted in yellow matching image 94FE6776) */}
-                      <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center bg-yellow-50/50">
-                        {isEditingMode ? (
-                          <select
-                            value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                            onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
-                            className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
-                            title="Select EPSS Distribution Hub"
-                          >
-                            {EPSS_HUBS_REGISTRY.map(h => (
-                              <option key={h.code} value={h.code}>
-                                {h.code} - {h.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1 group">
-                            <span className="px-2 py-0.5 rounded bg-yellow-200/90 text-yellow-950 font-mono font-black text-[11px] border border-yellow-300 shadow-2xs">
-                              {row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setIsEditingMode(true)}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
-                              title="Edit hub"
+                      {/* 6. Hub (Hidden when matrixTemplateFormat === 'submit-breakdown-to-moh', highlighted in yellow matching image 94FE6776) */}
+                      {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
+                        <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center bg-yellow-50/50">
+                          {isEditingMode ? (
+                            <select
+                              value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                              onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
+                              className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
+                              title="Select EPSS Distribution Hub"
                             >
-                              <Edit3 size={11} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                              {EPSS_HUBS_REGISTRY.map(h => (
+                                <option key={h.code} value={h.code}>
+                                  {h.code} - {h.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1 group">
+                              <span className="px-2 py-0.5 rounded bg-yellow-200/90 text-yellow-950 font-mono font-black text-[11px] border border-yellow-300 shadow-2xs">
+                                {row.hub || matchedHf?.deliveringPlant || 'HO01'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingMode(true)}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
+                                title="Edit hub"
+                              >
+                                <Edit3 size={11} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
 
                       {/* Equipment Quantity Cells (Only if not ITEM AGGREGATION mode) */}
                       {matrixTemplateFormat !== 'item' && columns.map(col => {
@@ -2171,18 +2319,18 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       </div>
       )}
 
-              {/* MODAL 1: SEND TO EPSS (DIRECT INSTITUTIONAL TRANSMITTAL) */}
+              {/* MODAL 1: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL & ITEM CONFIRMATION) */}
       {isTransmitModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 animate-scale-in max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-slate-900 text-amber-400">
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix to EPSS</h3>
-                  <p className="text-[11px] text-slate-400">Official Health Facility breakdown transmittal to EPSS</p>
+                  <h3 className="text-sm font-black text-slate-900">Send Region Breakdown Matrix to MOH</h3>
+                  <p className="text-[11px] text-slate-400">Official Health Facility breakdown transmittal to MOH PMD Directorate</p>
                 </div>
               </div>
               <button
@@ -2194,159 +2342,234 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               </button>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-              <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                DSP Project / Matrix Reference Title
-              </label>
-              <input 
-                type="text"
-                value={dspProjectName}
-                onChange={(e) => setDspProjectName(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
-              />
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  DSP Project / Matrix Reference Title
+                </label>
+                <input 
+                  type="text"
+                  value={dspProjectName}
+                  onChange={(e) => setDspProjectName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
+                    <span>Matrix Transmittal Payload Summary</span>
+                    <span className="text-amber-600 font-mono font-bold">{selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter}</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">HEALTH FACILITIES</span>
+                      <span className="font-bold text-slate-900">{filteredRows.length} Facilities</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">SELECTED ITEMS</span>
+                      <span className="font-bold text-indigo-800">{columns.length} Equipment Types</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">TOTAL EARMARKED UNITS</span>
+                      <span className="font-black text-emerald-700">{formatNumber(grandTotalUnits)} Units</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">TRANSMITTAL DATE</span>
+                      <span className="font-bold text-slate-900 font-mono">{internalDate}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Linked with MOH PMD Health Facility Master Data</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, Packages, and Equipment quantities directly to MOH (PMD Directorate).
+                  </p>
+                </div>
+
+                {/* SELECTED EQUIPMENT ITEM CONFIRMATION TABLE */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  <div className="px-3.5 py-2.5 bg-slate-900 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-black uppercase tracking-wide">Selected Items Equipment Confirmation ({columns.length})</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/30">
+                      {formatNumber(grandTotalUnits)} Total Units
+                    </span>
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-100 text-slate-700 font-bold text-[11px] sticky top-0 border-b border-slate-200">
+                        <tr>
+                          <th className="py-2 px-3 w-10 text-center">#</th>
+                          <th className="py-2 px-3">Equipment Item Description</th>
+                          <th className="py-2 px-3">SAP Material Code</th>
+                          <th className="py-2 px-3 text-center">Assigned Facilities</th>
+                          <th className="py-2 px-3 text-right">Earmarked Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                        {columns.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center text-slate-400 font-sans italic">
+                              No equipment items selected in table.
+                            </td>
+                          </tr>
+                        ) : (
+                          columns.map((col, idx) => {
+                            const totalQty = filteredRows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+                            const facCount = filteredRows.filter(r => (Number(r.quantities[col.id]) || 0) > 0).length;
+                            return (
+                              <tr key={col.id} className="hover:bg-amber-50/40 transition-colors">
+                                <td className="py-2 px-3 text-center text-slate-400 font-sans text-xs">{idx + 1}</td>
+                                <td className="py-2 px-3 font-sans font-bold text-slate-900">
+                                  {col.name}
+                                </td>
+                                <td className="py-2 px-3 text-amber-800 font-bold">
+                                  {col.code || 'N/A'}
+                                </td>
+                                <td className="py-2 px-3 text-center font-sans">
+                                  <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px] border border-indigo-200">
+                                    {facCount} Facilities
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-right font-black text-emerald-700">
+                                  {formatNumber(totalQty)} units
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                      <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-xs">
+                        <tr>
+                          <td colSpan={3} className="py-2 px-3 text-right font-sans font-black text-slate-700 uppercase text-[10px]">
+                            Grand Total Transmittal Quantity:
+                          </td>
+                          <td className="py-2 px-3 text-center font-sans text-indigo-900">
+                            {filteredRows.length} Facilities
+                          </td>
+                          <td className="py-2 px-3 text-right font-black text-emerald-800 text-sm">
+                            {formatNumber(grandTotalUnits)} units
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    <h4 className="text-[11px] font-black text-slate-900 uppercase">Authorized Regional Signatory</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person</label>
+                      <input 
+                        type="text"
+                        placeholder="Name"
+                        value={manualSignatoryName}
+                        onChange={(e) => setManualSignatoryName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role</label>
+                      <input 
+                        type="text"
+                        placeholder="Title"
+                        value={manualSignatoryRole}
+                        onChange={(e) => setManualSignatoryRole(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex justify-between items-center text-slate-500 font-bold uppercase text-[10px]">
-                  <span>Matrix Payload Summary</span>
-                  <span className="text-amber-600 font-mono font-bold">{selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">HEALTH FACILITIES</span>
-                    <span className="font-bold text-slate-900">{filteredRows.length} Facilities</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">EQUIPMENT TYPES</span>
-                    <span className="font-bold text-indigo-800">{columns.length} Columns</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TOTAL EARMARKED UNITS</span>
-                    <span className="font-black text-emerald-700">{formatNumber(grandTotalUnits)} Units</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">TRANSMITTAL DATE</span>
-                    <span className="font-bold text-slate-900 font-mono">{internalDate}</span>
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
+                    alert('Please fill in Authorized Person and Role before transmitting to MOH.');
+                    return;
+                  }
+                  const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
+                  const year = new Date().getFullYear();
+                  const randNum = Math.floor(100 + Math.random() * 900);
+                  const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
 
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-2 text-xs">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Linked with Health Facility Master Data</span>
-                </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, and Equipment quantities directly to EPSS (Sub-step 3.2 & 2.3).
-                </p>
-              </div>
+                  const rhbRecord: DspWorkflowRecord = {
+                    id: `dsp-rhb-moh-${Date.now()}`,
+                    dspRefNumber: brkRef,
+                    stage: 'rhb-breakdown-management',
+                    subStage: '3.2',
+                    stageTitle: 'RHB Breakdown Management',
+                    senderOrg: `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
+                    recipientOrg: 'MOH',
+                    dspName: cleanDspName,
+                    subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to MOH PMD (${filteredRows.length} Facilities)`,
+                    status: 'Endorsed & Approved',
+                    dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
+                    approvedDate: internalDate || new Date().toISOString().split('T')[0],
+                    totalDevices: columns.length,
+                    totalQuantity: grandTotalUnits,
+                    totalValuationETB: grandTotalUnits * 250000,
+                    targetedRegions: selectedRegionFilter === 'all' ? ALL_ETHIOPIAN_REGIONS : [selectedRegionFilter],
+                    targetedFacilitiesCount: filteredRows.length,
+                    officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
+                    signatory: manualSignatoryName,
+                    signatoryRole: manualSignatoryRole,
+                    facilityMatrixData: {
+                      date: internalDate,
+                      region: selectedRegionFilter,
+                      columns,
+                      rows: filteredRows
+                    },
+                    itemsIncluded: columns.map(c => ({
+                      material: c.code,
+                      description: c.name,
+                      quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+                      plant: 'MOH Central'
+                    })),
+                    notes: `Official Regional Health Facility Breakdown Matrix submitted to MOH PMD Directorate (${filteredRows.length} Facilities).`
+                  };
 
-              <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                  <h4 className="text-[11px] font-black text-slate-900 uppercase">Authorized Regional Signatory</h4>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person</label>
-                    <input 
-                      type="text"
-                      placeholder="Name"
-                      value={manualSignatoryName}
-                      onChange={(e) => setManualSignatoryName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role</label>
-                    <input 
-                      type="text"
-                      placeholder="Title"
-                      value={manualSignatoryRole}
-                      onChange={(e) => setManualSignatoryRole(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsTransmitModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
-                      alert('Please fill in Authorized Person and Role before transmitting.');
-                      return;
-                    }
-                    const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
-                    const year = new Date().getFullYear();
-                    const randNum = Math.floor(100 + Math.random() * 900);
-                    const brkRef = `RHB/EPSS-BRK/${year}/${randNum}`;
-
-                    const rhbRecord: DspWorkflowRecord = {
-                      id: `dsp-rhb-epss-${Date.now()}`,
-                      dspRefNumber: brkRef,
-                      stage: 'rhb-breakdown-management',
-                      subStage: '3.2',
-                      stageTitle: 'RHB Breakdown Management',
-                      senderOrg: `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
-                      recipientOrg: 'EPSS',
-                      dspName: cleanDspName,
-                      subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to EPSS (${filteredRows.length} Facilities)`,
-                      status: 'Endorsed & Approved',
-                      dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
-                      approvedDate: internalDate || new Date().toISOString().split('T')[0],
-                      totalDevices: columns.length,
-                      totalQuantity: grandTotalUnits,
-                      totalValuationETB: grandTotalUnits * 250000,
-                      targetedRegions: selectedRegionFilter === 'all' ? ALL_ETHIOPIAN_REGIONS : [selectedRegionFilter],
-                      targetedFacilitiesCount: filteredRows.length,
-                      officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
-                      signatory: manualSignatoryName,
-                      signatoryRole: manualSignatoryRole,
-                      facilityMatrixData: {
-                        date: internalDate,
-                        region: selectedRegionFilter,
-                        columns,
-                        rows: filteredRows
-                      },
-                      itemsIncluded: columns.map(c => ({
-                        material: c.code,
-                        description: c.name,
-                        quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-                        plant: 'AA01 Central'
-                      })),
-                      notes: `Official Regional Health Facility Breakdown Matrix submitted to EPSS (${filteredRows.length} Facilities).`
-                    };
-
-                    try {
-                      pushCentralMasterData({
-                        dspReceivedMohRows: filteredRows,
-                        updatedBy: 'RHB Regional Logistics',
-                        updateKind: `Transmit Region Breakdown Matrix to EPSS (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
-                      });
-                    } catch (e) {
-                      console.warn(e);
-                    }
-                    setIsTransmitModalOpen(false);
-                    showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to EPSS as Dossier [${cleanDspName}]!`);
-                  }}
-                  className="px-5 py-2 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
-                >
-                  <Send className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Confirm Transmit to EPSS</span>
-                </button>
-              </div>
+                  try {
+                    pushCentralMasterData({
+                      dspReceivedMohRows: filteredRows,
+                      updatedBy: 'RHB Regional Logistics',
+                      updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
+                    });
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                  setIsTransmitModalOpen(false);
+                  showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH as Dossier [${cleanDspName}]!`);
+                }}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 text-xs"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-400" />
+                <span>Confirm Transmit to MOH</span>
+              </button>
             </div>
           </div>
         </div>
