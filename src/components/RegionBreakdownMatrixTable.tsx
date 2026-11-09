@@ -897,6 +897,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* MAP HF TO HUB Button */}
+          <button
+            type="button"
+            onClick={handleMapHfToHub}
+            className="px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 bg-[#0a0f1d] text-white border border-amber-400 hover:bg-black group"
+            title="Map Health Facilities to official regional EPSS hubs using HF Master Data"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
+            <span className="uppercase font-black tracking-widest text-white group-hover:text-amber-300 transition-colors">
+              MAP HF TO HUB
+            </span>
+          </button>
+
           {/* ITEM AGGREGATION Button: Matching Attachment _23108371-8084-4E3E-8152-291A78533F75__0d333217.png */}
           <button
             type="button"
