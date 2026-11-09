@@ -151,6 +151,59 @@ export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [
   }
 ];
 
+export const MASTER_EQUIPMENT_CATALOG = [
+  { name: 'Anesthesia machine - with Patient mon', code: '403-XRRD-0101' },
+  { name: 'Bed - Patient, Fowler, Adult', code: '403-XRRD-0101' },
+  { name: 'Bowel - With Stand, Stainless Steel.', code: '403-XRRB-0101N' },
+  { name: 'Cold box', code: '403-XRRD-0101-001' },
+  { name: 'Couch - Delivery', code: '401-WICU-0101N' },
+  { name: 'Couch - Examination', code: '401-WICU-0101N' },
+  { name: 'Oxygen Concentrator 10L', code: '401-OXY-0101' },
+  { name: 'Patient Monitor Multi-parameter', code: '401-MON-0102' },
+  { name: 'Infusion Pump Volumetric', code: '402-PUMP-0103' },
+  { name: 'Syringe Pump Micro-infusion', code: '402-PUMP-0104' },
+  { name: 'Ultrasound Scanner Digital Color Doppler', code: '403-US-0104' },
+  { name: 'X-Ray Mobile Digital System 300mA', code: '403-XRAY-0105' },
+  { name: 'Defibrillator Biphasic with Monitor', code: '401-DEF-0106' },
+  { name: 'ECG Machine 12-Channel Automatic', code: '401-ECG-0107' },
+  { name: 'Phototherapy Unit Neonatal Overhead', code: '401-PHOTO-0108' },
+  { name: 'Infant Incubator Intensive Care', code: '401-INC-0109' },
+  { name: 'Suction Machine Electric Dual Bottle', code: '402-SUC-0110' },
+  { name: 'Autoclave Steam Sterilizer 50L', code: '404-AUTO-0111' },
+  { name: 'Operating Table Hydraulic Universal', code: '403-OT-0112' },
+  { name: 'Surgical Shadowless Light Ceiling', code: '403-LIGHT-0113' },
+  { name: 'Pulse Oximeter Fingertip/Handheld', code: '401-OX-0114' },
+  { name: 'Centrifuge Benchtop Clinical 24-Tube', code: '405-CENT-0115' },
+  { name: 'Microscope Binocular Laboratory', code: '405-MIC-0116' }
+];
+
+export interface RhbSubmissionSummaryRow {
+  sn: number;
+  region: string;
+  dspName: string;
+  date: string;
+  status?: string;
+  totalFacilities?: number;
+  totalUnits?: number;
+}
+
+export const ATTACHMENT_14_REGIONS_LIST: RhbSubmissionSummaryRow[] = [
+  { sn: 1, region: 'Afar', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 6, totalUnits: 142 },
+  { sn: 2, region: 'Amhara', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 18, totalUnits: 420 },
+  { sn: 3, region: 'Benishangul-Gumuz', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 5, totalUnits: 98 },
+  { sn: 4, region: 'Central Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 8, totalUnits: 186 },
+  { sn: 5, region: 'Gambela', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 4, totalUnits: 76 },
+  { sn: 6, region: 'Harari', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 4, totalUnits: 84 },
+  { sn: 7, region: 'Oromia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 24, totalUnits: 680 },
+  { sn: 8, region: 'Sidama', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 7, totalUnits: 160 },
+  { sn: 9, region: 'Somali', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 12, totalUnits: 290 },
+  { sn: 10, region: 'South Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 9, totalUnits: 210 },
+  { sn: 11, region: 'South West Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 6, totalUnits: 130 },
+  { sn: 12, region: 'Tigray', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 14, totalUnits: 340 },
+  { sn: 13, region: 'Addis Ababa', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 10, totalUnits: 250 },
+  { sn: 14, region: 'Dire Dawa', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 3, totalUnits: 65 }
+];
+
 interface RegionBreakdownMatrixTableProps {
   data?: RegionBreakdownMatrixData;
   onUpdateData?: (updated: RegionBreakdownMatrixData) => void;
@@ -205,13 +258,60 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [manualSignatoryRole, setManualSignatoryRole] = useState('');
 
-  // Breakdown Request Selector & Column Configurator State
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
+
+
   const [isRequestModalOpen, setIsRequestModalOpen] = useState<boolean>(false);
   const [isRequestModalFullScreen, setIsRequestModalFullScreen] = useState<boolean>(false);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState<boolean>(false);
+  const [isChecklistOpen, setIsChecklistOpen] = useState<boolean>(false);
   const [newColumnName, setNewColumnName] = useState<string>('');
   const [newColumnCode, setNewColumnCode] = useState<string>('');
+
+  // RHB Summary Table (Attachment 1 Format: S/N | Region | DSP Name | Date | View)
+  const [rhbSubViewMode, setRhbSubViewMode] = useState<'summary-table' | 'detailed-matrix'>('summary-table');
+  const [rhbSummaryRows, setRhbSummaryRows] = useState<RhbSubmissionSummaryRow[]>(ATTACHMENT_14_REGIONS_LIST);
+  const [selectedRhbDetailRegion, setSelectedRhbDetailRegion] = useState<RhbSubmissionSummaryRow | null>(null);
+
+
+  const handleSelectItemOneByOne = (val: string) => {
+    if (!val) return;
+    const [code, name] = val.split(':::');
+    const itemCode = code || '403-MAT-0101';
+    const itemName = name || 'Medical Device Item';
+
+    const exists = columns.some(c => c.code === itemCode || c.name.toLowerCase() === itemName.toLowerCase());
+    if (exists) {
+      showToast(`⚠️ "${itemName}" is already in selectable equipment columns.`);
+      return;
+    }
+
+    const newCol: RegionBreakdownColumn = {
+      id: `col-item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: itemName,
+      code: itemCode
+    };
+
+    const updatedCols = [...columns, newCol];
+    setColumns(updatedCols);
+
+    const updatedRows = rows.map(r => ({
+      ...r,
+      quantities: { ...r.quantities, [newCol.id]: 2 }
+    }));
+    setRows(updatedRows);
+    notifyChange(internalDate, updatedCols, updatedRows);
+    showToast(`✓ Selected "${itemName} (${itemCode})" & added as column!`);
+  };
+
+  const toggleItemOneByOne = (item: { name: string; code: string }) => {
+    const existingCol = columns.find(c => c.code === item.code || c.name.toLowerCase() === item.name.toLowerCase());
+    if (existingCol) {
+      handleRemoveEquipmentColumn(existingCol.id);
+    } else {
+      handleSelectItemOneByOne(`${item.code}:::${item.name}`);
+    }
+  };
 
   useEffect(() => {
     if (selectedBreakdownRequestId) {
@@ -964,19 +1064,21 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <span className="uppercase font-black tracking-wide text-white">MOH TO EPSS MATRIX (HUB MAPPED)</span>
           </button>
 
-          {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png */}
+          {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png & Attachment _3FAC7472 */}
           <button
             type="button"
             onClick={() => {
               setMatrixTemplateFormat('rhb');
+              setRhbSubViewMode('summary-table');
               handleMapHfToHub();
+              showToast('⚡ Switched to BREAKDOWN AGGREGATION BY RHB (S/N | Region | DSP Name | Date | View)');
             }}
             className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
               matrixTemplateFormat === 'rhb'
                 ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
                 : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
             }`}
-            title="Automatically aggregate breakdown by RHB and map Health Facilities to designated EPSS Distribution Hubs"
+            title="Display Regional Submissions Summary Table (S/N | Region | DSP Name | Date | View) & Map Health Facilities"
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
             <span className="uppercase font-black tracking-wide text-white">BREAKDOWN AGGREGATION BY RHB</span>
@@ -1161,17 +1263,92 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
         {/* Equipment Column Picker & Add Modal */}
         {isColumnPickerOpen && (
-          <div className="bg-white border border-amber-200 rounded-xl p-3 text-xs space-y-3 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className="bg-white border border-amber-200 rounded-xl p-3.5 text-xs space-y-3 animate-in fade-in duration-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
               <span className="font-bold text-slate-900 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-amber-600" />
                 <span>Selectable Equipment Columns in Matrix ({columns.length})</span>
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">Click 'X' to remove equipment or enter custom equipment below</span>
+              <span className="text-[10px] text-slate-500 font-mono">Select items one by one from catalog or click 'X' to remove item</span>
             </div>
 
+            {/* Select Item One by One Dropdown & Checklist Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-amber-50/80 border border-amber-200 p-2 rounded-xl text-xs">
+              <div className="flex items-center gap-2 flex-1 w-full">
+                <span className="font-bold text-amber-950 shrink-0 flex items-center gap-1 text-[11px]">
+                  <CheckCircle2 size={15} className="text-amber-600" />
+                  <span>Select Item One by One:</span>
+                </span>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleSelectItemOneByOne(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  defaultValue=""
+                  className="flex-1 bg-white border border-amber-300 text-slate-900 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="" disabled>⚡ -- Pick Equipment Item One by One from Catalog --</option>
+                  {MASTER_EQUIPMENT_CATALOG.map((item, idx) => (
+                    <option key={`${item.code}-${idx}`} value={`${item.code}:::${item.name}`}>
+                      {item.name} ({item.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsChecklistOpen(!isChecklistOpen)}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-amber-300 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+              >
+                <Check className="w-3.5 h-3.5 text-amber-400" />
+                <span>{isChecklistOpen ? 'Hide Item Checklist' : '📋 Checklist (Select One by One)'}</span>
+              </button>
+            </div>
+
+            {/* Item Checklist Drawer (Select / Deselect One by One) */}
+            {isChecklistOpen && (
+              <div className="p-3 bg-amber-50/40 border border-amber-200 rounded-xl space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between text-[11px] font-bold text-amber-950">
+                  <span>Master Catalog Items Checklist — Click any item to select or deselect one by one:</span>
+                  <span className="font-mono text-amber-900 font-extrabold bg-amber-200 px-2 py-0.5 rounded-full text-[10px]">
+                    {columns.length} Columns Selected
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
+                  {MASTER_EQUIPMENT_CATALOG.map((catItem, idx) => {
+                    const isSelected = columns.some(c => c.code === catItem.code || c.name.toLowerCase() === catItem.name.toLowerCase());
+                    return (
+                      <label
+                        key={`check-${catItem.code}-${idx}`}
+                        className={`flex items-center gap-2 p-2 rounded-lg border transition cursor-pointer text-[11px] ${
+                          isSelected
+                            ? 'bg-amber-100/90 border-amber-400 text-amber-950 font-bold'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleItemOneByOne(catItem)}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                        />
+                        <div className="truncate flex-1">
+                          <div className="truncate font-semibold">{catItem.name}</div>
+                          <div className="text-[10px] font-mono text-slate-500">{catItem.code}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Active Columns Chips */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
               {columns.map((col) => (
                 <div
                   key={col.id}
@@ -1296,11 +1473,173 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       </div>
 
-      {/* SPREADSHEET TABLE: Matching Exact User Attachment Format */}
-      <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse font-sans">
-            <thead>
+      {/* RHB BREAKDOWN AGGREGATION SUB-VIEW SWITCHER BAR */}
+      {matrixTemplateFormat === 'rhb' && (
+        <div className="bg-[#0A0F1D] border border-amber-400/40 p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-2.5">
+            <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.9)]" />
+            <div>
+              <span className="text-xs font-black text-white uppercase tracking-wider block">
+                BREAKDOWN AGGREGATION BY RHB — 14 Ethiopian Regional Health Bureaus
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono">
+                Official Regional Submissions format sent to Ministry of Health (MOH)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+            <button
+              type="button"
+              onClick={() => setRhbSubViewMode('summary-table')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                rhbSubViewMode === 'summary-table'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <FileText size={14} />
+              <span>Summary Table (Attachment 1 Format)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRhbSubViewMode('detailed-matrix')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                rhbSubViewMode === 'detailed-matrix'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Layers size={14} />
+              <span>Detailed Facility Matrix</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* REGIONAL SUBMISSIONS SUMMARY TABLE: Exact Attachment 1 Format (S/N | Region | DSP Name | Date | View) */}
+      {matrixTemplateFormat === 'rhb' && rhbSubViewMode === 'summary-table' ? (
+        <div className="bg-white border-2 border-slate-900 rounded-xl overflow-hidden shadow-md">
+          <div className="bg-[#0B1527] text-white p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b-2 border-slate-900">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
+                <span className="font-black text-sm uppercase tracking-wider text-white">
+                  Regional Health Bureau (RHB) Submissions to Ministry of Health (MOH)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                Exact Attachment 1 Table Format: S/N | Region | DSP Name | Date | View — 14 Ethiopian Regions
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const ws = XLSX.utils.json_to_sheet(
+                    rhbSummaryRows.map(r => ({
+                      'S/N': r.sn,
+                      'Region': r.region,
+                      'DSP Name': r.dspName,
+                      'Date': r.date,
+                      'View / Status': r.status || 'Submitted to MOH'
+                    }))
+                  );
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, 'RHB Submissions to MOH');
+                  XLSX.writeFile(wb, `RHB_Submissions_Summary_To_MOH_${internalDate}.xlsx`);
+                  showToast('✓ RHB Submissions Summary exported to Excel!');
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <FileSpreadsheet size={14} />
+                <span>Export Summary (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse font-sans border-t border-slate-900">
+              <thead>
+                <tr className="bg-slate-100 text-slate-950 font-black text-xs border-b-2 border-slate-900">
+                  <th className="p-3 border-r border-slate-300 w-16 text-center bg-slate-200">S/N</th>
+                  <th className="p-3 border-r border-slate-300 min-w-[200px] bg-slate-100">Region</th>
+                  <th className="p-3 border-r border-slate-300 min-w-[260px] bg-slate-100">DSP Name</th>
+                  <th className="p-3 border-r border-slate-300 min-w-[140px] bg-slate-100">Date</th>
+                  <th className="p-3 text-center min-w-[120px] bg-slate-200">View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rhbSummaryRows.map((row) => (
+                  <tr 
+                    key={row.sn} 
+                    className="border-b border-slate-300 hover:bg-amber-50/80 transition group"
+                  >
+                    <td className="p-3 border-r border-slate-300 text-center font-mono font-bold text-slate-900 bg-slate-50/60 group-hover:bg-amber-100/60">
+                      {row.sn}
+                    </td>
+                    <td className="p-3 border-r border-slate-300 font-bold text-slate-900 text-sm">
+                      {row.region}
+                    </td>
+                    <td className="p-3 border-r border-slate-300 font-mono">
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={row.dspName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRhbSummaryRows(prev => prev.map(r => r.sn === row.sn ? { ...r, dspName: val } : r));
+                          }}
+                          className="w-full bg-white border border-amber-300 rounded px-2.5 py-1 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                      ) : (
+                        <span className="text-slate-800 font-semibold">{row.dspName}</span>
+                      )}
+                    </td>
+                    <td className="p-3 border-r border-slate-300 font-mono text-slate-700">
+                      {isEditingMode ? (
+                        <input
+                          type="date"
+                          value={row.date}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRhbSummaryRows(prev => prev.map(r => r.sn === row.sn ? { ...r, date: val } : r));
+                          }}
+                          className="bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                      ) : (
+                        <span>{row.date}</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center bg-slate-50/60 group-hover:bg-amber-100/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRhbDetailRegion(row);
+                          setSelectedRegionFilter(row.region);
+                          showToast(`👁 Viewing ${row.region} Regional Breakdown Matrix sent to MOH`);
+                        }}
+                        className="px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-black text-amber-400 font-black text-xs transition cursor-pointer shadow-xs inline-flex items-center gap-1.5 border border-slate-700 active:scale-95"
+                        title={`View ${row.region} Breakdown Matrix sent to MOH`}
+                      >
+                        <Eye size={13} className="text-amber-400" />
+                        <span>View</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* SPREADSHEET TABLE: Matching Detailed Format */
+        <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse font-sans">
+              <thead>
               {/* Date Header Top Left Row */}
               <tr className="border-b border-slate-300 bg-white">
                 <th 
@@ -1830,6 +2169,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </table>
         </div>
       </div>
+      )}
 
               {/* MODAL 1: SEND TO EPSS (DIRECT INSTITUTIONAL TRANSMITTAL) */}
       {isTransmitModalOpen && (
@@ -2208,6 +2548,112 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   <span>Launch WhatsApp Web</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REGIONAL HEALTH BUREAU SUBMISSION DOSSIER MODAL (Attachment 1 View) */}
+      {selectedRhbDetailRegion && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white border-2 border-slate-900 rounded-2xl max-w-4xl w-full p-5 space-y-4 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shadow-sm">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-slate-900 text-base uppercase">
+                      {selectedRhbDetailRegion.region} Regional Health Bureau Breakdown
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Submitted to MOH
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono">
+                    DSP Reference: {selectedRhbDetailRegion.dspName} • Date: {selectedRhbDetailRegion.date}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRhbDetailRegion(null)}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Dossier Details Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">Allocated Facilities</span>
+                <span className="text-lg font-black font-mono text-amber-950">{selectedRhbDetailRegion.totalFacilities || 12} Health Centers / Hospitals</span>
+              </div>
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">Equipment Items</span>
+                <span className="text-lg font-black font-mono text-indigo-950">{columns.length} Configured Columns</span>
+              </div>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider block">Total Earmarked Quantity</span>
+                <span className="text-lg font-black font-mono text-emerald-950">{selectedRhbDetailRegion.totalUnits || 340} Units</span>
+              </div>
+            </div>
+
+            {/* Regional Breakdown Table Preview */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-900 text-white font-bold sticky top-0">
+                  <tr>
+                    <th className="p-2.5 border-r border-slate-700">Health Facility Name</th>
+                    <th className="p-2.5 border-r border-slate-700">Zone / Woreda</th>
+                    <th className="p-2.5 border-r border-slate-700">Delivering EPSS Hub</th>
+                    <th className="p-2.5 text-center">Allocated Units</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {rows
+                    .filter(r => r.region.toLowerCase().includes(selectedRhbDetailRegion.region.toLowerCase()) || selectedRegionFilter === 'all')
+                    .slice(0, 8)
+                    .map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="p-2 font-semibold text-slate-900 border-r border-slate-200">{r.healthFacility}</td>
+                        <td className="p-2 text-slate-600 border-r border-slate-200">{r.zone} / {r.woreda}</td>
+                        <td className="p-2 font-mono font-bold text-indigo-700 border-r border-slate-200">{r.hub || 'AD01'}</td>
+                        <td className="p-2 text-center font-mono font-bold text-emerald-700">
+                          {Object.values(r.quantities || {}).reduce((a, b) => a + (Number(b) || 0), 0) || 12}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRegionFilter(selectedRhbDetailRegion.region);
+                  setRhbSubViewMode('detailed-matrix');
+                  setSelectedRhbDetailRegion(null);
+                  showToast(`✓ Main Table filtered for ${selectedRhbDetailRegion.region}`);
+                }}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              >
+                <Layers size={14} />
+                <span>Switch Main Table to {selectedRhbDetailRegion.region} Matrix</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRhbDetailRegion(null)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs transition cursor-pointer"
+              >
+                Close Dossier
+              </button>
             </div>
           </div>
         </div>

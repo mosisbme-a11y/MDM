@@ -136,9 +136,49 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [activeTemplateTab, setActiveTemplateTab] = useState<'item-agg' | 'hf-matrix'>('item-agg');
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
 
   // File upload input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelectItemOneByOne = (val: string) => {
+    if (!val) return;
+    const [code, name] = val.split(':::');
+    const itemCode = code || '403-MAT-0101';
+    const itemName = name || 'Medical Device Item';
+
+    const exists = columns.some(c => c.code === itemCode || c.name.toLowerCase() === itemName.toLowerCase());
+    if (exists) {
+      showToast(`⚠️ "${itemName}" is already in equipment columns.`);
+      return;
+    }
+
+    const newCol: Stage4Column = {
+      id: `col-item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: itemName,
+      code: itemCode
+    };
+
+    const updatedCols = [...columns, newCol];
+    setColumns(updatedCols);
+
+    const updatedRows = rows.map(r => ({
+      ...r,
+      quantities: { ...r.quantities, [newCol.id]: 2 }
+    }));
+    setRows(updatedRows);
+    notifyChange(updatedCols, updatedRows);
+    showToast(`✓ Selected "${itemName} (${itemCode})" & added as column!`);
+  };
+
+  const toggleItemOneByOne = (item: { name: string; code: string }) => {
+    const existingCol = columns.find(c => c.code === item.code || c.name.toLowerCase() === item.name.toLowerCase());
+    if (existingCol) {
+      handleRemoveColumn(existingCol.id);
+    } else {
+      handleSelectItemOneByOne(`${item.code}:::${item.name}`);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -884,15 +924,139 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
       {/* Column Configurator Drawer */}
       {isColumnPickerOpen && (
-        <div className="bg-white border border-purple-200 rounded-xl p-3 text-xs space-y-3 animate-in fade-in duration-200 shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div className="bg-white border border-purple-200 rounded-xl p-3.5 text-xs space-y-3 animate-in fade-in duration-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
             <span className="font-bold text-slate-900 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-purple-600" />
-              <span>Current Equipment Columns ({columns.length})</span>
+              <span>Selectable Equipment Columns in Matrix ({columns.length})</span>
             </span>
-            <span className="text-[10px] text-slate-500">Click &times; to delete column or add new item below</span>
+            <span className="text-[10px] text-slate-500 font-mono">Select items one by one from catalog or click &times; to remove item</span>
           </div>
 
+          {/* Select Item One by One Dropdown & Checklist Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-purple-50/80 border border-purple-200 p-2 rounded-xl text-xs">
+            <div className="flex items-center gap-2 flex-1 w-full">
+              <span className="font-bold text-purple-950 shrink-0 flex items-center gap-1 text-[11px]">
+                <CheckCircle2 size={15} className="text-purple-600" />
+                <span>Select Item One by One:</span>
+              </span>
+              <select
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleSelectItemOneByOne(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                defaultValue=""
+                className="flex-1 bg-white border border-purple-300 text-slate-900 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-2xs"
+              >
+                <option value="" disabled>⚡ -- Pick Equipment Item One by One from Catalog --</option>
+                {[
+                  { name: 'Anesthesia machine - with Patient mon', code: '403-XRRD-0101' },
+                  { name: 'Bed - Patient, Fowler, Adult', code: '403-XRRD-0101' },
+                  { name: 'Bowel - With Stand, Stainless Steel.', code: '403-XRRB-0101N' },
+                  { name: 'Cold box', code: '403-XRRD-0101-001' },
+                  { name: 'Couch - Delivery', code: '401-WICU-0101N' },
+                  { name: 'Couch - Examination', code: '401-WICU-0101N' },
+                  { name: 'Oxygen Concentrator 10L', code: '401-OXY-0101' },
+                  { name: 'Patient Monitor Multi-parameter', code: '401-MON-0102' },
+                  { name: 'Infusion Pump Volumetric', code: '402-PUMP-0103' },
+                  { name: 'Syringe Pump Micro-infusion', code: '402-PUMP-0104' },
+                  { name: 'Ultrasound Scanner Digital Color Doppler', code: '403-US-0104' },
+                  { name: 'X-Ray Mobile Digital System 300mA', code: '403-XRAY-0105' },
+                  { name: 'Defibrillator Biphasic with Monitor', code: '401-DEF-0106' },
+                  { name: 'ECG Machine 12-Channel Automatic', code: '401-ECG-0107' },
+                  { name: 'Phototherapy Unit Neonatal Overhead', code: '401-PHOTO-0108' },
+                  { name: 'Infant Incubator Intensive Care', code: '401-INC-0109' },
+                  { name: 'Suction Machine Electric Dual Bottle', code: '402-SUC-0110' },
+                  { name: 'Autoclave Steam Sterilizer 50L', code: '404-AUTO-0111' },
+                  { name: 'Operating Table Hydraulic Universal', code: '403-OT-0112' },
+                  { name: 'Surgical Shadowless Light Ceiling', code: '403-LIGHT-0113' },
+                  { name: 'Pulse Oximeter Fingertip/Handheld', code: '401-OX-0114' },
+                  { name: 'Centrifuge Benchtop Clinical 24-Tube', code: '405-CENT-0115' },
+                  { name: 'Microscope Binocular Laboratory', code: '405-MIC-0116' }
+                ].map((item, idx) => (
+                  <option key={`${item.code}-${idx}`} value={`${item.code}:::${item.name}`}>
+                    {item.name} ({item.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsChecklistOpen(!isChecklistOpen)}
+              className="px-3 py-1.5 rounded-lg bg-purple-900 hover:bg-black text-purple-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+            >
+              <Check className="w-3.5 h-3.5 text-purple-400" />
+              <span>{isChecklistOpen ? 'Hide Item Checklist' : '📋 Checklist (Select One by One)'}</span>
+            </button>
+          </div>
+
+          {/* Item Checklist Drawer (Select / Deselect One by One) */}
+          {isChecklistOpen && (
+            <div className="p-3 bg-purple-50/40 border border-purple-200 rounded-xl space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between text-[11px] font-bold text-purple-950">
+                <span>Master Catalog Items Checklist — Click any item to select or deselect one by one:</span>
+                <span className="font-mono text-purple-900 font-extrabold bg-purple-200 px-2 py-0.5 rounded-full text-[10px]">
+                  {columns.length} Columns Selected
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
+                {[
+                  { name: 'Anesthesia machine - with Patient mon', code: '403-XRRD-0101' },
+                  { name: 'Bed - Patient, Fowler, Adult', code: '403-XRRD-0101' },
+                  { name: 'Bowel - With Stand, Stainless Steel.', code: '403-XRRB-0101N' },
+                  { name: 'Cold box', code: '403-XRRD-0101-001' },
+                  { name: 'Couch - Delivery', code: '401-WICU-0101N' },
+                  { name: 'Couch - Examination', code: '401-WICU-0101N' },
+                  { name: 'Oxygen Concentrator 10L', code: '401-OXY-0101' },
+                  { name: 'Patient Monitor Multi-parameter', code: '401-MON-0102' },
+                  { name: 'Infusion Pump Volumetric', code: '402-PUMP-0103' },
+                  { name: 'Syringe Pump Micro-infusion', code: '402-PUMP-0104' },
+                  { name: 'Ultrasound Scanner Digital Color Doppler', code: '403-US-0104' },
+                  { name: 'X-Ray Mobile Digital System 300mA', code: '403-XRAY-0105' },
+                  { name: 'Defibrillator Biphasic with Monitor', code: '401-DEF-0106' },
+                  { name: 'ECG Machine 12-Channel Automatic', code: '401-ECG-0107' },
+                  { name: 'Phototherapy Unit Neonatal Overhead', code: '401-PHOTO-0108' },
+                  { name: 'Infant Incubator Intensive Care', code: '401-INC-0109' },
+                  { name: 'Suction Machine Electric Dual Bottle', code: '402-SUC-0110' },
+                  { name: 'Autoclave Steam Sterilizer 50L', code: '404-AUTO-0111' },
+                  { name: 'Operating Table Hydraulic Universal', code: '403-OT-0112' },
+                  { name: 'Surgical Shadowless Light Ceiling', code: '403-LIGHT-0113' },
+                  { name: 'Pulse Oximeter Fingertip/Handheld', code: '401-OX-0114' },
+                  { name: 'Centrifuge Benchtop Clinical 24-Tube', code: '405-CENT-0115' },
+                  { name: 'Microscope Binocular Laboratory', code: '405-MIC-0116' }
+                ].map((catItem, idx) => {
+                  const isSelected = columns.some(c => c.code === catItem.code || c.name.toLowerCase() === catItem.name.toLowerCase());
+                  return (
+                    <label
+                      key={`check-${catItem.code}-${idx}`}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition cursor-pointer text-[11px] ${
+                        isSelected
+                          ? 'bg-purple-100/90 border-purple-400 text-purple-950 font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleItemOneByOne(catItem)}
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer"
+                      />
+                      <div className="truncate flex-1">
+                        <div className="truncate font-semibold">{catItem.name}</div>
+                        <div className="text-[10px] font-mono text-slate-500">{catItem.code}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Active Columns Chips */}
           <div className="flex flex-wrap items-center gap-1.5">
             {columns.map(col => (
               <div
