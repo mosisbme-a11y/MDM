@@ -86,13 +86,31 @@ export async function restoreSession(): Promise<AuthUser | null> {
   if (!supabase) return null;
   try {
     const { data } = await supabase.auth.getSession();
-    const session = data.session;
+    let session = data.session;
     if (!session) return null;
 
     const activeThisSession = sessionStorage.getItem(SESSION_ACTIVE_KEY) === '1';
     if (!activeThisSession) {
       await supabase.auth.signOut();
       return null;
+    }
+
+    // Check if token is expired or close to expiring (within 30 seconds)
+    const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+    if (expiresAt > 0 && expiresAt <= Date.now() + 30_000) {
+      try {
+        const { data: refreshed, error } = await supabase.auth.refreshSession();
+        if (error || !refreshed.session) {
+          console.warn('[AuthService] Stored session has expired and could not be refreshed:', error?.message);
+          await signOut();
+          return null;
+        }
+        session = refreshed.session;
+      } catch (err) {
+        console.warn('[AuthService] Refresh failed during session restoration:', err);
+        await signOut();
+        return null;
+      }
     }
 
     const profile = await loadProfile(session.user.id, session.user.email || '');

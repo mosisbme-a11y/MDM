@@ -633,7 +633,14 @@ async function pushOnce(updates: PushUpdates, quiet: boolean): Promise<CentralSy
       }
     }
   } catch (err: any) {
-    console.error('[CentralSyncService] Failed to sync with central server API:', err);
+    if (err?.status === 401 || err?.message?.includes('Session expired') || err?.message?.includes('Not signed in')) {
+      console.warn('[CentralSyncService] Sync halted: session expired or invalid. Please re-authenticate.');
+      window.dispatchEvent(new CustomEvent('epss:session_expired', {
+        detail: { message: err?.message || 'Session expired or invalid. Please sign in again.' }
+      }));
+    } else {
+      console.error('[CentralSyncService] Failed to sync with central server API:', err);
+    }
     errorMessage = err?.message || 'Network error';
     errorStatus = typeof err?.status === 'number' ? err.status : undefined;
   }

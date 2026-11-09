@@ -1,9 +1,10 @@
-import { getAccessToken } from '../lib/supabase';
+import { getAccessToken, supabase } from '../lib/supabase';
 
 /**
  * Makes every request to this app's own /api/* endpoints carry the Supabase access token,
  * so the server can verify who is calling. Also makes <a href="/api/download-file/..."> links
  * work (a plain link can not send an Authorization header, so we fetch it ourselves).
+ * Automatically refreshes expired sessions and gracefully handles authentication state.
  * Call once at startup.
  */
 export function installAuthFetch(): void {
@@ -23,15 +24,56 @@ export function installAuthFetch(): void {
     }
   };
 
+  let refreshInProgress: Promise<string | null> | null = null;
+  const tryRefreshSession = async (): Promise<string | null> => {
+    if (!supabase) return null;
+    if (!refreshInProgress) {
+      refreshInProgress = (async () => {
+        try {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (!error && data?.session?.access_token) {
+            return data.session.access_token;
+          }
+        } catch {
+          // ignore
+        } finally {
+          refreshInProgress = null;
+        }
+        return null;
+      })();
+    }
+    return refreshInProgress;
+  };
+
   Object.defineProperty(window, 'fetch', {
     value: async (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isOwnApi(input)) return originalFetch(input, init);
-      const token = await getAccessToken();
-      if (!token) return originalFetch(input, init);
+      let token = await getAccessToken();
 
-      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-      if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
-      return originalFetch(input, { ...init, headers });
+      const buildHeaders = (tok: string | null) => {
+        const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+        if (tok) {
+          headers.set('Authorization', `Bearer ${tok}`);
+        }
+        return headers;
+      };
+
+      let res = await originalFetch(input, { ...init, headers: buildHeaders(token) });
+
+      // If server returned 401 (e.g. session expired or invalid), attempt automatic refresh and retry once!
+      if (res.status === 401 && supabase) {
+        const newToken = await tryRefreshSession();
+        if (newToken) {
+          res = await originalFetch(input, { ...init, headers: buildHeaders(newToken) });
+        } else {
+          // Session is unrefreshable: dispatch notification so UI can return to sign-in smoothly
+          window.dispatchEvent(new CustomEvent('epss:session_expired', {
+            detail: { message: 'Session expired or invalid. Please sign in again.' }
+          }));
+        }
+      }
+
+      return res;
     },
     writable: true,
     configurable: true

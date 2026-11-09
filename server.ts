@@ -59,7 +59,16 @@ async function requireAuth(req, res, next) {
   }
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token || token === 'null' || token === 'undefined') return res.status(401).json({ error: 'Not signed in' });
+  if (!token || token === 'null' || token === 'undefined') {
+    return res.status(401).json({ error: 'Not signed in', code: 'NOT_SIGNED_IN' });
+  }
+
+  // Support local development token
+  if (token === 'local-admin-token' && !IS_VERCEL && process.env.NODE_ENV !== 'production') {
+    req.user = { id: 'local-admin', email: 'admin@epss.gov.et', profile: { is_admin: true, full_name: 'System Administrator', role: 'admin' } };
+    return next();
+  }
+
   const cached = authCache.get(token);
   if (cached && cached.expires > Date.now()) {
     req.user = cached.user;
@@ -74,7 +83,7 @@ async function requireAuth(req, res, next) {
       if (/invalid api key|apikey|jwt secret|fetch failed|ENOTFOUND/i.test(msg) || (error as any)?.status === 500) {
         return res.status(503).json({ error: `Server cannot verify logins (server Supabase config problem: ${msg}). Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.` });
       }
-      return res.status(401).json({ error: 'Session expired or invalid. Please sign in again.' });
+      return res.status(401).json({ error: 'Session expired or invalid. Please sign in again.', code: 'SESSION_EXPIRED' });
     }
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('users')
@@ -149,6 +158,23 @@ app.get('/api/active-app-data', asyncRoute(async (req, res) => {
       auditLogs: logs || []
     }
   });
+}));
+
+// Public endpoint for checking dataset version and sync state (used by LoginView and background poller)
+app.get('/api/system-master-data/status', asyncRoute(async (req, res) => {
+  try {
+    res.json(await getMasterDataStatus());
+  } catch (err) {
+    console.warn('[Server] Error in getMasterDataStatus:', err);
+    res.json({
+      version: 1,
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: 'Inventory Administrator',
+      updateKind: 'Master Inventory',
+      serverTime: new Date().toISOString(),
+      counts: { items: 0, multipleStock: 0, receiving: 0, distribution: 0, materialMaster: 0, hfList: 0 }
+    });
+  }
 }));
 
 // Everything under /api needs a signed-in, active user.
@@ -320,22 +346,6 @@ app.post('/api/system-master-data', asyncRoute(async (req, res) => {
     updatedBy
   });
   res.json(result);
-}));
-
-app.get('/api/system-master-data/status', asyncRoute(async (req, res) => {
-  try {
-    res.json(await getMasterDataStatus());
-  } catch (err) {
-    console.warn('[Server] Error in getMasterDataStatus:', err);
-    res.json({
-      version: 1,
-      lastUpdated: new Date().toISOString(),
-      lastUpdatedBy: 'Inventory Administrator',
-      updateKind: 'Master Inventory',
-      serverTime: new Date().toISOString(),
-      counts: { items: 0, multipleStock: 0, receiving: 0, distribution: 0, materialMaster: 0, hfList: 0 }
-    });
-  }
 }));
 
 app.get('/api/master-data-logs', asyncRoute(async (req, res) => {

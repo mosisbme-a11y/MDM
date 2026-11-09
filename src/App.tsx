@@ -193,9 +193,18 @@ export function App() {
       setAuthReady(true);
     });
     const stopListening = onSignedOut(() => { void clearCentralSyncCache(); setCurrentUser(null); });
+    const handleSessionExpired = (event: any) => {
+      console.warn('[App] Authentication session expired:', event?.detail?.message);
+      void supabaseSignOut();
+      void clearCentralSyncCache();
+      setCurrentUser(null);
+    };
+    window.addEventListener('epss:session_expired', handleSessionExpired);
+
     return () => {
       cancelled = true;
       stopListening();
+      window.removeEventListener('epss:session_expired', handleSessionExpired);
     };
   }, []);
 

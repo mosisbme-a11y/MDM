@@ -729,12 +729,31 @@ export async function fetchFromSupabase(table: string, limit = 50): Promise<{ da
 
 /**
  * Returns the current signed-in user's access token (JWT), or null.
+ * Proactively refreshes expired or expiring tokens so API calls carry valid authorization.
  */
 export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
   try {
     const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    const session = data.session;
+    if (!session) return null;
+
+    // Check if token is expired or close to expiring (within 60 seconds)
+    const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+    const isExpiringSoon = expiresAt > 0 && expiresAt <= Date.now() + 60_000;
+
+    if (isExpiringSoon) {
+      try {
+        const { data: refreshed, error } = await supabase.auth.refreshSession();
+        if (!error && refreshed?.session?.access_token) {
+          return refreshed.session.access_token;
+        }
+      } catch (refreshErr) {
+        console.warn('[Supabase Auth] Auto-refresh failed:', refreshErr);
+      }
+    }
+
+    const token = session.access_token;
     if (!token || typeof token !== 'string' || token === 'null' || token === 'undefined') {
       return null;
     }
