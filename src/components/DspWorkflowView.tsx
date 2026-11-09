@@ -418,19 +418,18 @@ export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
   currentUser
 }) => {
 const ALL_ETHIOPIAN_REGIONS = [
-  'Oromia',
+  'Afar',
   'Amhara',
+  'Benishangul-Gumuz',
+  'Central Ethiopia',
+  'Gambela',
+  'Harari',
+  'Oromia',
   'Sidama',
   'Somali',
-  'Tigray',
-  'Afar',
   'South Ethiopia',
-  'Central Ethiopia',
   'South West Ethiopia',
-  'SNNPR',
-  'Benishangul-Gumuz',
-  'Gambella',
-  'Harari',
+  'Tigray',
   'Addis Ababa',
   'Dire Dawa'
 ];
@@ -1939,6 +1938,43 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               }
               return prev;
             });
+          }}
+          onTransmitEPSS={(metadata) => {
+            const newRecord: DspWorkflowRecord = {
+              id: `dsp-moh-epss-${Date.now()}`,
+              dspRefNumber: `MOH/EPSS-HO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+              stage: 'epss-ho-aggregation',
+              subStage: '1.3.1',
+              stageTitle: '5. EPSS HO Aggregation (from MOH)',
+              senderOrg: metadata.organization,
+              recipientOrg: 'EPSS Head Office',
+              subject: `DSP [Aggregated]: National Breakdown Matrix from MOH PMD (${metadata.matrixData.rows.length} Facilities)`,
+              status: 'Submitted & Pending',
+              dateSubmitted: metadata.date,
+              totalDevices: metadata.matrixData.columns.length,
+              totalQuantity: metadata.matrixData.rows.reduce((sum, r) => sum + metadata.matrixData.columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0), 0),
+              totalValuationETB: metadata.matrixData.rows.length * 500000,
+              targetedRegions: [...new Set(metadata.matrixData.rows.map(r => r.region))].filter(Boolean),
+              targetedFacilitiesCount: metadata.matrixData.rows.length,
+              officialLetterRef: `MOH/LET/${Date.now().toString().slice(-4)}`,
+              signatory: metadata.signatory,
+              signatoryRole: metadata.role,
+              authorizedPerson: metadata.signatory,
+              organization: metadata.organization,
+              role: metadata.role,
+              itemsIncluded: metadata.matrixData.columns.map(c => ({
+                material: c.code,
+                description: c.name,
+                quantity: metadata.matrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+                plant: 'HO01 Central'
+              })),
+              stage4MatrixData: metadata.matrixData,
+              notes: `Aggregated breakdown transmitted from MOH PMD to EPSS Head Office. Signatory: ${metadata.signatory} (${metadata.role})`
+            };
+
+            setRecords(prev => [newRecord, ...prev]);
+            setSelectedRecord(newRecord);
+            onSelectSubTab?.('dsp-ho-1-3-1'); // Transition to EPSS HO Aggregation step
           }}
           title="2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix"
           subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"

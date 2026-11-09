@@ -20,7 +20,9 @@ import {
   Upload,
   X,
   RefreshCw,
-  Printer
+  Printer,
+  Send,
+  UserCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber } from '../utils/formatters';
@@ -103,6 +105,13 @@ interface Stage4MohSubmittedMatrixTableProps {
   onSelectDossier?: (dossierId: string) => void;
   title?: string;
   subtitle?: string;
+  onTransmitEPSS?: (metadata: { 
+    signatory: string; 
+    role: string; 
+    organization: string; 
+    date: string;
+    matrixData: Stage4MatrixData;
+  }) => void;
 }
 
 export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTableProps> = ({
@@ -114,7 +123,8 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   selectedDossierId = '',
   onSelectDossier,
   title = '4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix',
-  subtitle = 'Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers'
+  subtitle = 'Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers',
+  onTransmitEPSS
 }) => {
   const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
   const [columns, setColumns] = useState<Stage4Column[]>(data?.columns || DEFAULT_STAGE_4_COLUMNS);
@@ -132,6 +142,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnCode, setNewColumnCode] = useState('');
   const [batchQtyInputs, setBatchQtyInputs] = useState<Record<string, string>>({});
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'moh-to-epss' | 'dsp-aggr-submitted-to-epss'>('moh-to-epss');
+
+  // Transmittal Modal State
+  const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
+  const [signatoryName, setSignatoryName] = useState('');
+  const [signatoryRole, setSignatoryRole] = useState('PMD Director');
+  const [signatoryOrg, setSignatoryOrg] = useState('Ministry of Health (MOH)');
 
   const handleBatchApplyQtyToAllRows = (colId: string, customQty?: number) => {
     const valToApply = customQty !== undefined ? customQty : (Number(batchQtyInputs[colId]) || 0);
@@ -571,13 +588,16 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   };
 
   // Download Blank Template
-  const handleDownloadTemplate = () => {
+  const handleDownloadBlankTemplate = () => {
+    const includePlant = matrixTemplateFormat !== 'dsp-aggr-submitted-to-epss';
+
     const headerRow1 = [
       'Region',
       'Zone',
       'Woreda',
       'Name of health facility',
       'List of Packeges',
+      ...(includePlant ? ['Plant'] : []),
       ...columns.map(c => c.name)
     ];
 
@@ -587,6 +607,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
       '',
       '',
       'List of Packeges',
+      ...(includePlant ? ['Delivering Plant'] : []),
       ...columns.map(c => c.code)
     ];
 
@@ -596,6 +617,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
       '01',
       'Sample Health Facility',
       'MCH',
+      ...(includePlant ? ['AD01'] : []),
       ...columns.map(() => 2)
     ];
 
@@ -729,7 +751,11 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-slate-900 tracking-tight">{title}</h2>
+              <h2 className="text-base font-black text-slate-900 tracking-tight">
+                {matrixTemplateFormat === 'dsp-aggr-submitted-to-epss' 
+                  ? '2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix' 
+                  : title}
+              </h2>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
                 Official MoH Two-Tier Format
               </span>
@@ -770,6 +796,27 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             </span>
           </button>
 
+          {/* DSP AGGR. SUBMITTED TO EPSS Dark Pill Button - User Screenshot Matching */}
+          <button
+            type="button"
+            onClick={() => {
+              setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
+              setToastMessage('⚡ Switched to DSP Aggregated Submission to EPSS Format (No Hub Column)');
+              setTimeout(() => setToastMessage(null), 3000);
+            }}
+            className={`flex items-center gap-3 px-5 py-2 rounded-full font-black text-xs shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase group ${
+              matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
+                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
+                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
+            }`}
+            title="Switch to DSP Aggregated Submission to EPSS format (Region, Zone, Woreda, Facility, Packages & Equipment - Excludes Hub column)"
+          >
+            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
+            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
+              DSP AGGR. SUBMITTED TO EPSS
+            </span>
+          </button>
+
           <input
             type="file"
             ref={fileInputRef}
@@ -777,6 +824,16 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             accept=".xlsx,.xls,.csv"
             className="hidden"
           />
+
+          <button
+            type="button"
+            onClick={() => setIsTransmitModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-amber-400 font-black text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] transition-all active:border-b-0 active:translate-y-[4px]"
+            title="Send official aggregated breakdown matrix to EPSS Head Office"
+          >
+            <Send size={14} className="text-amber-400" />
+            <span className="uppercase">Send to EPSS</span>
+          </button>
 
           <button
             type="button"
@@ -1239,9 +1296,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[130px] text-center">
                   List of Packeges
                 </th>
-                <th className="p-2.5 bg-[#facc15] text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center shadow-2xs">
-                  Plant
-                </th>
                 {columns.map(col => (
                   <th
                     key={col.id}
@@ -1276,9 +1330,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold text-center">
                   List of Packeges
-                </th>
-                <th className="p-2 bg-[#fef08a] font-mono font-bold text-yellow-950 border-r border-slate-300 text-center text-[10px]">
-                  Delivering Plant
                 </th>
                 {columns.map(col => (
                   <th
@@ -1332,12 +1383,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     {/* Region */}
                     <td className="p-2 border-r border-slate-200">
                       {isEditingMode ? (
-                        <input
-                          type="text"
+                        <select
                           value={row.region}
                           onChange={(e) => handleRowFieldChange(row.id, 'region', e.target.value)}
-                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs"
-                        />
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs cursor-pointer"
+                        >
+                          {uniqueRegions.map(reg => <option key={reg} value={reg}>{reg}</option>)}
+                        </select>
                       ) : (
                         <span className="font-medium">{row.region}</span>
                       )}
@@ -1346,12 +1398,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     {/* Zone */}
                     <td className="p-2 border-r border-slate-200">
                       {isEditingMode ? (
-                        <input
-                          type="text"
+                        <select
                           value={row.zone}
                           onChange={(e) => handleRowFieldChange(row.id, 'zone', e.target.value)}
-                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs"
-                        />
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs cursor-pointer"
+                        >
+                          {uniqueZones.map(zone => <option key={zone} value={zone}>{zone}</option>)}
+                        </select>
                       ) : (
                         <span>{row.zone}</span>
                       )}
@@ -1360,12 +1413,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     {/* Woreda */}
                     <td className="p-2 border-r border-slate-200 text-center font-mono">
                       {isEditingMode ? (
-                        <input
-                          type="text"
+                        <select
                           value={row.woreda}
                           onChange={(e) => handleRowFieldChange(row.id, 'woreda', e.target.value)}
-                          className="w-full text-center bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-mono"
-                        />
+                          className="w-full text-center bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-mono cursor-pointer"
+                        >
+                          {Array.from(new Set(rows.map(r => r.woreda))).sort().map(woreda => <option key={woreda} value={woreda}>{woreda}</option>)}
+                        </select>
                       ) : (
                         <span>{row.woreda}</span>
                       )}
@@ -1374,12 +1428,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     {/* Name of health facility */}
                     <td className="p-2 border-r border-slate-200">
                       {isEditingMode ? (
-                        <input
-                          type="text"
+                        <select
                           value={row.healthFacility}
                           onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
-                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900"
-                        />
+                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900 cursor-pointer"
+                        >
+                          {hfListItems.map(hf => <option key={hf.id} value={hf.customerDescription}>{hf.customerDescription}</option>)}
+                        </select>
                       ) : (
                         <span className="font-semibold text-slate-900">{row.healthFacility}</span>
                       )}
@@ -1399,22 +1454,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                       )}
                     </td>
 
-                    {/* Plant Column (highlighted yellow background matching user attachment) */}
-                    <td className="p-2 border-r border-slate-200 text-center bg-yellow-50/80 font-mono font-bold text-yellow-950">
-                      {isEditingMode ? (
-                        <input
-                          type="text"
-                          value={row.plant || lookupHubFromHfMasterData(row.healthFacility, row.region, hfListItems)}
-                          onChange={(e) => handleRowFieldChange(row.id, 'plant', e.target.value)}
-                          className="w-full text-center bg-white border border-yellow-400 rounded px-1 py-0.5 text-xs font-mono font-bold text-yellow-950"
-                          placeholder="e.g. AA01"
-                        />
-                      ) : (
-                        <span className="inline-block px-2 py-0.5 rounded bg-yellow-200/90 border border-yellow-400 font-mono font-black text-yellow-950 text-[11px] shadow-2xs">
-                          {row.plant || lookupHubFromHfMasterData(row.healthFacility, row.region, hfListItems)}
-                        </span>
-                      )}
-                    </td>
 
                     {/* Equipment Quantities Cells */}
                     {columns.map(col => (
@@ -1464,9 +1503,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 </td>
                 <td className="p-2.5 border-r border-slate-300 text-center bg-[#dbeafe] text-blue-900 font-mono font-bold">
                   TOTAL
-                </td>
-                <td className="p-2.5 border-r border-slate-300 text-center bg-[#fef08a] font-mono font-bold text-yellow-950">
-                  -
                 </td>
                 {columns.map(col => (
                   <td key={col.id} className="p-2.5 border-r border-slate-300 text-right font-mono font-black text-purple-900">
@@ -1649,15 +1685,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 </div>
               )}
             </div>
-
-            {/* Action Bar */}
             <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-xs text-slate-500 font-medium">
                 Select download format for active matrix template:
               </div>
-
               <div className="flex items-center gap-3">
                 <button
+                  type="button"
                   onClick={() => {
                     if (activeTemplateTab === 'item-agg') {
                       handleDownloadItemAggregationTemplate('csv');
@@ -1671,8 +1705,8 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                   <Download size={15} />
                   <span>Download CSV</span>
                 </button>
-
                 <button
+                  type="button"
                   onClick={() => {
                     if (activeTemplateTab === 'item-agg') {
                       handleDownloadItemAggregationTemplate('xlsx');
@@ -1687,6 +1721,193 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                   <span>Download Excel (.xlsx)</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SEND TO EPSS (MOH TO EPSS TRANSMITTAL) - STANDALONE MODAL */}
+      {isTransmitModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scale-in overflow-y-auto max-h-[95vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-[#0a0f1d] text-amber-400 shadow-lg">
+                  <Send className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight uppercase">Send Region Breakdown Matrix to EPSS</h3>
+                  <p className="text-xs text-slate-400 font-medium">Official Health Facility breakdown transmittal to EPSS</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* DSP PROJECT / MATRIX REFERENCE TITLE - Matching Image 5 */}
+              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-amber-700" />
+                  <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">DSP Project / Matrix Reference Title</span>
+                </div>
+                <input 
+                  type="text"
+                  placeholder="e.g. Regional Health Facility Allocation Matrix"
+                  value={signatoryOrg.includes('Regional') ? signatoryOrg : 'Regional Health Facility Allocation Matrix'}
+                  onChange={(e) => setSignatoryOrg(e.target.value)}
+                  className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:border-amber-500 outline-none transition shadow-sm"
+                />
+              </div>
+
+              {/* MATRIX PAYLOAD SUMMARY - Matching Image 5 KPI Style */}
+              <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between text-slate-500 font-black uppercase text-[10px] tracking-widest border-b border-slate-200 pb-2">
+                  <span>Matrix Payload Summary</span>
+                  <span className="text-amber-600">All Regions</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Health Facilities</div>
+                    <div className="text-sm font-black text-slate-900">{filteredRows.length} Facilities</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Equipment Types</div>
+                    <div className="text-sm font-black text-indigo-700">{columns.length} Columns</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Total Earmarked Units</div>
+                    <div className="text-sm font-black text-emerald-700">{formatNumber(rows.reduce((sum, r) => sum + columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0), 0))} Units</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Transmittal Date</div>
+                    <div className="text-sm font-black text-slate-900 font-mono">{internalDate}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONFIRMATION TABLE FOR SELECTED ITEMS - Request 4 & 5 */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="bg-slate-900 px-4 py-2 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-between">
+                  <span>Items Selection Confirmation</span>
+                  <span className="text-amber-400 font-mono">{columns.length} Items</span>
+                </div>
+                <div className="max-h-40 overflow-y-auto bg-white">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 font-bold text-slate-600">
+                      <tr>
+                        <th className="p-2">Equipment Description</th>
+                        <th className="p-2">Material Code</th>
+                        <th className="p-2 text-right">Total Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {columns.map(col => {
+                        const qty = rows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+                        return (
+                          <tr key={`conf-${col.id}`} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-2 text-slate-900">{col.name}</td>
+                            <td className="p-2 text-indigo-600 font-mono font-bold">{col.code}</td>
+                            <td className="p-2 text-right font-black text-emerald-700">{formatNumber(qty)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Linked with Health Facility Master Data Info Box - Matching Image 5 */}
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex gap-3 shadow-2xs">
+                <div className="shrink-0 w-6 h-6 rounded-full bg-white border border-emerald-200 flex items-center justify-center mt-0.5">
+                  <CheckCircle2 size={14} className="text-emerald-500" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-black text-emerald-900 tracking-tight">Linked with Health Facility Master Data</h4>
+                  <p className="text-[11px] text-emerald-700 leading-relaxed font-medium">
+                    Submitting this matrix will transmit exact Region, Zone, Woreda, Health Facility Name, and Equipment quantities directly to EPSS (Sub-step 3.2 & 2.3).
+                  </p>
+                </div>
+              </div>
+
+              {/* AUTHORIZED REGIONAL SIGNATORY - Matching Image 5 */}
+              <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-sm">
+                <div className="flex items-center gap-2 text-indigo-900 font-black uppercase text-[11px] tracking-wider">
+                  <UserCheck className="w-5 h-5 text-indigo-600" />
+                  <span>Authorized Regional Signatory</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Authorized Person</label>
+                    <input 
+                      type="text"
+                      placeholder="Name"
+                      value={signatoryName}
+                      onChange={(e) => setSignatoryName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition shadow-2xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Official Role</label>
+                    <input 
+                      type="text"
+                      placeholder="Title"
+                      value={signatoryRole}
+                      onChange={(e) => setSignatoryRole(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition shadow-2xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(false)}
+                className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer text-xs shadow-2xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!signatoryName.trim()) {
+                    alert('Please fill in the Authorized Person Name before transmitting.');
+                    return;
+                  }
+                  
+                  if (onTransmitEPSS) {
+                    onTransmitEPSS({
+                      signatory: signatoryName,
+                      role: signatoryRole,
+                      organization: signatoryOrg,
+                      date: internalDate,
+                      matrixData: {
+                        date: internalDate,
+                        region: selectedRegionFilter,
+                        columns,
+                        rows
+                      }
+                    });
+                  }
+
+                  setToastMessage(`✓ Aggregated Breakdown successfully transmitted to EPSS! (Signatory: ${signatoryName})`);
+                  setTimeout(() => setToastMessage(null), 4000);
+                  setIsTransmitModalOpen(false);
+                }}
+                className="px-8 py-3 bg-[#0a0f1d] hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-2.5 shadow-xl active:scale-95 text-xs uppercase tracking-wider group"
+              >
+                <Send className="w-4 h-4 text-amber-400 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                <span>Confirm Transmit to EPSS</span>
+              </button>
             </div>
           </div>
         </div>
