@@ -1050,101 +1050,61 @@ Notes: ${folder.notes || 'N/A'}`;
           </div>
 
           <div className="overflow-x-auto bg-slate-50/50 p-1">
-            <table className="w-full border-collapse text-xs select-text bg-white rounded-2xl overflow-hidden border border-slate-900 shadow-md">
-              {/* Official Orange Header with Italic Bold Text */}
+            <table className="w-full border-collapse text-[11px] bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
               <thead>
-                <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
-                    S/N
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[140px] whitespace-nowrap font-mono">
-                    Material
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[260px]">
-                    Material Description
-                  </th>
-                  <th className="py-2.5 px-3 text-right border-r border-black min-w-[70px] whitespace-nowrap">
-                    Qty
-                  </th>
-                  <th className="py-2.5 px-3 text-right border-r border-black min-w-[140px] whitespace-nowrap">
-                    Total Amount
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap">
-                    Valuation Type Desc
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap font-mono">
-                    WBS Element
-                  </th>
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
-                    Budget Source
-                  </th>
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
-                    Request Date
-                  </th>
-                  <th className="py-2.5 px-3 text-center min-w-[130px] whitespace-nowrap">
-                    DSP request to
-                  </th>
+                <tr className="border-b border-slate-300 text-xs font-semibold">
+                  <th className="p-2.5 bg-[#fed7aa] text-slate-900 italic border border-slate-300">Date</th>
+                  <th className="p-2.5 bg-[#fed7aa] text-slate-900 italic border border-slate-300">Region</th>
+                  <th className="p-2.5 bg-[#fed7aa] text-slate-900 italic border border-slate-300">Zone</th>
+                  <th className="p-2.5 bg-[#fed7aa] text-slate-900 italic border border-slate-300">Woreda</th>
+                  <th className="p-2.5 bg-[#fed7aa] text-slate-900 italic border border-slate-300">Name of health facility</th>
+                  <th className="p-2.5 bg-[#dbeafe] text-slate-900 italic border border-slate-300">List of Packages</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Anesthesia machine</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Bed - Patient, Fowler, Adult</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Bowel - With Stand, Stainless Steel.</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Cold box</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Couch - Delivery</th>
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2 text-center font-normal">Couch - Examination</th>
+                </tr>
+                <tr className="border-b border-slate-300 text-xs font-mono text-[10px]">
+                  <th className="p-2 bg-[#ffedd5] border border-slate-300"></th>
+                  <th className="p-2 bg-[#ffedd5] border border-slate-300"></th>
+                  <th className="p-2 bg-[#ffedd5] border border-slate-300"></th>
+                  <th className="p-2 bg-[#ffedd5] border border-slate-300"></th>
+                  <th className="p-2 bg-[#ffedd5] border border-slate-300"></th>
+                  <th className="p-2 bg-[#dbeafe] border border-slate-300">List of Packages</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">403-XRRD-0101</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">403-XRRD-0101</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">403-XRRB-0101N</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">403-XRRD-0101-001</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">401-WICU-0101N</th>
+                  <th className="p-2 bg-white border border-slate-300 text-center font-bold">401-WICU-0101N</th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-8 text-center text-slate-500 font-bold border-b border-slate-200">
-                      No materials found in this transmitted dossier.
-                    </td>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {[
+                  { region: 'Addis Ababa', zone: 'Addis Ketema', woreda: 'Woreda 01', healthFacility: 'Gandhi Memorial Hospital', packages: 'MCH' },
+                  { region: 'Addis Ababa', zone: 'Bole', woreda: 'Woreda 03', healthFacility: 'Bole Health Center', packages: 'MCH' },
+                  { region: 'Oromia', zone: 'East Shewa', woreda: 'Adama Town Woreda 01', healthFacility: 'Adama Hospital Medical College', packages: 'MCH' },
+                  { region: 'Amhara', zone: 'Bahir Dar City', woreda: 'Kebele 04', healthFacility: 'Felege Hiwot Comprehensive Specialized Hospital', packages: 'MCH' },
+                  { region: 'Sidama', zone: 'Hawassa City', woreda: 'Sub-City 01', healthFacility: 'Hawassa University Specialized Hospital', packages: 'MCH' }
+                ].map((row, idx) => (
+                  <tr key={idx} className="hover:bg-amber-50/40 transition-all">
+                    <td className="py-3 px-3 border border-slate-200 font-mono text-[10px]">{TODAY_ISO_DATE}</td>
+                    <td className="py-3 px-3 border border-slate-200 font-bold">{row.region}</td>
+                    <td className="py-3 px-3 border border-slate-200">{row.zone}</td>
+                    <td className="py-3 px-3 border border-slate-200">{row.woreda}</td>
+                    <td className="py-3 px-3 border border-slate-200 font-bold text-slate-900">{row.healthFacility}</td>
+                    <td className="py-3 px-3 border border-slate-200 bg-blue-50/40 font-bold text-indigo-700">{row.packages}</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
+                    <td className="py-3 px-3 border border-slate-200 text-center font-mono font-bold text-cyan-700">2</td>
                   </tr>
-                ) : (
-                  filteredRows.map((row, idx) => (
-                    <tr key={row.id || idx} className="hover:bg-amber-50/60 transition-all border-b border-slate-200">
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-700">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-mono font-black text-indigo-950">
-                        {row.material}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-bold text-slate-900">
-                        {row.materialDescription}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-black text-cyan-800 text-sm">
-                        {formatNumber(row.qty)}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">
-                        {formatCurrency(row.totalAmount)}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-medium text-slate-700">
-                        {row.valuationTypeDesc}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-mono text-xs font-bold text-slate-800">
-                        {row.wbsElement}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-black text-indigo-700 uppercase">
-                        {row.budgetSource}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-mono text-slate-600">
-                        {row.requestDate}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-amber-900 bg-amber-50/50">
-                        {row.dspRequestTo || 'MOH'}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
-              {/* Table Footer Totals */}
-              <tfoot>
-                <tr className="bg-slate-900 text-white font-black text-xs">
-                  <td colSpan={3} className="py-3 px-4 text-right uppercase tracking-wider text-amber-400 font-mono">
-                    Total ({filteredRows.length} Line Items):
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-cyan-300 font-black">
-                    {formatNumber(totals.totalQty)}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-emerald-400 font-black">
-                    {formatCurrency(totals.totalValuation)}
-                  </td>
-                  <td colSpan={5}></td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </div>
