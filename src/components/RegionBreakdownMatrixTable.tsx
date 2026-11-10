@@ -240,7 +240,35 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh'>('submit-breakdown-to-moh');
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
+
+  const handleSelectAllCatalogItems = () => {
+    const newCols: RegionBreakdownColumn[] = MASTER_EQUIPMENT_CATALOG.map((item, idx) => ({
+      id: `col-cat-${item.code}-${idx}`,
+      name: item.name,
+      code: item.code
+    }));
+    setColumns(newCols);
+
+    const updatedRows = rows.map(r => {
+      const q: Record<string, number> = {};
+      newCols.forEach(col => {
+        q[col.id] = r.quantities[col.id] || 2;
+      });
+      return { ...r, quantities: q };
+    });
+    setRows(updatedRows);
+    notifyChange(internalDate, newCols, updatedRows);
+    showToast(`✓ Selected All ${newCols.length} Master Catalog Equipment Items!`);
+  };
+
+  const handleDeselectAllCatalogItems = () => {
+    setColumns([]);
+    const updatedRows = rows.map(r => ({ ...r, quantities: {} }));
+    setRows(updatedRows);
+    notifyChange(internalDate, [], updatedRows);
+    showToast(`Cleared all equipment columns.`);
+  };
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [recentlyLoadedToken, setRecentlyLoadedToken] = useState<number>(0);
 
@@ -1051,11 +1079,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           <button
             type="button"
             onClick={() => {
-              setMatrixTemplateFormat('submit-breakdown-to-moh');
-              showToast('⚡ Switched to DSP AGGR. SUBMITTED TO EPSS format (Standard Health Facility Matrix)');
+              setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
+              showToast('⚡ Switched to DSP AGGR. SUBMITTED TO EPSS format');
             }}
             className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'submit-breakdown-to-moh'
+              matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
                 ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
                 : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
             }`}
@@ -1229,6 +1257,40 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       </div>
 
+      {/* DSP AGGR. SUBMITTED TO EPSS ACTIVE VIEW BANNER */}
+      {matrixTemplateFormat === 'dsp-aggr-submitted-to-epss' && (
+        <div className="p-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-2 border-amber-400/80 rounded-2xl text-white shadow-xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-400 text-slate-950 font-bold shrink-0">
+              <Send className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix Active</h4>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5 font-medium">
+                Official Health Facility Breakdown format • Select items (All in One or Pick One by One from Catalog) & transmit directly to EPSS with exact source data.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setTransmittalDestination('EPSS');
+                setIsTransmitModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-2 cursor-pointer shadow-lg transition-all active:scale-95 border border-amber-300"
+            >
+              <Send className="w-4 h-4 text-slate-950" />
+              <span className="uppercase tracking-wide font-extrabold">Send to EPSS Now</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Equipment Column Configurator */}
       <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50/60 border border-amber-200 rounded-2xl p-3.5 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1334,18 +1396,36 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-amber-300 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
               >
                 <Check className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isChecklistOpen ? 'Hide Item Checklist' : '📋 Checklist (Select One by One)'}</span>
+                <span>{isChecklistOpen ? 'Hide Item Checklist' : '📋 Checklist (Select One by One or All)'}</span>
               </button>
             </div>
 
-            {/* Item Checklist Drawer (Select / Deselect One by One) */}
+            {/* Item Checklist Drawer (Select / Deselect One by One or All in One) */}
             {isChecklistOpen && (
               <div className="p-3 bg-amber-50/40 border border-amber-200 rounded-xl space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-between text-[11px] font-bold text-amber-950">
-                  <span>Master Catalog Items Checklist — Click any item to select or deselect one by one:</span>
-                  <span className="font-mono text-amber-900 font-extrabold bg-amber-200 px-2 py-0.5 rounded-full text-[10px]">
-                    {columns.length} Columns Selected
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-amber-950 pb-1 border-b border-amber-200">
+                  <span>Master Catalog Items Checklist — Select All in One or Pick One by One:</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllCatalogItems}
+                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase shadow-2xs transition cursor-pointer"
+                      title="Select all equipment items from master catalog into matrix columns"
+                    >
+                      ✓ Select All in One ({MASTER_EQUIPMENT_CATALOG.length} Items)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllCatalogItems}
+                      className="px-2.5 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10px] uppercase transition cursor-pointer"
+                      title="Clear all selected equipment columns"
+                    >
+                      Clear All
+                    </button>
+                    <span className="font-mono text-amber-900 font-extrabold bg-amber-200 px-2 py-0.5 rounded-full text-[10px]">
+                      {columns.length} Columns Selected
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">

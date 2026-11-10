@@ -766,73 +766,15 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* MAP HF TO HUB Dark Pill Button Matching attachment _2C20FE77-C59A-4AE4-A51A-9016280E8D95__a472711d.png */}
-          <button
-            type="button"
-            onClick={handleMapWithHubs}
-            disabled={isAnalyzing}
-            className="flex items-center gap-3 px-5 py-2 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs shadow-xl hover:shadow-amber-500/20 transition-all transform active:scale-95 border border-slate-700/80 disabled:opacity-50 cursor-pointer tracking-wider uppercase group"
-            title="Map Health Facilities to official regional EPSS hubs using HF Master Data"
-          >
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
-            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
-              {isAnalyzing ? 'MAPPING...' : 'MAP HF TO HUB'}
-            </span>
-          </button>
-
-          {/* ITEM AGGREGATION Dark Pill Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTemplateTab('item-agg');
-              setShowTemplateModal(true);
-            }}
-            className="flex items-center gap-3 px-5 py-2 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs shadow-xl hover:shadow-amber-500/20 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
-            title="View and download Item Aggregation Template by Hub"
-          >
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
-            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
-              ITEM AGGREGATION
-            </span>
-          </button>
-
-          {/* DSP AGGR. SUBMITTED TO EPSS Dark Pill Button - User Screenshot Matching */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
-              setToastMessage('⚡ Switched to DSP Aggregated Submission to EPSS Format (No Hub Column)');
-              setTimeout(() => setToastMessage(null), 3000);
-            }}
-            className={`flex items-center gap-3 px-5 py-2 rounded-full font-black text-xs shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase group ${
-              matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
-                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Switch to DSP Aggregated Submission to EPSS format (Region, Zone, Woreda, Facility, Packages & Equipment - Excludes Hub column)"
-          >
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
-            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
-              DSP AGGR. SUBMITTED TO EPSS
-            </span>
-          </button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-          />
-
+          {/* Send to EPSS Button - Prominent Action */}
           <button
             type="button"
             onClick={() => setIsTransmitModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-amber-400 font-black text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] transition-all active:border-b-0 active:translate-y-[4px]"
-            title="Send official aggregated breakdown matrix to EPSS Head Office"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-2 cursor-pointer border-b-4 border-amber-700 shadow-md transition-all active:border-b-0 active:translate-y-[2px]"
+            title="Send official aggregated breakdown matrix directly to EPSS Head Office"
           >
-            <Send size={14} className="text-amber-400" />
-            <span className="uppercase">Send to EPSS</span>
+            <Send size={15} className="text-slate-950" />
+            <span className="uppercase font-black tracking-wider">Send to EPSS</span>
           </button>
 
           <button
