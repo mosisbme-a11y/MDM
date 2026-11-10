@@ -49,14 +49,6 @@ export const INVENTORY_SUB_TABS: InventorySubTabDef[] = [
 
   // 2. Stock & Ledgers Group
   {
-    id: 'multiple-stock',
-    label: 'Multiple Stock',
-    category: 'ledgers',
-    categoryLabel: 'Stock & Ledgers',
-    icon: Warehouse,
-    description: '14-column multi-plant stock on hand ledgers'
-  },
-  {
     id: 'receiving-data',
     label: 'Receiving Data',
     category: 'ledgers',
@@ -71,14 +63,6 @@ export const INVENTORY_SUB_TABS: InventorySubTabDef[] = [
     categoryLabel: 'Stock & Ledgers',
     icon: Truck,
     description: 'Dispatched & delivered stock across regional hubs'
-  },
-  {
-    id: 'inventory-analysis',
-    label: 'Inventory Analysis',
-    category: 'ledgers',
-    categoryLabel: 'Stock & Ledgers',
-    icon: BarChart2,
-    description: 'Analytical stock distributions & valuation metrics'
   },
 
   // 3. Operations & Pipelines Group

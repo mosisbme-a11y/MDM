@@ -1868,11 +1868,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                   List of Packeges
                 </th>
-                {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
-                  <th className="p-2.5 bg-yellow-300 text-slate-950 border-r border-slate-300 font-black min-w-[110px] text-center uppercase tracking-wide">
-                    Hub
-                  </th>
-                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1917,10 +1912,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
-                {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
-                  <th className="p-2 bg-yellow-100 border-r border-slate-300"></th>
-                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1952,7 +1945,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <tbody className="divide-y divide-slate-200">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4)) + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
+                  <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + 7) + (isEditingMode ? 1 : 0)} className="p-8 text-center text-slate-400">
                     No facility rows matching the selected region or filter.
                   </td>
                 </tr>
@@ -2143,11 +2136,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                                 <Edit3 size={11} />
                               </button>
                             </div>
-                            {matrixTemplateFormat === 'rhb' && matchedHf && (
+                            {matrixTemplateFormat === 'rhb' && matchedHf && matchedHf.zoneDescription && (
                               <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-                                <span className="text-amber-700 font-semibold">Plant:</span>
-                                <span className="font-bold text-slate-700">{matchedHf.deliveringPlant || 'HO01'}</span>
-                                {matchedHf.zoneDescription && <span className="text-slate-400">• {matchedHf.zoneDescription}</span>}
+                                <span className="text-slate-400">{matchedHf.zoneDescription}</span>
                               </div>
                             )}
                           </div>
@@ -2173,40 +2164,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                           row.packages
                         )}
                       </td>
-
-                      {/* 6. Hub (Hidden when matrixTemplateFormat === 'submit-breakdown-to-moh', highlighted in yellow matching image 94FE6776) */}
-                      {matrixTemplateFormat !== 'submit-breakdown-to-moh' && (
-                        <td className="p-2 text-slate-900 border-r border-slate-200 min-w-[110px] text-center bg-yellow-50/50">
-                          {isEditingMode ? (
-                            <select
-                              value={row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                              onChange={(e) => handleRowFieldChange(row.id, 'hub', e.target.value)}
-                              className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-mono font-bold bg-white text-slate-900 cursor-pointer shadow-2xs focus:border-amber-500"
-                              title="Select EPSS Distribution Hub"
-                            >
-                              {EPSS_HUBS_REGISTRY.map(h => (
-                                <option key={h.code} value={h.code}>
-                                  {h.code} - {h.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="flex items-center justify-center gap-1 group">
-                              <span className="px-2 py-0.5 rounded bg-yellow-200/90 text-yellow-950 font-mono font-black text-[11px] border border-yellow-300 shadow-2xs">
-                                {row.hub || matchedHf?.deliveringPlant || 'HO01'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingMode(true)}
-                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-amber-700 transition"
-                                title="Edit hub"
-                              >
-                                <Edit3 size={11} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      )}
 
                       {/* Equipment Quantity Cells (Only if not ITEM AGGREGATION mode) */}
                       {matrixTemplateFormat !== 'item' && columns.map(col => {
@@ -2261,7 +2218,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
               {/* Inline Add Facility Row Button Row */}
               <tr className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
-                <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4)) + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
+                <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + 7) + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
                   <button
                     type="button"
                     onClick={handleAddRow}
@@ -2287,17 +2244,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center">
                   -
                 </td>
+                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center">
+                  -
+                </td>
                 <td className="p-2.5 border-r border-slate-300 font-black text-slate-900">
                   {filteredRows.length} Health Facilities
                 </td>
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
-                {matrixTemplateFormat === 'rhb' && (
-                  <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-amber-50/30 text-amber-800">
-                    -
-                  </td>
-                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <td 
                     key={col.id} 
