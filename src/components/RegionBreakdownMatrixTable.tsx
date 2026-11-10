@@ -1341,64 +1341,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               </div>
             )}
 
-            {/* Manage / Add Equipment Columns Button */}
-            <button
-              type="button"
-              onClick={() => setIsColumnPickerOpen(!isColumnPickerOpen)}
-              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{isColumnPickerOpen ? 'Hide Column Picker' : 'Manage Equipment Columns (' + columns.length + ')'}</span>
-            </button>
           </div>
         </div>
 
-        {/* Equipment Column Picker & Add Modal */}
-        {isColumnPickerOpen && (
-          <div className="bg-white border border-amber-200 rounded-xl p-3.5 text-xs space-y-3 animate-in fade-in duration-200 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
-              <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-amber-600" />
-                <span>Selectable Equipment Columns in Matrix ({columns.length})</span>
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">Select items one by one from catalog or click 'X' to remove item</span>
-            </div>
 
-            {/* Select Item One by One Dropdown & Checklist Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-amber-50/80 border border-amber-200 p-2 rounded-xl text-xs">
-              <div className="flex items-center gap-2 flex-1 w-full">
-                <span className="font-bold text-amber-950 shrink-0 flex items-center gap-1 text-[11px]">
-                  <CheckCircle2 size={15} className="text-amber-600" />
-                  <span>Select Item One by One:</span>
-                </span>
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleSelectItemOneByOne(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  defaultValue=""
-                  className="flex-1 bg-white border border-amber-300 text-slate-900 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="" disabled>⚡ -- Pick Equipment Item One by One from Catalog --</option>
-                  {MASTER_EQUIPMENT_CATALOG.map((item, idx) => (
-                    <option key={`${item.code}-${idx}`} value={`${item.code}:::${item.name}`}>
-                      {item.name} ({item.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => setIsChecklistOpen(!isChecklistOpen)}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-amber-300 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-              >
-                <Check className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isChecklistOpen ? 'Hide Item Checklist' : '📋 Checklist (Select One by One or All)'}</span>
-              </button>
-            </div>
+
+
 
             {/* Item Checklist Drawer (Select / Deselect One by One or All in One) */}
             {isChecklistOpen && (
@@ -1597,10 +1546,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 + Add Column
               </button>
             </div>
-          </div>
-        )}
       </div>
-
+      
       {/* Region Selector & Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[300px]">

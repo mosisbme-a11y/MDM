@@ -98,14 +98,6 @@ export const INVENTORY_SUB_TABS: InventorySubTabDef[] = [
     icon: FileSpreadsheet,
     description: 'Live Drive & Sheets synchronization logs'
   },
-  {
-    id: 'regional-aggregator',
-    label: 'Regional Aggregator',
-    category: 'operations',
-    categoryLabel: 'Operations & Pipelines',
-    icon: Layers,
-    description: 'Consolidated regional data vs EPSS stock levels'
-  },
 ];
 
 interface InventoryViewHeaderProps {
