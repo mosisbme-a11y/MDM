@@ -1236,37 +1236,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       </div>
 
-      {/* KPI Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Region Filter</div>
-          <div className="text-sm font-black font-mono text-amber-700 mt-0.5 flex items-center gap-1.5">
-            <Building2 size={14} className="text-amber-600" />
-            <span>{selectedRegionFilter === 'all' ? 'All 15 Regions' : selectedRegionFilter}</span>
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Allocated Health Facilities</div>
-          <div className="text-sm font-black font-mono text-indigo-700 mt-0.5">
-            {filteredRows.length} Center{filteredRows.length !== 1 ? 's' : ''} (of {rows.length})
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">HF Master List Link</div>
-          <div className="text-sm font-black font-mono text-purple-700 mt-0.5">
-            {hfListItems.length > 0 ? `${hfListItems.length} Master Facilities` : 'Default Sample List'}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Quantity Earmarked</div>
-          <div className="text-sm font-black font-mono text-emerald-700 mt-0.5">
-            {formatNumber(grandTotalUnits)} Units
-          </div>
-        </div>
-      </div>
 
       {/* DSP AGGR. SUBMITTED TO EPSS ACTIVE VIEW BANNER */}
       {matrixTemplateFormat === 'dsp-aggr-submitted-to-epss' && (
@@ -1614,17 +1584,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500"
             />
           </div>
-
-          <select
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer focus:outline-none focus:border-amber-500"
-          >
-            <option value="all">All Zones ({uniqueZones.length})</option>
-            {uniqueZones.map(z => (
-              <option key={z} value={z}>{z}</option>
-            ))}
-          </select>
         </div>
 
         <div className="flex items-center gap-2">

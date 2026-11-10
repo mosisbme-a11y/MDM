@@ -891,28 +891,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
               <option key={reg} value={reg}>{reg}</option>
             ))}
           </select>
-
-          <select
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
-          >
-            <option value="all">All Zones ({uniqueZones.length})</option>
-            {uniqueZones.map(z => (
-              <option key={z} value={z}>{z}</option>
-            ))}
-          </select>
-
-          <select
-            value={selectedPackage}
-            onChange={(e) => setSelectedPackage(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
-          >
-            <option value="all">All Packages ({uniquePackages.length})</option>
-            {uniquePackages.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
         </div>
 
         {/* Buttons to Add Row & Columns */}

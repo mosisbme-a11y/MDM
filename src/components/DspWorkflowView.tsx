@@ -1410,72 +1410,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
 
 
-      {/* KPI Cards for Current Selection */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Total DSP Dossiers</div>
-            <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">{filteredRecords.length} Documents</div>
-            <div className="text-[10px] text-amber-600 font-medium mt-0.5">Active in Current Stage</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
-            <FileText className="w-5 h-5" />
-          </div>
-        </div>
 
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Allocated Medical Devices</div>
-            <div className="text-xl font-black text-cyan-600 mt-0.5 font-mono">{totalUnits.toLocaleString()} Units</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Physical Devices Earmarked</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-500">Total Distribution Valuation</div>
-            <div className="text-xl font-black text-emerald-600 mt-0.5 font-mono">{formatCurrency(totalValuation)}</div>
-            <div className="text-[10px] text-emerald-600/80 mt-0.5 font-medium">Program & Capital Value</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-
-        {currentStage === 'moh-to-epss' ? (
-          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500">MOH Action & Turnaround Tracker</div>
-              <div className="text-xl font-black text-amber-600 mt-0.5 font-mono">
-                {stage1PendingCount} Pending Action
-              </div>
-              <div className="text-[10px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
-                <span className={stage1OverdueCount > 0 ? "text-rose-600 font-bold" : "text-emerald-600 font-medium"}>
-                  {stage1OverdueCount > 0 ? `• ${stage1OverdueCount} Overdue (>3d)` : `• All within SLA`}
-                </span>
-                <span>| Avg {avgTurnaroundDays}d turnaround</span>
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex items-center justify-between">
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500">Recipient Health Facilities</div>
-              <div className="text-xl font-black text-purple-600 mt-0.5 font-mono">{totalFacilities} Centers</div>
-              <div className="text-[10px] text-purple-600/80 mt-0.5 font-medium">Hospitals & Health Centers</div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-100 text-purple-600">
-              <Hospital className="w-5 h-5" />
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Action Notification Banner */}
       {actionFeedbackToast && (
