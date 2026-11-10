@@ -257,6 +257,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [waCopied, setWaCopied] = useState(false);
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [manualSignatoryRole, setManualSignatoryRole] = useState('');
+  const [manualSignatoryOrg, setManualSignatoryOrg] = useState('Regional Health Bureau');
+  const [transmittalDestination, setTransmittalDestination] = useState<'EPSS' | 'MOH'>('EPSS');
 
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
 
@@ -1027,19 +1029,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* MAP HF TO HUB Button */}
-          <button
-            type="button"
-            onClick={handleMapHfToHub}
-            className="px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 bg-[#0a0f1d] text-white border border-amber-400 hover:bg-black group"
-            title="Map Health Facilities to official regional EPSS hubs using HF Master Data"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-widest text-white group-hover:text-amber-300 transition-colors">
-              MAP HF TO HUB
-            </span>
-          </button>
-
           {/* ITEM AGGREGATION Button: Matching Attachment _23108371-8084-4E3E-8152-291A78533F75__0d333217.png */}
           <button
             type="button"
@@ -1058,43 +1047,25 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <span className="uppercase font-black tracking-wide text-white">ITEM AGGREGATION</span>
           </button>
 
-          {/* DSP RECEIVED FROM MOH Button */}
+          {/* DSP AGGR. SUBMITTED TO EPSS Pill Button - Matching User Attachment */}
           <button
             type="button"
             onClick={() => {
-              setMatrixTemplateFormat('dsp-received-from-moh');
-              showToast('⚡ Switched to DSP RECEIVED FROM MOH Format');
+              setMatrixTemplateFormat('submit-breakdown-to-moh');
+              showToast('⚡ Switched to DSP AGGR. SUBMITTED TO EPSS format (Standard Health Facility Matrix)');
             }}
             className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'dsp-received-from-moh'
-                ? 'bg-[#0a0f1d] text-white border-slate-400 ring-2 ring-slate-400/40'
+              matrixTemplateFormat === 'submit-breakdown-to-moh'
+                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
                 : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
             }`}
-            title="Switch to DSP Received from MOH View"
+            title="Switch to DSP Aggregated Submission to EPSS View"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
-            <span className="uppercase font-black tracking-wide text-white">DSP RECEIVED FROM MOH</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
+            <span className="uppercase font-black tracking-wide text-white">DSP AGGR. SUBMITTED TO EPSS</span>
           </button>
 
-          {/* MOH TO EPSS MATRIX Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('moh-to-epss');
-              showToast('⚡ Switched to MOH TO EPSS MATRIX (Hub Mapped) Format');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'moh-to-epss'
-                ? 'bg-[#0a0f1d] text-white border-slate-400 ring-2 ring-slate-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Switch to MOH TO EPSS MATRIX (Hub Mapped) View"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-[0_0_8px_rgba(148,163,184,0.9)]" />
-            <span className="uppercase font-black tracking-wide text-white">MOH TO EPSS MATRIX (HUB MAPPED)</span>
-          </button>
-
-          {/* SUBMIT BREAKDOWN TO MOH Button: Matching Attachment _EDC0FB35-30FB-4A2A-96D7-97541BD8563B__fa240c1f.png */}
+          {/* SUBMIT BREAKDOWN TO MOH Button */}
           <button
             type="button"
             onClick={() => {
@@ -1112,7 +1083,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <span className="uppercase font-black tracking-wide text-white">SUBMIT BREAKDOWN TO MOH</span>
           </button>
 
-          {/* BREAKDOWN AGGREGATION BY RHB Button: Matching Attachment _D13E96D7-26B7-4EE7-8BAC-DBD4D4A1D1D8__38b63b76.png & Attachment _3FAC7472 */}
+          {/* BREAKDOWN AGGREGATION BY RHB Button */}
           <button
             type="button"
             onClick={() => {
@@ -1130,6 +1101,17 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
             <span className="uppercase font-black tracking-wide text-white">BREAKDOWN AGGREGATION BY RHB</span>
+          </button>
+
+          {/* Send to EPSS Button */}
+          <button
+            type="button"
+            onClick={() => setIsTransmitModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer border-b-4 border-amber-700 shadow-[0_4px_0_rgb(180,83,9)] transition-all active:border-b-0 active:translate-y-[4px]"
+            title="Send official aggregated breakdown matrix to EPSS Head Office"
+          >
+            <Send className="w-3.5 h-3.5 text-slate-950" />
+            <span className="uppercase">Send to EPSS</span>
           </button>
 
           {/* Send TO MOH Button */}
@@ -2420,30 +2402,68 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </div>
 
+                {/* Transmittal Target Destination Selection */}
+                <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setTransmittalDestination('EPSS')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      transmittalDestination === 'EPSS'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send to EPSS Head Office</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransmittalDestination('MOH')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      transmittalDestination === 'MOH'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Send className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Send to MOH PMD Directorate</span>
+                  </button>
+                </div>
+
                 <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
                   <div className="flex items-center gap-2 mb-1">
                     <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                    <h4 className="text-[11px] font-black text-slate-900 uppercase">Authorized Regional Signatory</h4>
+                    <h4 className="text-[11px] font-black text-slate-900 uppercase">Authorized Person, Role & Organization</h4>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person *</label>
                       <input 
                         type="text"
-                        placeholder="Name"
+                        placeholder="e.g. Dr. Abebe Bikila"
                         value={manualSignatoryName}
                         onChange={(e) => setManualSignatoryName(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role *</label>
                       <input 
                         type="text"
-                        placeholder="Title"
+                        placeholder="e.g. Director / Regional Coordinator"
                         value={manualSignatoryRole}
                         onChange={(e) => setManualSignatoryRole(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Organization *</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. Regional Health Bureau"
+                        value={manualSignatoryOrg}
+                        onChange={(e) => setManualSignatoryOrg(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
                       />
                     </div>
@@ -2464,24 +2484,25 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 type="button"
                 onClick={() => {
                   if (!manualSignatoryName.trim() || !manualSignatoryRole.trim()) {
-                    alert('Please fill in Authorized Person and Role before transmitting to MOH.');
+                    alert('Please fill in Authorized Person and Role before transmitting.');
                     return;
                   }
                   const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
                   const year = new Date().getFullYear();
                   const randNum = Math.floor(100 + Math.random() * 900);
-                  const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
+                  const brkRef = `RHB/${transmittalDestination}-BRK/${year}/${randNum}`;
+                  const targetOrg = transmittalDestination === 'EPSS' ? 'EPSS Head Office' : 'MOH PMD Directorate';
 
                   const rhbRecord: DspWorkflowRecord = {
-                    id: `dsp-rhb-moh-${Date.now()}`,
+                    id: `dsp-rhb-${transmittalDestination.toLowerCase()}-${Date.now()}`,
                     dspRefNumber: brkRef,
-                    stage: 'rhb-breakdown-management',
-                    subStage: '3.2',
-                    stageTitle: 'RHB Breakdown Management',
-                    senderOrg: `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
-                    recipientOrg: 'MOH',
+                    stage: transmittalDestination === 'EPSS' ? 'epss-ho-aggregation' : 'rhb-breakdown-management',
+                    subStage: transmittalDestination === 'EPSS' ? '4.1' : '3.2',
+                    stageTitle: transmittalDestination === 'EPSS' ? 'EPSS Aggregated Dispatch' : 'RHB Breakdown Management',
+                    senderOrg: manualSignatoryOrg || `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
+                    recipientOrg: transmittalDestination,
                     dspName: cleanDspName,
-                    subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Submitted to MOH PMD (${filteredRows.length} Facilities)`,
+                    subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Transmitted to ${targetOrg} (${filteredRows.length} Facilities)`,
                     status: 'Endorsed & Approved',
                     dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
                     approvedDate: internalDate || new Date().toISOString().split('T')[0],
@@ -2503,27 +2524,31 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       material: c.code,
                       description: c.name,
                       quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-                      plant: 'MOH Central'
+                      plant: 'EPSS Central Hub'
                     })),
-                    notes: `Official Regional Health Facility Breakdown Matrix submitted to MOH PMD Directorate (${filteredRows.length} Facilities).`
+                    notes: `Official Health Facility Breakdown Matrix submitted by ${manualSignatoryName} (${manualSignatoryRole}, ${manualSignatoryOrg || 'RHB'}) to ${targetOrg}.`
                   };
 
                   try {
                     pushCentralMasterData({
                       dspReceivedMohRows: filteredRows,
-                      updatedBy: 'RHB Regional Logistics',
-                      updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
+                      updatedBy: `${manualSignatoryOrg || 'RHB'} - ${manualSignatoryName}`,
+                      updateKind: `Transmit Region Breakdown Matrix to ${targetOrg} (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
                     });
                   } catch (e) {
                     console.warn(e);
                   }
                   setIsTransmitModalOpen(false);
-                  showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) transmitted to MOH as Dossier [${cleanDspName}]!`);
+                  showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) successfully transmitted to ${targetOrg} by ${manualSignatoryName}!`);
                 }}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-black text-amber-400 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 text-xs"
+                className={`px-5 py-2.5 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 text-xs ${
+                  transmittalDestination === 'EPSS'
+                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                    : 'bg-slate-900 hover:bg-black text-amber-400'
+                }`}
               >
-                <Send className="w-3.5 h-3.5 text-amber-400" />
-                <span>Confirm Transmit to MOH</span>
+                <Send className="w-3.5 h-3.5" />
+                <span>Confirm Transmit to {transmittalDestination}</span>
               </button>
             </div>
           </div>
