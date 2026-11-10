@@ -27,7 +27,8 @@ import {
   ExternalLink,
   Eye,
   ArrowLeft,
-  ChevronDown
+  ChevronDown,
+  Link2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
@@ -1075,61 +1076,71 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <span className="uppercase font-black tracking-wide text-white">ITEM AGGREGATION</span>
           </button>
 
-          {/* DSP AGGR. SUBMITTED TO EPSS Pill Button - Matching User Attachment */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
-              showToast('⚡ Switched to DSP AGGR. SUBMITTED TO EPSS format');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
-                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Switch to DSP Aggregated Submission to EPSS View"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-wide text-white">DSP AGGR. SUBMITTED TO EPSS</span>
-          </button>
+          {/* LINKED FORMATS CONTAINER: DSP AGGR. SUBMITTED TO EPSS 🔗 BREAKDOWN AGGREGATION BY RHB */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950/90 rounded-full border border-amber-400/40 shadow-inner">
+            <span className="pl-3 pr-1 text-[10px] font-black uppercase text-amber-300 tracking-wider flex items-center gap-1 shrink-0">
+              <Link2 className="w-3 h-3 text-amber-400 animate-pulse" />
+              <span>LINKED:</span>
+            </span>
 
-          {/* SUBMIT BREAKDOWN TO MOH Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('submit-breakdown-to-moh');
-              showToast('⚡ Switched to SUBMIT BREAKDOWN TO MOH Format (No Delivery Hubs Included)');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'submit-breakdown-to-moh'
-                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Switch to SUBMIT BREAKDOWN TO MOH View (Region, Zone, Woreda, Facility, Packages & Equipment - Excludes Delivery Hubs)"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-wide text-white">SUBMIT BREAKDOWN TO MOH</span>
-          </button>
+            {/* DSP AGGR. SUBMITTED TO EPSS Pill Button - Matching User Attachment 1 */}
+            <button
+              type="button"
+              onClick={() => {
+                setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
+                showToast('⚡ Switched to DSP AGGR. SUBMITTED TO EPSS format (Linked with RHBs)');
+              }}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+                matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
+                  ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
+                  : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+              }`}
+              title="Switch to DSP Aggregated Submission to EPSS View (Linked with RHBs)"
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                matrixTemplateFormat === 'dsp-aggr-submitted-to-epss'
+                  ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse'
+                  : 'bg-slate-400'
+              }`} />
+              <span className="uppercase font-black tracking-wide text-white">DSP AGGR. SUBMITTED TO EPSS</span>
+              {matrixTemplateFormat === 'dsp-aggr-submitted-to-epss' && (
+                <span className="text-[9px] font-extrabold bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-400/40">
+                  LINKED
+                </span>
+              )}
+            </button>
 
-          {/* BREAKDOWN AGGREGATION BY RHB Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setMatrixTemplateFormat('rhb');
-              setRhbSubViewMode('summary-table');
-              handleMapHfToHub();
-              showToast('⚡ Switched to BREAKDOWN AGGREGATION BY RHB (S/N | Region | DSP Name | Date | View)');
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
-              matrixTemplateFormat === 'rhb'
-                ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/40'
-                : 'bg-slate-900 hover:bg-black text-slate-300 border-slate-700'
-            }`}
-            title="Display Regional Submissions Summary Table (S/N | Region | DSP Name | Date | View) & Map Health Facilities"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" />
-            <span className="uppercase font-black tracking-wide text-white">BREAKDOWN AGGREGATION BY RHB</span>
-          </button>
+            <span className="text-amber-400/60 font-bold text-xs px-0.5">↔</span>
+
+            {/* BREAKDOWN AGGREGATION BY RHB Button - Matching User Attachment 2 */}
+            <button
+              type="button"
+              onClick={() => {
+                setMatrixTemplateFormat('rhb');
+                setRhbSubViewMode('summary-table');
+                handleMapHfToHub();
+                showToast('⚡ Switched to BREAKDOWN AGGREGATION BY RHB (S/N | Region | DSP Name | Date | View)');
+              }}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 border ${
+                matrixTemplateFormat === 'rhb'
+                  ? 'bg-[#0a0f1d] text-white border-amber-400 ring-2 ring-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
+                  : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+              }`}
+              title="Display Regional Submissions Summary Table (S/N | Region | DSP Name | Date | View) & Map Health Facilities"
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                matrixTemplateFormat === 'rhb'
+                  ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse'
+                  : 'bg-slate-400'
+              }`} />
+              <span className="uppercase font-black tracking-wide text-white">BREAKDOWN AGGREGATION BY RHB</span>
+              {matrixTemplateFormat === 'rhb' && (
+                <span className="text-[9px] font-extrabold bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-400/40">
+                  LINKED
+                </span>
+              )}
+            </button>
+          </div>
 
           {/* Send to EPSS Button */}
           <button
@@ -1276,6 +1287,21 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMatrixTemplateFormat('rhb');
+                setRhbSubViewMode('summary-table');
+                handleMapHfToHub();
+                showToast('⚡ Switched to Linked BREAKDOWN AGGREGATION BY RHB Summary Table');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer border border-amber-400/40 transition-all active:scale-95"
+              title="Switch directly to linked Breakdown Aggregation by RHB summary table"
+            >
+              <Link2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Linked RHB Summary Table</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -1665,6 +1691,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               <Layers size={14} />
               <span>Detailed Facility Matrix</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
+                showToast('⚡ Switched to Linked DSP AGGR. SUBMITTED TO EPSS Health Facility Matrix');
+              }}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Open linked DSP Aggregated Submission to EPSS matrix"
+            >
+              <Link2 size={14} className="text-slate-950" />
+              <span>Linked EPSS Matrix</span>
+            </button>
           </div>
         </div>
       )}
@@ -1681,7 +1720,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Exact Attachment 1 Table Format: S/N | Region | DSP Name | Date | View — 14 Ethiopian Regions
+                Exact Attachment 1 Table Format: S/N | Region | DSP Name | Date | View — 14 Ethiopian Regions (Linked to EPSS Matrix)
               </p>
             </div>
 
@@ -1770,10 +1809,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         onClick={() => {
                           setSelectedRhbDetailRegion(row);
                           setSelectedRegionFilter(row.region);
-                          showToast(`👁 Viewing ${row.region} Regional Breakdown Matrix sent to MOH`);
+                          setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
+                          showToast(`🔗 Linked View: Opened ${row.region} Breakdown Matrix in DSP AGGR. SUBMITTED TO EPSS format`);
                         }}
                         className="px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-black text-amber-400 font-black text-xs transition cursor-pointer shadow-xs inline-flex items-center gap-1.5 border border-slate-700 active:scale-95"
-                        title={`View ${row.region} Breakdown Matrix sent to MOH`}
+                        title={`View ${row.region} Health Facility Breakdown Matrix in DSP AGGR. SUBMITTED TO EPSS format`}
                       >
                         <Eye size={13} className="text-amber-400" />
                         <span>View</span>
