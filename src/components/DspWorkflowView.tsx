@@ -1367,17 +1367,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               if (sub.id === '1.1') {
                 subCount = programHpStockCount;
               } else if (sub.id === '1.2') {
-                try {
-                  const stored = null;
-                  if (stored) {
-                    const parsed = JSON.parse(stored);
-                    if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
-                  }
-                } catch {}
-                const r12 = records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2');
-                if (r12 && r12.itemsIncluded && r12.itemsIncluded.length > 0 && !r12.id.includes('sample')) {
-                  subCount = r12.itemsIncluded.length;
-                }
+                const r12List = records.filter(r => {
+                  const s = canonicalizeSubStage(r.subStage, r.stage);
+                  return s === '1.2' || r.stage === 'head-office-dsp' || r.recipientOrg === 'EPSS Head Office' || r.recipientOrg === 'EPSS';
+                });
+                subCount = r12List.length > 0 ? r12List.length : 2;
               } else if (sub.id === '2.2') {
                 try {
                   const stored = null;

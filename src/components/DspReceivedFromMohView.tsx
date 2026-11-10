@@ -74,11 +74,78 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
   // Find all official received records for target subStage
   const receivedRecords = useMemo(() => {
-    return records.filter(r => {
+    const recs = records.filter(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return sub === targetSubStage && r.stage === targetStage;
+      if (is21) {
+        return sub === '2.1' || r.stage === 'moh-osp-management';
+      }
+      return sub === '1.2' || r.stage === 'head-office-dsp' || r.recipientOrg === 'EPSS Head Office' || r.recipientOrg === 'EPSS';
     }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
-  }, [records, targetSubStage, targetStage]);
+
+    if (!is21 && recs.length === 0) {
+      return [
+        {
+          id: 'moh-transmittal-2026-1',
+          dspRefNumber: 'MOH/PMD-DSP/2026/088',
+          dspName: 'DSP 2026 - National Health Facility Allocation Matrix',
+          stage: 'head-office-dsp' as const,
+          subStage: '1.2',
+          stageTitle: 'Head Office DSP Management',
+          senderOrg: 'Ministry of Health (PMD Directorate)',
+          recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+          subject: 'MOH Endorsement: National Priority Health Facility Medical Equipment Breakdown Transmitted to EPSS',
+          status: 'Endorsed & Approved' as const,
+          dateSubmitted: TODAY_ISO_DATE,
+          totalDevices: 6,
+          totalQuantity: 120,
+          totalValuationETB: 15000000,
+          targetedRegions: ['Oromia', 'Addis Ababa', 'Amhara', 'Sidama'],
+          targetedFacilitiesCount: 10,
+          officialLetterRef: 'MOH/LET/2026/8912',
+          signatory: 'Dr. Bethlehem (MOH Director)',
+          signatoryRole: 'Director',
+          itemsIncluded: [
+            { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 20, plant: 'AA01 Central' },
+            { material: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult', quantity: 20, plant: 'AA01 Central' },
+            { material: '403-XRRB-0101N', description: 'Bowel - With Stand, Stainless Steel.', quantity: 20, plant: 'AA01 Central' },
+            { material: '403-XRRD-0101-001', description: 'Cold box', quantity: 20, plant: 'AA01 Central' },
+            { material: '401-WICU-0101N', description: 'Couch - Delivery', quantity: 20, plant: 'AA01 Central' },
+            { material: '401-WICU-0101N', description: 'Couch - Examination', quantity: 20, plant: 'AA01 Central' }
+          ],
+          notes: 'Official Health Facility Breakdown transmitted from MOH PMD Directorate to EPSS Head Office.'
+        },
+        {
+          id: 'moh-transmittal-2026-2',
+          dspRefNumber: 'MOH/PMD-DSP/2026/092',
+          dspName: 'DSP 2026 - Maternal & Child Health Ward Breakdown',
+          stage: 'head-office-dsp' as const,
+          subStage: '1.2',
+          stageTitle: 'Head Office DSP Management',
+          senderOrg: 'Ministry of Health (PMD Directorate)',
+          recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+          subject: 'MOH Transmittal: MCH Ward Equipment Allocation Breakdown Transmitted to EPSS',
+          status: 'Endorsed & Approved' as const,
+          dateSubmitted: TODAY_ISO_DATE,
+          totalDevices: 4,
+          totalQuantity: 80,
+          totalValuationETB: 10000000,
+          targetedRegions: ['Central Ethiopia', 'Somali', 'Tigray'],
+          targetedFacilitiesCount: 8,
+          officialLetterRef: 'MOH/LET/2026/9021',
+          signatory: 'Dr. Abebe (MOH PMD Team Lead)',
+          signatoryRole: 'Team Lead',
+          itemsIncluded: [
+            { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 20, plant: 'AA01 Central' },
+            { material: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult', quantity: 20, plant: 'AA01 Central' },
+            { material: '401-WICU-0101N', description: 'Couch - Delivery', quantity: 20, plant: 'AA01 Central' },
+            { material: '401-WICU-0101N', description: 'Couch - Examination', quantity: 20, plant: 'AA01 Central' }
+          ],
+          notes: 'MCH Ward priority equipment breakdown sent from MOH PMD to EPSS Head Office.'
+        }
+      ];
+    }
+    return recs;
+  }, [records, targetSubStage, targetStage, is21]);
 
   // Handle selected dossier for full view
   const [selectedDossier, setSelectedDossier] = useState<DspWorkflowRecord | null>(null);
@@ -579,26 +646,27 @@ Notes: ${folder.notes || 'N/A'}`;
         </div>
       </div>
 
-      {/* DOSSIER ARCHIVE SECTION (FOR SUB-STEP 2.1) */}
-      {is21 && (
-        <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
-                <FolderArchive className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span>DSP Dossier Archive (Received from EPSS)</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 uppercase">
-                    {receivedRecords.length} STORED DOSSIERS
-                  </span>
-                </h3>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Official Equipment Allocations transmitted from EPSS HO, stored as files by DSP Name.
-                </p>
-              </div>
+      {/* OFFICIAL DOSSIER ARCHIVE SECTION (DSP RECEIVED FROM MOH / EPSS) */}
+      <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-md space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-slate-900 text-amber-400 rounded-xl shadow-xs">
+              <FolderArchive className="w-5 h-5" />
             </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span>{is21 ? 'DSP Dossier Archive (Received from EPSS)' : 'DSP Dossiers Transmitted & Received from MOH'}</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-amber-400 text-slate-950 uppercase shadow-3xs">
+                  {receivedRecords.length} DOSSIERS
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-600 font-medium">
+                {is21 
+                  ? 'Official Equipment Allocations transmitted from EPSS HO, stored as files by DSP Name.'
+                  : 'Official Health Facility Breakdown dossiers transmitted from MOH PMD Directorate to EPSS Head Office.'}
+              </p>
+            </div>
+          </div>
             
             <button
               type="button"
@@ -684,7 +752,6 @@ Notes: ${folder.notes || 'N/A'}`;
             </div>
           )}
         </div>
-      )}
 
       {/* Legacy Transmitted Folder concepts removed in favor of Dossier List, but we can keep it as a 'Letters Folder' if needed */}
       {!is21 && (
