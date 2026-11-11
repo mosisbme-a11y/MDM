@@ -20,7 +20,14 @@ import {
   Info
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { RegionBreakdownMatrixTable, RegionBreakdownMatrixData, RegionBreakdownRow, RegionBreakdownColumn } from './RegionBreakdownMatrixTable';
+import { 
+  RegionBreakdownMatrixTable, 
+  RegionBreakdownMatrixData, 
+  RegionBreakdownRow, 
+  RegionBreakdownColumn,
+  DEFAULT_STAGE_3_COLUMNS,
+  DEFAULT_STAGE_3_ROWS
+} from './RegionBreakdownMatrixTable';
 import { HealthFacilityRecord } from '../types';
 import { downloadCSV } from '../utils/formatters';
 import Papa from 'papaparse';
@@ -154,21 +161,23 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
     woreda: string;
     hub: string;
     facility: string;
+    packages?: string;
     quantities: Record<string, number>;
   }> = {};
 
   if (isListMode) {
-    // Collect all unique items to form columns preserving exact description and code
+    // Collect all unique items to form columns preserving 100% exact description and code
     const itemMap: Record<string, { name: string, code: string }> = {};
     rowsJson.forEach(row => {
-      const rawItemName = String(row[listItemCol!] || 'Unknown Item').trim();
+      const rawItemName = String(row[listItemCol!] || '').trim();
+      if (!rawItemName) return;
       const rawItemCode = listCodeCol ? String(row[listCodeCol!] || '').trim() : '';
 
-      const { name, code } = extractCodeAndName(rawItemName, rawItemCode || `CODE-${rawItemName.slice(0, 3).toUpperCase()}`);
-      const finalCode = rawItemCode || code;
-
       if (!itemMap[rawItemName]) {
-        itemMap[rawItemName] = { name: name || rawItemName, code: finalCode || rawItemName };
+        itemMap[rawItemName] = {
+          name: rawItemName, // EXACT uploaded item name - NEVER altered or stripped
+          code: rawItemCode || `40${Object.keys(itemMap).length + 1}-MAT`
+        };
       }
     });
 
@@ -180,15 +189,15 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
 
     // Group and aggregate
     rowsJson.forEach(row => {
-      const facilityName = String(row[facilityCol!] || 'Unknown Facility').trim();
-      const rawItemName = String(row[listItemCol!] || 'Unknown Item').trim();
+      const facilityName = String(row[facilityCol!] || '').trim();
+      if (!facilityName) return;
+      const rawItemName = String(row[listItemCol!] || '').trim();
       const qty = Number(row[listQtyCol!] || 0);
       
-      const colObj = finalColumns.find(c => c.name === itemMap[rawItemName]?.name || c.name === rawItemName);
+      const colObj = finalColumns.find(c => c.name === rawItemName);
       if (!colObj) return;
 
       if (!facilityGroups[facilityName]) {
-        // Find master data match
         const masterMatch = hfMasterData.find(hf => 
           hf.customerDescription.toLowerCase() === facilityName.toLowerCase() || 
           hf.customer === facilityName ||
@@ -196,20 +205,32 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
         );
 
+        const uploadedRegion = String(row[regionCol!] || '').trim();
+        const uploadedZone = zoneCol ? String(row[zoneCol!] || '').trim() : '';
+        const uploadedWoreda = woredaCol ? String(row[woredaCol!] || '').trim() : '';
+        const uploadedHub = hubCol ? String(row[hubCol!] || '').trim() : '';
+        const uploadedPkg = String(row['List of Packeges'] || row['packages'] || row['Packages'] || 'MCH').trim();
+
         const officialMapping = mapFacilityToHub(
           facilityName,
-          masterMatch ? masterMatch.region : String(row[regionCol!] || ''),
-          masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
-          masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
+          uploadedRegion || (masterMatch ? masterMatch.region : ''),
+          uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
+          uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
           hfMasterData
         );
 
+        // Strict Hub symbol (e.g. AA01, AD01) - excluding HO01
+        const hubSymbol = (uploadedHub && uploadedHub.toUpperCase() !== 'HO01' && !uploadedHub.toUpperCase().includes('HEAD'))
+          ? uploadedHub.toUpperCase()
+          : ((officialMapping.hubCode && officialMapping.hubCode !== 'HO01' && !officialMapping.hubCode.includes('HEAD')) ? officialMapping.hubCode : 'AA01');
+
         facilityGroups[facilityName] = {
-          facility: masterMatch ? masterMatch.customerDescription : facilityName,
-          region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
-          zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
-          woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: officialMapping.hubName,
+          facility: facilityName, // NEVER overwrite exact uploaded facility name!
+          region: uploadedRegion || (masterMatch ? masterMatch.region : 'Addis Ababa'),
+          zone: uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
+          woreda: uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
+          packages: uploadedPkg || 'MCH',
+          hub: hubSymbol,
           quantities: {}
         };
       }
@@ -229,13 +250,9 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
       equipmentHeaders = ['Allocation Quantity'];
     }
 
-    // Check if row 0 of rowsJson contains explicit item codes for each column (e.g. 2-tier header files)
     const firstRowData = rowsJson[0] || {};
-    
-    // Improvement: Better detection of 2-tier headers as shown in user screenshot {C0871FED-A796-4A43-868D-774FC3A71926}.png
     const hasCodeRowInFirstRow = equipmentHeaders.some(h => {
       const val = String(firstRowData[h] || '').trim();
-      // If it looks like a code (uppercase with dashes) or specifically mentioned in the screenshot like "ITEM-1"
       return val && isNaN(Number(val)) && (/[A-Z0-9]{3,}/i.test(val) || val.includes('-') || val.startsWith('ITEM-'));
     });
 
@@ -247,17 +264,23 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
 
       if (hasCodeRowInFirstRow) {
         codeVal = String(firstRowData[h] || '').trim();
-        // If the header itself is an empty marker like "__EMPTY_1", use the first row data as the name if it's not a pure code
         if (h.startsWith('__EMPTY_') || h.toLowerCase() === 'item') {
           nameVal = codeVal;
         }
       }
 
-      const { name, code } = extractCodeAndName(nameVal, codeVal || `ITEM-${i + 1}`);
+      // Preserve 100% EXACT item name from uploaded header
+      const exactName = nameVal.trim() || `Item ${i + 1}`;
+      let finalCode = codeVal;
+      if (!finalCode) {
+        const parsed = extractCodeAndName(exactName);
+        finalCode = parsed.code !== exactName ? parsed.code : `40${i + 1}-MAT`;
+      }
+
       return {
         id: `col-adhoc-${i}`,
-        name: name,
-        code: codeVal || code
+        name: exactName, // EXACT item name as uploaded
+        code: finalCode
       };
     });
 
@@ -266,7 +289,7 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
     }
 
     effectiveRowsJson.forEach(row => {
-      const facilityName = String(row[facilityCol!] || 'Unknown Facility').trim();
+      const facilityName = String(row[facilityCol!] || '').trim();
       if (!facilityName || facilityName === 'Unknown Facility') return;
 
       if (!facilityGroups[facilityName]) {
@@ -277,20 +300,32 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
           facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
         );
 
+        const uploadedRegion = String(row[regionCol!] || '').trim();
+        const uploadedZone = zoneCol ? String(row[zoneCol!] || '').trim() : '';
+        const uploadedWoreda = woredaCol ? String(row[woredaCol!] || '').trim() : '';
+        const uploadedHub = hubCol ? String(row[hubCol!] || '').trim() : '';
+        const uploadedPkg = String(row['List of Packeges'] || row['packages'] || row['Packages'] || 'MCH').trim();
+
         const officialMapping = mapFacilityToHub(
           facilityName,
-          masterMatch ? masterMatch.region : String(row[regionCol!] || ''),
-          masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
-          masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
+          uploadedRegion || (masterMatch ? masterMatch.region : ''),
+          uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
+          uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
           hfMasterData
         );
 
+        // Strict Hub symbol (e.g. AA01, AD01) - excluding HO01
+        const hubSymbol = (uploadedHub && uploadedHub.toUpperCase() !== 'HO01' && !uploadedHub.toUpperCase().includes('HEAD'))
+          ? uploadedHub.toUpperCase()
+          : ((officialMapping.hubCode && officialMapping.hubCode !== 'HO01' && !officialMapping.hubCode.includes('HEAD')) ? officialMapping.hubCode : 'AA01');
+
         facilityGroups[facilityName] = {
-          facility: masterMatch ? masterMatch.customerDescription : facilityName,
-          region: masterMatch ? masterMatch.region : String(row[regionCol!] || 'Auto Region'),
-          zone: masterMatch ? masterMatch.zoneDescription : String(row[zoneCol!] || ''),
-          woreda: masterMatch ? masterMatch.woredaDescription : String(row[woredaCol!] || ''),
-          hub: officialMapping.hubName,
+          facility: facilityName, // NEVER overwrite exact uploaded facility name!
+          region: uploadedRegion || (masterMatch ? masterMatch.region : 'Addis Ababa'),
+          zone: uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
+          woreda: uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
+          packages: uploadedPkg || 'MCH',
+          hub: hubSymbol,
           quantities: {}
         };
       }
@@ -314,7 +349,7 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
       hub: g.hub,
       healthFacility: g.facility,
       customerDescription: g.facility,
-      packages: 'P-1',
+      packages: g.packages || 'MCH',
       quantities: g.quantities
     };
   });
@@ -349,34 +384,46 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
   const handleMapWithHubs = () => {
     setIsAnalyzing(true);
-    setUploadFeedback({ message: 'Analyzing facilities and mapping to official regional hubs...', type: 'info' });
+    setUploadFeedback({ message: 'Analyzing facilities and mapping to official regional EPSS hub symbols...', type: 'info' });
     
     setTimeout(() => {
-      if (adHocDataActive && matrixData) {
-        // Map Hubs for Ad-hoc Data using official registry
-        const updatedRows = matrixData.rows.map(row => {
-          const mapping = mapFacilityToHub(
-            row.healthFacility,
-            row.region,
-            row.zone,
-            row.woreda,
-            hfListItems
-          );
-          
-          return {
-            ...row,
-            hub: mapping.hubName // Use the official name (e.g. "Adama Hub")
-          };
-        });
+      const baseRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+        ? matrixData.rows
+        : DEFAULT_STAGE_3_ROWS;
+
+      const baseCols = (matrixData && matrixData.columns && matrixData.columns.length > 0)
+        ? matrixData.columns
+        : DEFAULT_STAGE_3_COLUMNS;
+
+      const updatedRows = baseRows.map(row => {
+        const mapping = mapFacilityToHub(
+          row.healthFacility || row.customerDescription || '',
+          row.region || '',
+          row.zone || '',
+          row.woreda || '',
+          hfListItems
+        );
         
-        setMatrixData({
-          ...matrixData,
-          rows: updatedRows
-        });
-        setUploadFeedback({ message: '✓ Analysis complete: Facilities mapped with official Hub names.', type: 'success' });
-      } else {
-        // Map Hubs for Master Data and persist the changes
-        const updated = hfListItems.map(hf => {
+        // Pure Hub symbol (e.g. AA01, AD01, DI01) - excluding HO01
+        const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
+          ? mapping.hubCode
+          : 'AA01';
+
+        return {
+          ...row,
+          hub: hubSymbol // Adds/updates only the Hub symbol; never alters exact item names or quantities!
+        };
+      });
+      
+      setMatrixData({
+        date: matrixData?.date || new Date().toISOString().split('T')[0],
+        region: matrixData?.region || 'Mapped Matrix',
+        columns: baseCols, // PRESERVE 100% EXACT ITEM COLUMNS
+        rows: updatedRows
+      });
+
+      if (hfListItems && hfListItems.length > 0 && onUploadHFData) {
+        const updatedMaster = hfListItems.map(hf => {
           const mapping = mapFacilityToHub(
             hf.customerDescription,
             hf.region,
@@ -384,20 +431,23 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
             hf.woredaDescription,
             hfListItems
           );
-          
+          const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
+            ? mapping.hubCode
+            : 'AA01';
           return {
             ...hf,
-            hub: mapping.hubName // This writes the "official name" into the master data
+            hub: hubSymbol
           };
         });
-
-        if (onUploadHFData) {
-          onUploadHFData(updated, 'replace');
-        }
-        setUploadFeedback({ message: '✓ Mapping analysis completed: All master facilities updated with official hub names.', type: 'success' });
+        onUploadHFData(updatedMaster, 'replace');
       }
+
+      setUploadFeedback({ 
+        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols. All exact item descriptions & quantities intact.`, 
+        type: 'success' 
+      });
       setIsAnalyzing(false);
-    }, 800);
+    }, 600);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -522,42 +572,95 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     setUploadFeedback({ message: `Exported ${mismatched.length} facilities with missing regional mappings.`, type: 'success' });
   };
 
-  const handleDownloadMappedData = () => {
-    if (adHocDataActive && matrixData) {
-      // Export the current Matrix (Aggregated)
-      const exportData = matrixData.rows.map(row => {
+  const handleDownloadMappedData = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const activeCols = (matrixData && matrixData.columns && matrixData.columns.length > 0)
+      ? matrixData.columns
+      : DEFAULT_STAGE_3_COLUMNS;
+    const activeRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+      ? matrixData.rows
+      : DEFAULT_STAGE_3_ROWS;
+
+    const currentDateStr = new Date().toISOString().split('T')[0];
+
+    if (format === 'xlsx') {
+      const aoa: any[][] = [];
+      aoa.push(['Date', currentDateStr]);
+      aoa.push([
+        'Region',
+        'Zone',
+        'Woreda',
+        'Name of health facility',
+        'List of Packeges',
+        'HUB',
+        ...activeCols.map(c => c.name) // Exact item names as uploaded
+      ]);
+      aoa.push([
+        '',
+        '',
+        '',
+        '',
+        'List of Packeges',
+        '⬡',
+        ...activeCols.map(c => c.code)
+      ]);
+
+      activeRows.forEach(r => {
+        const hubSymbol = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD')) ? r.hub : 'AA01';
+        aoa.push([
+          r.region,
+          r.zone,
+          r.woreda,
+          r.healthFacility || r.customerDescription,
+          r.packages || 'MCH',
+          hubSymbol,
+          ...activeCols.map(c => {
+            const val = r.quantities[c.id];
+            return val === undefined || val === null ? 0 : val;
+          })
+        ]);
+      });
+
+      // Total summary row
+      aoa.push([
+        'TOTAL',
+        '',
+        '',
+        `${activeRows.length} Facilities`,
+        '',
+        '',
+        ...activeCols.map(c => activeRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0))
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [
+        { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 16 }, { wch: 10 },
+        ...activeCols.map(() => ({ wch: 22 }))
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Mapped Breakdown Matrix');
+      XLSX.writeFile(wb, `Mapped_Breakdown_Matrix_${currentDateStr}.xlsx`);
+      setUploadFeedback({ message: `✓ Exported complete Excel file (.xlsx) with ${activeRows.length} facilities, Hub symbols, and ${activeCols.length} exact equipment columns.`, type: 'success' });
+    } else {
+      // CSV format
+      const exportData = activeRows.map(row => {
+        const hubSymbol = (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) ? row.hub : 'AA01';
         const entry: any = {
           'Region': row.region,
           'Zone': row.zone,
           'Woreda': row.woreda,
-          'HUB': row.hub || '',
-          'Name of health facility': row.healthFacility,
-          'List of Packages': row.packages
+          'Name of health facility': row.healthFacility || row.customerDescription,
+          'List of Packages': row.packages || 'MCH',
+          'HUB': hubSymbol
         };
-        
-        // Add item columns
-        matrixData.columns.forEach(col => {
-          entry[col.name] = row.quantities[col.id] || 0;
+        activeCols.forEach(col => {
+          entry[col.name] = row.quantities[col.id] !== undefined ? row.quantities[col.id] : 0;
         });
-        
         return entry;
       });
-      
-      downloadCSV(`Mapped_Breakdown_Matrix_${new Date().toISOString().split('T')[0]}.csv`, exportData);
-      setUploadFeedback({ message: `Exported ${matrixData.rows.length} rows from active mapping matrix.`, type: 'success' });
-    } else {
-      // Fallback: Export Master List with HUBs
-      const exportData = hfListItems.map(hf => ({
-        'Region': hf.region,
-        'Zone': hf.zoneDescription,
-        'Woreda': hf.woredaDescription,
-        'HUB': hf.hub || hf.deliveringPlant || '',
-        'Name of health facility': hf.customerDescription,
-        'Customer ID': hf.customer
-      }));
-      
-      downloadCSV(`Master_HF_List_${new Date().toISOString().split('T')[0]}.csv`, exportData);
-      setUploadFeedback({ message: `Exported ${hfListItems.length} records from Master HF Data.`, type: 'success' });
+
+      downloadCSV(`Mapped_Breakdown_Matrix_${currentDateStr}.csv`, exportData);
+      setUploadFeedback({ message: `✓ Exported complete CSV with ${activeRows.length} facilities, Hub symbols, and ${activeCols.length} exact equipment columns.`, type: 'success' });
     }
   };
 
@@ -722,7 +825,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
             {/* MAP HF TO HUB Pill Button */}
             <button
               onClick={handleMapWithHubs}
-              disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
+              disabled={isAnalyzing}
               className="flex items-center gap-3 px-6 py-3 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-sm shadow-2xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 disabled:opacity-50 cursor-pointer tracking-wider uppercase group"
               title="Map Health Facilities to official regional EPSS hubs"
             >
@@ -742,47 +845,56 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               <span>GET TEMPLATE</span>
             </button>
 
-            {isAdmin && (
-              <div className="flex flex-wrap items-center gap-2">
-                {adHocDataActive && (
-                  <button
-                    onClick={handleResetToMaster}
-                    className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-rose-500 transition active:scale-95 cursor-pointer"
-                  >
-                    <RefreshCw size={16} />
-                    <span>Reset to Master</span>
-                  </button>
-                )}
-
+            {/* Action Buttons: Upload & Downloads */}
+            <div className="flex flex-wrap items-center gap-2">
+              {adHocDataActive && (
                 <button
-                  onClick={handleDownloadMappedData}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer"
-                  title="Download CSV of all mapped facilities"
+                  onClick={handleResetToMaster}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer"
+                  title="Reset to Master Health Facility records"
                 >
-                  <Download size={16} />
-                  <span>Download Mapped Data</span>
+                  <RefreshCw size={14} />
+                  <span>Reset</span>
                 </button>
+              )}
 
-                <div className="flex flex-col items-end">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-900 rounded-xl font-bold text-xs shadow-lg hover:bg-cyan-50 transition active:scale-95 disabled:opacity-50 cursor-pointer"
-                    title="Upload any Excel or CSV file for ad-hoc mapping analysis"
-                  >
-                    <Upload size={16} />
-                    <span>{isUploading ? 'Analyzing...' : 'Analyze Any File'}</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept=".xlsx,.xls,.csv,.tsv,.txt"
-                    className="hidden"
-                  />
-                </div>
+              <div className="flex flex-col items-end">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white text-indigo-950 rounded-xl font-bold text-xs shadow-lg hover:bg-cyan-50 transition active:scale-95 disabled:opacity-50 cursor-pointer border border-cyan-200"
+                  title="Upload any Excel or CSV file for mapping with official EPSS hubs"
+                >
+                  <Upload size={15} className="text-cyan-600" />
+                  <span>{isUploading ? 'Analyzing...' : 'Upload & Map File'}</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept=".xlsx,.xls,.csv,.tsv,.txt"
+                  className="hidden"
+                />
               </div>
-            )}
+
+              <button
+                onClick={() => handleDownloadMappedData('xlsx')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-lg transition active:scale-95 cursor-pointer border border-emerald-400/40"
+                title="Download complete 2-tier Excel file (.xlsx) with exact uploaded items and mapped Hub symbols"
+              >
+                <FileSpreadsheet size={15} />
+                <span>Export Excel (.xlsx)</span>
+              </button>
+
+              <button
+                onClick={() => handleDownloadMappedData('csv')}
+                className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer border border-indigo-400/30"
+                title="Download CSV with exact uploaded items and mapped Hub symbols"
+              >
+                <Download size={15} />
+                <span>CSV</span>
+              </button>
+            </div>
           </div>
         </div>
 
