@@ -1,4 +1,0 @@
-{
-  "summary": "Security specification for the Medical Device Inventory application, defining data invariants and testing payloads for hardened Firestore rules.",
-  "updatedAt": "2026-11-02T15:23:31.247886982Z"
-}

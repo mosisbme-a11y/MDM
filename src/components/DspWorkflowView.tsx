@@ -11,7 +11,6 @@ import {
   Search,
   Filter,
   ArrowRight,
-  Layers,
   Hospital,
   Warehouse,
   ChevronRight,
@@ -40,10 +39,7 @@ import {
   Copy,
   BarChart3,
   TrendingUp,
-  GitMerge,
-  ArrowUpDown,
-  ChevronUp,
-  ChevronDown
+  GitMerge
 } from 'lucide-react';
 import {
   FunnelChart,
@@ -450,25 +446,6 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
-  const [summaryViewMode, setSummaryViewMode] = useState<'itemized' | 'dossier'>('dossier');
-
-  // Smart Table Sorting State
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-
-  const requestSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const renderSortIcon = (key: string) => {
-    if (sortConfig?.key !== key) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />;
-    return sortConfig.direction === 'asc' 
-      ? <ChevronUp className="w-3 h-3 text-indigo-500 ml-1" />
-      : <ChevronDown className="w-3 h-3 text-indigo-500 ml-1" />;
-  };
 
 
   // Take Action modal state for EPSS to MOH requests
@@ -812,71 +789,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       return matchStage && matchSubStep && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
     });
   }, [records, currentStage, currentSubStep, searchQuery, statusFilter, agingFilter, selectedRegionsFilter, stageFilter]);
-
-  const allRequestTableItems = useMemo(() => {
-    const result: Array<{
-      id: string;
-      parentRecord: DspWorkflowRecord;
-      itemIndex: number;
-      material: string;
-      description: string;
-      quantity: number;
-      plant: string;
-      allocatedFacility?: string;
-      unitPriceETB: number;
-      totalValuationETB: number;
-    }> = [];
-
-    filteredRecords.forEach((rec) => {
-      const totalQty = rec.itemsIncluded.reduce((acc, i) => acc + (i.quantity || 0), 0) || 1;
-      const avgValPerUnit = rec.totalValuationETB > 0 ? rec.totalValuationETB / totalQty : 350000;
-
-      rec.itemsIncluded.forEach((item, idx) => {
-        const itemQty = item.quantity || 1;
-        const val = itemQty * avgValPerUnit;
-        result.push({
-          id: `${rec.id}-item-${idx}`,
-          parentRecord: rec,
-          itemIndex: idx,
-          material: item.material,
-          description: item.description,
-          quantity: itemQty,
-          plant: item.plant || 'HO01',
-          allocatedFacility: item.allocatedFacility || rec.recipientOrg,
-          unitPriceETB: Math.round(avgValPerUnit),
-          totalValuationETB: Math.round(val)
-        });
-      });
-    });
-
-    return result;
-  }, [filteredRecords]);
-
-  const sortedRequestTableItems = useMemo(() => {
-    if (!sortConfig) return allRequestTableItems;
-    const sorted = [...allRequestTableItems].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortConfig.key) {
-        case 'material': aValue = a.material; bValue = b.material; break;
-        case 'description': aValue = a.description; bValue = b.description; break;
-        case 'stage': aValue = a.parentRecord.stageTitle; bValue = b.parentRecord.stageTitle; break;
-        case 'sender': aValue = a.parentRecord.senderOrg; bValue = b.parentRecord.senderOrg; break;
-        case 'recipient': aValue = a.parentRecord.recipientOrg; bValue = b.parentRecord.recipientOrg; break;
-        case 'qty': aValue = a.quantity; bValue = b.quantity; break;
-        case 'unitPrice': aValue = a.unitPriceETB; bValue = b.unitPriceETB; break;
-        case 'totalVal': aValue = a.totalValuationETB; bValue = b.totalValuationETB; break;
-        case 'date': aValue = a.parentRecord.dateSubmitted; bValue = b.parentRecord.dateSubmitted; break;
-        default: return 0;
-      }
-
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [allRequestTableItems, sortConfig]);
 
   const totalValuation = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalValuationETB, 0), [filteredRecords]);
   const totalUnits = useMemo(() => filteredRecords.reduce((s, r) => s + r.totalQuantity, 0), [filteredRecords]);
@@ -1974,37 +1886,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-amber-600" />
                 <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
-                  {summaryViewMode === 'itemized' 
-                    ? `Itemized Matrix: ${currentStage === 'all' ? 'Unified Tracker' : stagesList.find(s => s.stageKey === currentStage)?.label} (${allRequestTableItems.length} Material Rows)`
-                    : `Summary: ${currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} (${filteredRecords.length} Documents)`
-                  }
+                  Summary: {currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} ({filteredRecords.length} Documents)
                 </span>
-              </div>
-
-              {/* Template Toggle - Based on user screenshot requirements */}
-              <div className="flex items-center gap-1.5 bg-slate-200/50 p-0.5 rounded-lg border border-slate-300/60 shadow-xs">
-                <button 
-                  onClick={() => setSummaryViewMode('dossier')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                    summaryViewMode === 'dossier' 
-                      ? 'bg-white text-amber-700 shadow-sm border border-slate-200' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <FileText className="w-3 h-3" />
-                  SUMMARY TEMPLATE
-                </button>
-                <button 
-                  onClick={() => setSummaryViewMode('itemized')}
-                  className={`px-3 py-1 rounded-md text-[10px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                    summaryViewMode === 'itemized' 
-                      ? 'bg-white text-amber-700 shadow-sm border border-slate-200' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Layers className="w-3 h-3" />
-                  ITEMIZED MATRIX
-                </button>
               </div>
             </div>
 
@@ -2012,237 +1895,103 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               <button
                 type="button"
                 onClick={() => {
-                  if (summaryViewMode === 'itemized') {
-                    const csv = sortedRequestTableItems.map((item, idx) => ({
+                  const csv = filteredRecords.map((r, idx) => {
+                    const dspInfo = getDossierDisplayInfo(r, idx);
+                    return {
                       'S/N': idx + 1,
-                      'MATERIAL CODE': item.material,
-                      'ITEM DESCRIPTION': item.description,
-                      'HIERARCHY STAGE': item.parentRecord.stageTitle,
-                      'SENDER': item.parentRecord.senderOrg,
-                      'RECIPIENT': item.parentRecord.recipientOrg,
-                      'QTY REQUESTED': item.quantity,
-                      'UNIT VAL (ETB)': item.unitPriceETB,
-                      'TOTAL VAL (ETB)': item.totalValuationETB,
-                      'REQUESTED DATE': item.parentRecord.dateSubmitted,
-                      'STATUS': item.parentRecord.status
-                    }));
-                    downloadCSV(`request-items-matrix-${Date.now()}.csv`, csv);
-                  } else {
-                    const csv = filteredRecords.map((r, idx) => {
-                      const dspInfo = getDossierDisplayInfo(r, idx);
-                      return {
-                        'S/N': idx + 1,
-                        'Date': r.dateSubmitted,
-                        'DSP Name': dspInfo.dspName,
-                        'Authorized person': dspInfo.authorizedPerson,
-                        'Organazation': dspInfo.organization,
-                        'Role': dspInfo.role,
-                        'Status': dspInfo.status,
-                        'Reference': r.dspRefNumber
-                      };
-                    });
-                    downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
-                  }
+                      'Date': r.dateSubmitted,
+                      'DSP Name': dspInfo.dspName,
+                      'Authorized person': dspInfo.authorizedPerson,
+                      'Organazation': dspInfo.organization,
+                      'Role': dspInfo.role,
+                      'Status': dspInfo.status,
+                      'Reference': r.dspRefNumber
+                    };
+                  });
+                  downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
                 }}
                 className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export {summaryViewMode === 'itemized' ? 'Matrix' : 'Summary'} CSV</span>
+                <span>Export Summary CSV</span>
               </button>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            {summaryViewMode === 'itemized' ? (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
-                    <th className="py-2.5 px-3 text-center">S/N</th>
-                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('material')}>
-                      <div className="flex items-center">
-                        MATERIAL CODE
-                        {renderSortIcon('material')}
+            {/* User-Requested Summary Template */}
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
+                  <th className="py-2.5 px-3 text-center w-20 italic">View</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center bg-slate-50/30">
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText className="w-8 h-8 text-slate-200" />
+                        <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
                       </div>
-                    </th>
-                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('description')}>
-                      <div className="flex items-center">
-                        ITEM DESCRIPTION
-                        {renderSortIcon('description')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('stage')}>
-                      <div className="flex items-center">
-                        HIERARCHY STAGE
-                        {renderSortIcon('stage')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('sender')}>
-                      <div className="flex items-center">
-                        SENDER
-                        {renderSortIcon('sender')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('recipient')}>
-                      <div className="flex items-center">
-                        RECIPIENT
-                        {renderSortIcon('recipient')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('qty')}>
-                      <div className="flex items-center justify-end">
-                        QTY REQUESTED
-                        {renderSortIcon('qty')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('unitPrice')}>
-                      <div className="flex items-center justify-end">
-                        UNIT VAL (ETB)
-                        {renderSortIcon('unitPrice')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('totalVal')}>
-                      <div className="flex items-center justify-end">
-                        TOTAL VAL (ETB)
-                        {renderSortIcon('totalVal')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors group" onClick={() => requestSort('date')}>
-                      <div className="flex items-center justify-center">
-                        REQUESTED DATE
-                        {renderSortIcon('date')}
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-center">ACTION</th>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-600">
-                  {sortedRequestTableItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="py-12 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <Archive className="w-8 h-8 text-slate-200" />
-                          <p className="text-slate-400 font-medium">No request table items found in this selection.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedRequestTableItems.map((item, idx) => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{item.material}</td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800">{item.description}</td>
-                        <td className="py-2.5 px-3">
-                          <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-[10px]">
-                            {item.parentRecord.stageTitle}
+                ) : (
+                  filteredRecords.map((rec, idx) => {
+                    const dspInfo = getDossierDisplayInfo(rec, idx);
+                    return (
+                      <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
+                        <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
+                          {rec.dateSubmitted}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                          {dspInfo.dspName}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                          {dspInfo.authorizedPerson}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                          {dspInfo.organization}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                          {dspInfo.role}
+                        </td>
+                        <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            dspInfo.status === 'Approved' 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                            {dspInfo.status}
                           </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
-                          {item.parentRecord.senderOrg}
-                        </td>
-                        <td className="py-2.5 px-3 text-[11px] font-semibold text-slate-800">
-                          {item.parentRecord.recipientOrg}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-700">
-                          {formatNumber(item.quantity)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-600">
-                          {formatCurrency(item.unitPriceETB)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
-                          {formatCurrency(item.totalValuationETB)}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-600 font-bold">
-                          {item.parentRecord.dateSubmitted}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
-                            onClick={() => setSelectedRecord(item.parentRecord)}
-                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition cursor-pointer"
+                            onClick={() => setSelectedRecord(rec)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                            title="View dossier details"
                           >
-                            View Table
+                            <Eye className="w-3 h-3 text-amber-600" />
+                            <span>View</span>
                           </button>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              /* User-Requested Summary Template (Image 2) */
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
-                    <th className="py-2.5 px-3 text-center w-20 italic">View</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
-                  {filteredRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center bg-slate-50/30">
-                        <div className="flex flex-col items-center gap-2">
-                          <FileText className="w-8 h-8 text-slate-200" />
-                          <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRecords.map((rec, idx) => {
-                      const dspInfo = getDossierDisplayInfo(rec, idx);
-                      return (
-                        <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
-                          <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
-                            {idx + 1}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
-                            {rec.dateSubmitted}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                            {dspInfo.dspName}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
-                            {dspInfo.authorizedPerson}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                            {dspInfo.organization}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
-                            {dspInfo.role}
-                          </td>
-                          <td className="py-2.5 px-3 border-r border-slate-100 text-center">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                              dspInfo.status === 'Approved' 
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}>
-                              {dspInfo.status}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRecord(rec)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
-                              title="View dossier details"
-                            >
-                              <Eye className="w-3 h-3 text-amber-600" />
-                              <span>View</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            )}
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
