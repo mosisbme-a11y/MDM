@@ -237,6 +237,9 @@ const normalizeString = (str: string): string => {
 export interface MapHfToHubResult {
   hubCode: string;
   hubName: string;
+  region?: string;
+  zone?: string;
+  woreda?: string;
   masterCustomerCode?: string;
   masterFacilityName?: string;
   matchMethod: 'exact-master' | 'fuzzy-master' | 'zone-region-fallback' | 'manual-override' | 'unmapped';
@@ -275,6 +278,9 @@ export function mapFacilityToHub(
         return {
           hubCode: hub.code,
           hubName: hub.name,
+          region: exactMatch.region || region || hub.region,
+          zone: exactMatch.zoneDescription || exactMatch.zoneCode || zone || 'East Shewa',
+          woreda: exactMatch.woredaDescription || exactMatch.woreda || woreda || 'Woreda 01',
           masterCustomerCode: exactMatch.customer,
           masterFacilityName: exactMatch.customerDescription,
           matchMethod: 'exact-master',
@@ -302,6 +308,9 @@ export function mapFacilityToHub(
           return {
             hubCode: hub.code,
             hubName: hub.name,
+            region: fuzzyMatch.region || region || hub.region,
+            zone: fuzzyMatch.zoneDescription || fuzzyMatch.zoneCode || zone || 'East Shewa',
+            woreda: fuzzyMatch.woredaDescription || fuzzyMatch.woreda || woreda || 'Woreda 01',
             masterCustomerCode: fuzzyMatch.customer,
             masterFacilityName: fuzzyMatch.customerDescription,
             matchMethod: 'fuzzy-master',

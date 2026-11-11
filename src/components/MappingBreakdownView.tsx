@@ -411,14 +411,16 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
         return {
           ...row,
-          hub: hubSymbol // Adds/updates only the Hub symbol; never alters exact item names or quantities!
+          zone: row.zone && row.zone.trim() !== '' ? row.zone : (mapping.zone || 'East Shewa'),
+          woreda: row.woreda && row.woreda.trim() !== '' ? row.woreda : (mapping.woreda || 'Woreda 01'),
+          hub: hubSymbol // Adds/updates Hub symbol; never alters exact item names or quantities!
         };
       });
       
       setMatrixData({
         date: matrixData?.date || new Date().toISOString().split('T')[0],
         region: matrixData?.region || 'Mapped Matrix',
-        columns: baseCols, // PRESERVE 100% EXACT ITEM COLUMNS
+        columns: baseCols, // PRESERVE 100% EXACT ITEM COLUMNS AND CODES
         rows: updatedRows
       });
 
@@ -436,6 +438,8 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
             : 'AA01';
           return {
             ...hf,
+            zoneDescription: hf.zoneDescription || mapping.zone || 'East Shewa',
+            woredaDescription: hf.woredaDescription || mapping.woreda || 'Woreda 01',
             hub: hubSymbol
           };
         });
@@ -443,7 +447,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       }
 
       setUploadFeedback({ 
-        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols. All exact item descriptions & quantities intact.`, 
+        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols, Zone, and Woreda. All exact item descriptions & quantities intact.`, 
         type: 'success' 
       });
       setIsAnalyzing(false);
@@ -600,19 +604,18 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         '',
         '',
         'List of Packeges',
-        '⬡',
+        'HUB',
         ...activeCols.map(c => c.code)
       ]);
 
       activeRows.forEach(r => {
-        const hubSymbol = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD')) ? r.hub : 'AA01';
         aoa.push([
           r.region,
           r.zone,
           r.woreda,
           r.healthFacility || r.customerDescription,
           r.packages || 'MCH',
-          hubSymbol,
+          r.hub || 'AA01',
           ...activeCols.map(c => {
             const val = r.quantities[c.id];
             return val === undefined || val === null ? 0 : val;
@@ -633,25 +636,24 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws['!cols'] = [
-        { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 16 }, { wch: 10 },
+        { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 16 }, { wch: 12 },
         ...activeCols.map(() => ({ wch: 22 }))
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Mapped Breakdown Matrix');
       XLSX.writeFile(wb, `Mapped_Breakdown_Matrix_${currentDateStr}.xlsx`);
-      setUploadFeedback({ message: `✓ Exported complete Excel file (.xlsx) with ${activeRows.length} facilities, Hub symbols, and ${activeCols.length} exact equipment columns.`, type: 'success' });
+      setUploadFeedback({ message: `✓ Exported complete Excel file (.xlsx) with ${activeRows.length} facilities, mapped Hubs, and ${activeCols.length} exact equipment columns.`, type: 'success' });
     } else {
       // CSV format
       const exportData = activeRows.map(row => {
-        const hubSymbol = (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) ? row.hub : 'AA01';
         const entry: any = {
           'Region': row.region,
           'Zone': row.zone,
           'Woreda': row.woreda,
           'Name of health facility': row.healthFacility || row.customerDescription,
           'List of Packages': row.packages || 'MCH',
-          'HUB': hubSymbol
+          'HUB': row.hub || 'AA01'
         };
         activeCols.forEach(col => {
           entry[col.name] = row.quantities[col.id] !== undefined ? row.quantities[col.id] : 0;
@@ -660,7 +662,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       });
 
       downloadCSV(`Mapped_Breakdown_Matrix_${currentDateStr}.csv`, exportData);
-      setUploadFeedback({ message: `✓ Exported complete CSV with ${activeRows.length} facilities, Hub symbols, and ${activeCols.length} exact equipment columns.`, type: 'success' });
+      setUploadFeedback({ message: `✓ Exported complete CSV with ${activeRows.length} facilities, mapped Hubs, and ${activeCols.length} exact equipment columns.`, type: 'success' });
     }
   };
 
@@ -723,26 +725,42 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
   const handleDownloadExactTemplate = (format: 'xlsx' | 'csv' = 'xlsx') => {
     const headersRow1 = [
-      '', '', '', '', 'List of Packeges', '',
-      'Anesthesia machine - with Patient mon', 'Anesthesia machine - with Patient mon',
+      '', '', '', '', 'List of Packeges',
+      'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult',
       'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
     ];
     const headersRow2 = [
-      'Region', 'Zone', 'Woreda', 'Name of health facility', '', 'HUB',
+      'Region', 'Zone', 'Woreda', 'Name of health facility', '',
       '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
     ];
 
-    const sampleRows = [
-      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'AA01', 2, 2, 2, 2, 2, 2],
-      ['Oromia', 'East Shewa', 'Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
-      ['Dire Dawa', 'Dire Dawa', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DI01', 2, 2, 2, 2, 2, 2]
-    ];
+    let facilityRows: any[][] = [];
+
+    if (hfListItems && hfListItems.length > 0) {
+      facilityRows = hfListItems.map(hf => [
+        hf.region || 'Oromia',
+        hf.zoneDescription || hf.zoneCode || 'East Shewa',
+        hf.woredaDescription || hf.woreda || 'Woreda 01',
+        hf.customerDescription || hf.customer,
+        'MCH',
+        2, 2, 2, 2, 2, 2
+      ]);
+    } else {
+      facilityRows = [
+        ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 2, 2, 2, 2, 2, 2],
+        ['Oromia', 'East Shewa', 'Woreda 01', 'Adama Hospital Medical College', 'MCH', 2, 2, 2, 2, 2, 2],
+        ['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital', 'MCH', 2, 2, 2, 2, 2, 2],
+        ['Amhara', 'West Gojjam', 'Bahir Dar', 'Felege Hiwot Comprehensive Specialized Hospital', 'MCH', 2, 2, 2, 2, 2, 2],
+        ['Tigray', 'Mekelle', 'Mekelle', 'Ayder Comprehensive Specialized Hospital', 'MCH', 2, 2, 2, 2, 2, 2],
+        ['Sidama', 'Hawassa', 'Hawassa', 'Hawassa University Comprehensive Specialized Hospital', 'MCH', 2, 2, 2, 2, 2, 2]
+      ];
+    }
 
     if (format === 'csv') {
       const csvData = [
         headersRow1,
         headersRow2,
-        ...sampleRows
+        ...facilityRows
       ].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
 
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -753,26 +771,26 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setUploadFeedback({ message: '✓ Downloaded Health Facility Matrix CSV template!', type: 'success' });
+      setUploadFeedback({ message: `✓ Downloaded Health Facility Allocation Matrix CSV template with ${facilityRows.length} facilities!`, type: 'success' });
       return;
     }
 
     const aoa = [
       headersRow1,
       headersRow2,
-      ...sampleRows
+      ...facilityRows
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [
-      { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 10 }, { wch: 10 },
-      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
+      { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 42 }, { wch: 12 },
+      { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'HF Allocation Matrix');
     XLSX.writeFile(wb, `Health_Facility_Allocation_Matrix_Template_${new Date().toISOString().split('T')[0]}.xlsx`);
-    setUploadFeedback({ message: '✓ Downloaded Health Facility Matrix Excel (.xlsx) template!', type: 'success' });
+    setUploadFeedback({ message: `✓ Downloaded Health Facility Allocation Matrix Excel (.xlsx) template with ${facilityRows.length} facilities!`, type: 'success' });
   };
 
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -1100,7 +1118,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Woreda</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Name of health facility</th>
                         <th className="p-2.5 bg-[#dbeafe] text-slate-900 font-semibold italic border-r border-slate-300 text-center">List of Packeges</th>
-                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 text-center">⬡</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Anesthesia machine - with Patient mon</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bed - Patient, Fowler, Adult</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bowel - With Stand, Stainless Steel.</th>
@@ -1116,7 +1133,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <td className="p-2 border-r border-slate-300"></td>
                         <td className="p-2 border-r border-slate-300"></td>
                         <td className="p-2 border-r border-slate-300 bg-[#eff6ff] italic text-slate-500 text-[10px] text-center">List of Packeges</td>
-                        <td className="p-2 border-r border-slate-300 bg-yellow-100"></td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRB-0101N</td>
@@ -1132,7 +1148,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <td className="p-2 border-r border-slate-200">Woreda 01</td>
                         <td className="p-2 border-r border-slate-200 font-sans font-medium">Tikur Anbessa Specialized Hospital</td>
                         <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
-                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">AA01</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
@@ -1146,7 +1161,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <td className="p-2 border-r border-slate-200">Woreda 01</td>
                         <td className="p-2 border-r border-slate-200 font-sans font-medium">Adama Hospital Medical College #40002328</td>
                         <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
-                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">AD01</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
@@ -1156,11 +1170,10 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                       </tr>
                       <tr>
                         <td className="p-2 border-r border-slate-200">Dire Dawa</td>
-                        <td className="p-2 border-r border-slate-200">Dire Dawa</td>
+                        <td className="p-2 border-r border-slate-200">Dire Dawa Administration</td>
                         <td className="p-2 border-r border-slate-200">Woreda 01</td>
                         <td className="p-2 border-r border-slate-200 font-sans font-medium">Dire Dawa Dil Chora Hospital #40002962</td>
                         <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
-                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">DD01</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
