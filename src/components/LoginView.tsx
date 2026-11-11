@@ -21,7 +21,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isVideoBgEnabled, setIsVideoBgEnabled] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,34 +50,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden bg-slate-50 text-slate-900">
-      {/* Medical Device Management System Cinematic Background Image */}
-      {isVideoBgEnabled && (
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <img
-            src="/assets/aistudio/Login_5f131aa2.jpg"
-            alt="Login Background"
-            className="absolute inset-0 w-full h-full object-cover opacity-30 filter brightness-105 contrast-110"
-          />
-          <div className="absolute inset-0 bg-linear-to-tr from-slate-50 via-slate-50/85 to-blue-50/60 backdrop-blur-[2px]" />
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:24px_24px]" />
-        </div>
-      )}
+    <div 
+      className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden text-slate-900 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: 'url("/assets/aistudio/_93FFF0CD-1266-4F3C-AAD9-931A25846CF2__8b0e9ee3.png")' }}
+    >
+      {/* Overlay to ensure readability */}
+      <div className="absolute inset-0 bg-blue-50/70 backdrop-blur-[2px]" />
 
-      {/* Top Controls: Theme Selector & Video Background Toggle */}
+      {/* Top Controls: Theme Selector */}
       <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
-        <button
-          onClick={() => setIsVideoBgEnabled(prev => !prev)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border flex items-center gap-1.5 cursor-pointer shadow-xs ${
-            isVideoBgEnabled 
-              ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' 
-              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-          }`}
-          title="Toggle Medical Equipment Cinematic Background Video"
-        >
-          <span>🎥</span>
-          <span className="font-bold">{isVideoBgEnabled ? 'Video BG: On' : 'Video BG: Off'}</span>
-        </button>
         <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
       </div>
 
