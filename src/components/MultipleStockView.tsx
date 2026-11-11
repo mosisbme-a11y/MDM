@@ -100,9 +100,6 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const [processingStatusText, setProcessingStatusText] = useState('');
 
-  // Upload UI Tab ('file' or 'paste')
-  const [uploadTab, setUploadTab] = useState<'file' | 'paste'>('file');
-  const [pasteContent, setPasteContent] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
@@ -425,69 +422,7 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
     document.body.removeChild(link);
   };
 
-  // Process Pasted Data
-  const handleProcessPastedData = () => {
-    if (!pasteContent.trim()) return;
 
-    try {
-      const lines = pasteContent.trim().split('\n');
-      if (lines.length < 2) {
-        setUploadToast({
-          type: 'error',
-          message: 'Please provide at least one header row and one data row.'
-        });
-        return;
-      }
-
-      const delimiter = lines[0].includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
-      const rawRows: any[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const vals = line.split(delimiter).map(v => v.trim().replace(/^["']|["']$/g, ''));
-        const rowObj: any = {};
-        headers.forEach((h, idx) => {
-          rowObj[h] = vals[idx] || '';
-        });
-        rawRows.push(rowObj);
-      }
-
-      const parsed = parseMultipleStockRows(rawRows, 'Pasted Data');
-      if (parsed.length === 0) {
-        setUploadToast({
-          type: 'error',
-          message: 'Could not parse records from pasted content. Check your column headers.'
-        });
-        return;
-      }
-
-      if (autoReplaceImmediate) {
-        if (onUploadMultipleStockData) {
-          onUploadMultipleStockData(parsed, 'replace');
-        }
-        setPasteContent('');
-        setUploadToast({
-          type: 'success',
-          message: `✓ Successfully parsed & saved ${parsed.length.toLocaleString()} pasted records! Previous records cleared automatically.`
-        });
-      } else {
-        setPendingBatch({
-          files: [{ name: 'Pasted Clipboard Data', count: parsed.length }],
-          items: parsed,
-          totalCount: parsed.length,
-          timestamp: Date.now()
-        });
-        setPasteContent('');
-      }
-    } catch (err: any) {
-      setUploadToast({
-        type: 'error',
-        message: `Failed to parse pasted text: ${err.message || 'Formatting error'}`
-      });
-    }
-  };
 
   // Add Single Item Handler
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -847,42 +782,8 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
         {/* Collapsible Drop & Paste Zone - Only visible to Inventory Administrators */}
         {isAdmin && (isUploadPanelOpen || isDragging) && (
           <div className="border-t border-indigo-200 bg-slate-50 p-5 space-y-4 transition-all">
-            {/* Upload Mode Selector */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUploadTab('file')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                    uploadTab === 'file'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Browse Spreadsheet (.xlsx, .csv)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUploadTab('paste')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-                    uploadTab === 'paste'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <ClipboardPaste className="w-3.5 h-3.5" />
-                  <span>Paste from Clipboard / Excel</span>
-                </button>
-              </div>
 
-              <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>All 14 columns will be recorded & immediately listed</span>
-              </div>
-            </div>
 
-            {uploadTab === 'file' ? (
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -913,38 +814,6 @@ export const MultipleStockView: React.FC<MultipleStockViewProps> = ({
                   </label>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <div className="text-xs text-slate-600 font-medium">
-                  Paste rows directly from Excel or Google Sheets (headers will be matched to the 14 columns):
-                </div>
-                <textarea
-                  value={pasteContent}
-                  onChange={(e) => setPasteContent(e.target.value)}
-                  rows={4}
-                  placeholder="Material&#9;Material Description&#9;Plant&#9;Storage Location&#9;Special Stock Type&#9;Unrestricted Stock&#9;Stock in Quality Inspection&#9;Blocked Stock&#9;Current Value of Unrestricted Stock&#9;Inventory Valuation Type&#9;Material Group Name&#9;Value of Blocked Stock&#9;Value of Stock in Quality Inspection&#9;WBS Element"
-                  className="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:outline-none"
-                />
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setPasteContent('')}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
-                  >
-                    Clear Text
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleProcessPastedData}
-                    disabled={!pasteContent.trim()}
-                    className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Parse & Save Pasted Stock Data</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
