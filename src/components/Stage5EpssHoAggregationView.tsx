@@ -1127,134 +1127,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         </div>
       )}
 
-      {/* Top Banner / Feature Callout */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-2xl p-5 text-white shadow-lg border border-indigo-700/40">
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/30 text-blue-200 border border-blue-400/30 flex items-center gap-1.5">
-                <Truck className="w-3 h-3 text-blue-300" />
-                Item Aggregation & Order Process
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-slate-200">
-                HF Master: {hfListItems.length > 0 ? `${hfListItems.length} Records Connected` : '20 Official EPSS Hubs'}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                STO: I=U | PGr=HP4 | SPlt=HO01 | POrg=HP02
-              </span>
-            </div>
-            <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-              {currentDossier?.dspName || "medical equipment allocation"}
-            </h2>
-            <p className="text-xs text-blue-100/90 leading-relaxed">
-              Consolidated national breakdown for medical equipment allocation with two-tier equipment headers. Health facilities are mapped to designated EPSS Distribution Hubs, and summary quantities are compiled into SAP Stock Transport Order lines for branch warehouse fulfillment.
-            </p>
-          </div>
-
-          {/* Action Buttons in Banner */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            <button
-              onClick={() => setViewTab('order-process')}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition border-b-4 border-indigo-800 shadow-[0_4px_0_rgb(30,58,95)] flex items-center gap-2 cursor-pointer active:border-b-0 active:translate-y-[4px] ring-2 ring-blue-400/20"
-            >
-              <Truck className="w-4 h-4 text-amber-300" />
-              <span className="uppercase">Order Process (SAP STO)</span>
-              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
-                {orderProcessItems.length} lines
-              </span>
-            </button>
-
-            <button
-              onClick={handleRunAutoMapping}
-              disabled={isMappingRunning || !currentDossier}
-              className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold transition border-b-4 border-teal-800 shadow-[0_4px_0_rgb(17,94,89)] flex items-center gap-2 cursor-pointer active:border-b-0 active:translate-y-[4px] disabled:opacity-50"
-            >
-              <Sparkles className={`w-4 h-4 ${isMappingRunning ? 'animate-spin' : 'text-amber-300'}`} />
-              <span className="uppercase">{isMappingRunning ? 'Mapping...' : 'Map HF to Hub (Master Data)'}</span>
-            </button>
-
-            <button
-              onClick={handleAggregateAllRHBSubmissions}
-              className="px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition border-b-4 border-amber-800 shadow-[0_4px_0_rgb(146,64,14)] flex items-center gap-1.5 cursor-pointer active:border-b-0 active:translate-y-[4px]"
-              title="Consolidate all regional RHB breakdown submissions into this single MOH-to-EPSS aggregated breakdown"
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-200" />
-              <span className="uppercase">Aggregate RHBs</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Decorative background element */}
-        <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-      </div>
-
-      {/* KPI Cards Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Aggregated Regions</div>
-          <div className="text-xl font-black text-slate-900 mt-1 flex items-baseline gap-1.5">
-            {uniqueRegions.length}
-            <span className="text-[11px] font-normal text-slate-500">Regions</span>
-          </div>
-          <div className="text-[10px] text-indigo-700 font-medium mt-0.5 truncate" title={uniqueRegions.join(', ')}>
-            {uniqueRegions.slice(0, 3).join(', ')}{uniqueRegions.length > 3 ? '...' : ''}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Health Facilities</div>
-          <div className="text-xl font-black text-slate-900 mt-1 flex items-baseline gap-1.5">
-            {stats.totalFacilities}
-            <span className="text-[11px] font-normal text-slate-500">Total HFs</span>
-          </div>
-          <div className="text-[10px] text-slate-500 font-medium mt-0.5">Hospitals & Centers</div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">HF to Hub Mapped</div>
-          <div className="text-xl font-black text-emerald-600 mt-1 flex items-baseline gap-1.5">
-            {stats.coveragePercent}%
-            <span className="text-[11px] font-normal text-slate-500">Mapped</span>
-          </div>
-          <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-            {stats.mappedFacilities} of {stats.totalFacilities} Hubs assigned
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">SAP Order Lines</div>
-          <div className="text-xl font-black text-blue-600 mt-1 flex items-baseline gap-1.5">
-            {stats.totalOrderProcessLines}
-            <span className="text-[11px] font-normal text-slate-500">STO Lines</span>
-          </div>
-          <div className="text-[10px] text-blue-600 font-medium mt-0.5">
-            I=U · PGr=HP4 · SPlt=HO01
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Receiving Plants (Hubs)</div>
-          <div className="text-xl font-black text-purple-600 mt-1 flex items-baseline gap-1.5">
-            {stats.activeHubsCount}
-            <span className="text-[11px] font-normal text-slate-500">Plants</span>
-          </div>
-          <div className="text-[10px] text-purple-700 font-medium mt-0.5">
-            EPSS Branch Warehouses
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Summary Qty</div>
-          <div className="text-xl font-black text-indigo-600 mt-1 flex items-baseline gap-1.5">
-            {formatNumber(stats.totalUnits)}
-            <span className="text-[11px] font-normal text-slate-500">Units</span>
-          </div>
-          <div className="text-[10px] text-indigo-600 font-medium mt-0.5">
-            {equipmentColumns.length} Equipment Types
-          </div>
-        </div>
-      </div>
-
       {/* Control Bar: Dossier Selector + Format Switcher */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm">
         {/* Dossier Picker */}
@@ -1406,6 +1278,25 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
               <button
+                onClick={handleRunAutoMapping}
+                disabled={isMappingRunning || !currentDossier}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                title="Map Health Facilities to official regional EPSS hubs"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isMappingRunning ? 'animate-spin' : 'text-amber-300'}`} />
+                <span>{isMappingRunning ? 'Mapping...' : 'Map HF to Hub'}</span>
+              </button>
+
+              <button
+                onClick={handleAggregateAllRHBSubmissions}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Consolidate all regional RHB breakdown submissions"
+              >
+                <Layers className="w-3.5 h-3.5 text-amber-200" />
+                <span>Aggregate RHBs</span>
+              </button>
+
+              <button
                 onClick={handleExportExcel}
                 className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
@@ -1425,16 +1316,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
 
           {/* THE EXACT SPREADSHEET TABLE */}
           <div className="bg-white border-2 border-slate-400 rounded-xl shadow-md overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-300 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900">MOH to EPSS Aggregated Equipment Breakdown Matrix</span>
-                <span className="text-[11px] text-slate-500">• Two-Tier Template with Mapped Hub Column</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono">
-                Showing {filteredAllocations.length} of {allocations.length} health facilities
-              </div>
-            </div>
-
             <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
               <table className="w-full text-left border-collapse select-text">
                 <thead>

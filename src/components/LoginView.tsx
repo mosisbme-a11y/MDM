@@ -52,20 +52,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
 
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden bg-slate-50 text-slate-900">
-      {/* Medical Device Management System Cinematic Background Video & Tech Canvas */}
+      {/* Medical Device Management System Cinematic Background Image */}
       {isVideoBgEnabled && (
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-15 filter brightness-105 contrast-110 scale-105"
-            src="https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-medical-data-31908-large.mp4"
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
-            }}
+          <img
+            src="/assets/aistudio/Login_5f131aa2.jpg"
+            alt="Login Background"
+            className="absolute inset-0 w-full h-full object-cover opacity-30 filter brightness-105 contrast-110"
           />
           <div className="absolute inset-0 bg-linear-to-tr from-slate-50 via-slate-50/85 to-blue-50/60 backdrop-blur-[2px]" />
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:24px_24px]" />

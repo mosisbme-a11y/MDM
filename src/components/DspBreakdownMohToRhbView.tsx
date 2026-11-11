@@ -896,14 +896,43 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
         quantity: totals[c.id] || 0,
         plant: 'AA01 Central'
       })),
+      facilityMatrixData: {
+        date: TODAY_ISO_DATE,
+        region: targetedActiveRegions[0] || 'Oromia',
+        columns: columns.map(c => ({
+          id: c.id,
+          name: c.description,
+          code: c.materialCode
+        })),
+        rows: rows.map(r => ({
+          id: r.id,
+          region: r.region,
+          zone: 'Zone 1',
+          woreda: '1',
+          hub: 'AD01',
+          healthFacility: `${r.region} Health Facility`,
+          packages: r.budgetSource || 'MCH',
+          quantities: r.quantities
+        }))
+      },
       notes: `Secured & Authorized Transmission via Horizontal Matrix. Authorized by ${finalSignatory} (${finalRole}, ${finalOrg}). Verified for ${targetedActiveRegions.length} Ethiopian Regions.${uploadedLetter ? ` Official Letter: ${uploadedLetter.name}` : ''}`
     };
 
+    // Also create matching incoming dossier for RHB (Sub-step 3.1)
+    const rhbIncomingRecord: DspWorkflowRecord = {
+      ...newRecord,
+      id: `dsp-rhb-rcv-${Date.now()}`,
+      stage: 'rhb-breakdown-management',
+      subStage: '3.1',
+      stageTitle: '3.1 Breakdown Received from MOH',
+      subject: `MOH Breakdown Dossier: Received from MOH PMD (${columns.length} Materials)`,
+      status: 'Submitted & Pending'
+    };
 
-    setRecords(prev => [newRecord, ...prev]);
+    setRecords(prev => [rhbIncomingRecord, newRecord, ...prev]);
     
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`✓ Secured Breakdown Request ${refNum} transmitted to ${targetedActiveRegions.length} Ethiopian Regions!`, {
+      onTriggerCloudSync(`✓ Secured Breakdown Request ${refNum} transmitted to ${targetedActiveRegions.length} Ethiopian Regions & archived in RHB Inbox!`, {
         type: 'CREATE',
         title: `Breakdown Request ${refNum}`,
         payload: newRecord

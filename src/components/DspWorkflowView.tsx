@@ -73,6 +73,7 @@ import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
 import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
 import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
 import { DspReceivedFromMohView } from './DspReceivedFromMohView';
+import { DspBreakdownReceivedFromMohView } from './DspBreakdownReceivedFromMohView';
 import { DspBreakdownMohToRhbView } from './DspBreakdownMohToRhbView';
 import { MappingBreakdownView } from './MappingBreakdownView';
 import { StageSourceDataModal } from './StageSourceDataModal';
@@ -1503,8 +1504,19 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         </div>
       )}
 
-      {/* Render Facility Breakdown Matrix directly when in Stage 3 and matrix mode */}
-      {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'matrix' ? (
+      {/* Sub-step 3.1: Breakdown Received from MOH (RHB Incoming Dossier Archive) */}
+      {(currentSubStep === '3.1' || currentSubTab === 'dsp-rhb-3-1') ? (
+        <DspBreakdownReceivedFromMohView
+          records={records}
+          setRecords={setRecords}
+          hfListItems={hfListItems}
+          onSelectSubTab={onSelectSubTab}
+          onSelectRecordForBreakdown={(rec) => {
+            setSelectedRecord(rec);
+          }}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : ((currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'matrix') ? (
         <RegionBreakdownMatrixTable
           data={
             selectedRecord?.facilityMatrixData ||

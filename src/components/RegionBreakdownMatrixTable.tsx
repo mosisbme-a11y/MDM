@@ -363,6 +363,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   useEffect(() => {
     if (selectedBreakdownRequestId) {
       setSelectedRequestId(selectedBreakdownRequestId);
+      handleSelectBreakdownRequest(selectedBreakdownRequestId);
     }
   }, [selectedBreakdownRequestId]);
 
