@@ -268,7 +268,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         woreda: 'Woreda 01',
         packages: 'MCH',
         hubCode: 'AA01',
-        hubName: 'Addis Ababa Central Hub',
+        hubName: 'AA01',
         quantities: {
           'col-1': 6,
           'col-2': 6,
@@ -285,7 +285,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         woreda: 'Adama Town Woreda 01',
         packages: 'MCH',
         hubCode: 'AD01',
-        hubName: 'Adama Hub',
+        hubName: 'AD01',
         quantities: {
           'col-1': 2,
           'col-2': 2,
@@ -302,7 +302,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         woreda: 'Woreda 01',
         packages: 'MCH',
         hubCode: 'DI01',
-        hubName: 'Dire Dawa Hub',
+        hubName: 'DI01',
         quantities: {
           'col-1': 2,
           'col-2': 2,

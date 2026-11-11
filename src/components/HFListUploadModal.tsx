@@ -153,7 +153,7 @@ export function parseHealthFacilityRows(rawRows: any[], sourceName: string = 'Up
       rowMap['supplyingplant'] ||
       rowMap['plant'] ||
       rowMap['hub'] ||
-      'HO01'
+      'AA01'
     ).trim().toUpperCase();
 
     // 4. Ownership Code
@@ -487,7 +487,7 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
           rowMap['supplyingplant'] ||
           rowMap['plant'] ||
           rowMap['hub'] ||
-          'HO01'
+          'AA01'
         ).trim().toUpperCase();
 
         // 4. Ownership Code
@@ -737,7 +737,7 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
       "Customer": "e.g. 1000214",
       "Customer Description": "e.g. Tikur Anbessa Specialized Hospital",
       "Facility Type": "Hospital",
-      "Delivering Plant": "HO01",
+      "Delivering Plant": "AA01",
       "Ownership Code": "GOV",
       "Ownership Description": "Public / Federal Referral",
       "Region": "Addis Ababa",
@@ -952,7 +952,7 @@ export const HFListUploadModal: React.FC<HFListUploadModalProps> = ({
                 rows={6}
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                placeholder="Customer&#9;Customer Description&#9;Delivering Plant&#9;Ownership Code&#9;Ownership Description&#9;Region&#9;Zone Code&#9;Zone Description&#9;Woreda&#9;Woreda Description&#10;1000214&#9;Tikur Anbessa Specialized Hospital&#9;HO01&#9;GOV&#9;Public / Federal Referral&#9;Addis Ababa&#9;Z-LID&#9;Lideta Sub-City&#9;W-08&#9;Lideta Woreda 08"
+                placeholder="Customer&#9;Customer Description&#9;Delivering Plant&#9;Ownership Code&#9;Ownership Description&#9;Region&#9;Zone Code&#9;Zone Description&#9;Woreda&#9;Woreda Description&#10;1000214&#9;Tikur Anbessa Specialized Hospital&#9;AA01&#9;GOV&#9;Public / Federal Referral&#9;Addis Ababa&#9;Z-LID&#9;Lideta Sub-City&#9;W-08&#9;Lideta Woreda 08"
                 className="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:border-emerald-500"
               />
 

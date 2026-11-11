@@ -77,7 +77,7 @@ export function lookupHubFromHfMasterData(
 
   // Regional defaults if not found in master data
   const reg = (regionName || '').toLowerCase();
-  if (reg.includes('addis')) return 'HO01';
+  if (reg.includes('addis')) return 'AA01';
   if (reg.includes('oromia')) return 'AD01';
   if (reg.includes('amhara')) return 'BD01';
   if (reg.includes('tigray')) return 'ME01';

@@ -101,7 +101,7 @@ export const DEFAULT_STAGE_3_ROWS: RegionBreakdownRow[] = [
     healthFacility: 'Tikur Anbessa Specialized Hospital',
     customerDescription: 'Tikur Anbessa Specialized Hospital',
     packages: 'MCH',
-    hub: 'HO01',
+    hub: 'AA01',
     quantities: { 'col-default-1': 2, 'col-default-2': 2, 'col-default-3': 2, 'col-default-4': 2, 'col-default-5': 2, 'col-default-6': 2 }
   },
   {
@@ -663,13 +663,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             updatedRow.healthFacility = firstHf.customer || firstHf.customerDescription || 'HF-001';
             updatedRow.zone = firstHf.zoneDescription || firstHf.zoneCode || '';
             updatedRow.woreda = firstHf.woredaDescription || firstHf.woreda || '';
-            updatedRow.hub = firstHf.deliveringPlant || 'HO01';
+            updatedRow.hub = (firstHf.deliveringPlant && firstHf.deliveringPlant !== 'HO01') ? firstHf.deliveringPlant : 'AA01';
           } else {
             updatedRow.customerDescription = '';
             updatedRow.healthFacility = '';
             updatedRow.zone = '';
             updatedRow.woreda = '';
-            updatedRow.hub = 'HO01';
+            updatedRow.hub = 'AA01';
           }
         }
 
@@ -695,7 +695,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             }
             updatedRow.zone = matchedHf.zoneDescription || matchedHf.zoneCode || r.zone;
             updatedRow.woreda = matchedHf.woredaDescription || matchedHf.woreda || r.woreda;
-            updatedRow.hub = matchedHf.deliveringPlant || r.hub || 'HO01';
+            const dp = matchedHf.deliveringPlant;
+            updatedRow.hub = (dp && dp !== 'HO01') ? dp : (r.hub && r.hub !== 'HO01' ? r.hub : 'AA01');
           }
         }
 
@@ -720,7 +721,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             }
             updatedRow.zone = matchedHf.zoneDescription || matchedHf.zoneCode || r.zone;
             updatedRow.woreda = matchedHf.woredaDescription || matchedHf.woreda || r.woreda;
-            updatedRow.hub = matchedHf.deliveringPlant || r.hub || 'HO01';
+            const dp = matchedHf.deliveringPlant;
+            updatedRow.hub = (dp && dp !== 'HO01') ? dp : (r.hub && r.hub !== 'HO01' ? r.hub : 'AA01');
           }
         }
 
@@ -810,13 +812,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
     // Row 2: Top Tier Headers
     if (fmt === 'item') {
-      aoa.push(['Hub', ...columns.map(c => c.name)]);
-      aoa.push(['Hub', ...columns.map(c => c.code)]);
+      aoa.push(['⬡', ...columns.map(c => c.name)]);
+      aoa.push(['⬡', ...columns.map(c => c.code)]);
       
       // Calculate Hub Aggregations
       const hubAgg: Record<string, Record<string, number>> = {};
       filteredRows.forEach(r => {
-        const hubCode = r.hub || 'HO01';
+        const hubCode = (r.hub && r.hub !== 'HO01') ? r.hub : 'AA01';
         if (!hubAgg[hubCode]) hubAgg[hubCode] = {};
         columns.forEach(c => {
           hubAgg[hubCode][c.id] = (hubAgg[hubCode][c.id] || 0) + (Number(r.quantities[c.id]) || 0);
@@ -879,7 +881,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'Woreda',
         'Customer Description',
         'List of Packeges',
-        'Hub',
+        '⬡',
         ...columns.map(c => c.name)
       ]);
       aoa.push([
@@ -898,7 +900,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           r.woreda,
           r.customerDescription || r.healthFacility,
           r.packages,
-          r.hub || 'HO01',
+          r.hub || 'AA01',
           ...columns.map(c => {
             const val = r.quantities[c.id];
             return val === 0 ? '' : (val ?? '');
@@ -951,11 +953,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     const fmt = matrixTemplateFormat;
     const aoa: any[][] = fmt === 'item' ? [
       [
-        'Hub',
+        '⬡',
         'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
       ],
       [
-        'Hub',
+        '⬡',
         '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
       ],
       ['AA01', 6, 6, 2, 2, 2, 2],
@@ -980,14 +982,14 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       ['Afar', 'Kilbati', 'Abala', 'Abala Primary Hospital', 'MCH', 2, 3, 3, 2, 2, 2]
     ] : [
       [
-        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges', 'Hub',
+        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges', '⬡',
         'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
       ],
       [
         '', '', '', '', 'List of Packeges', '',
         '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
       ],
-      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'HO01', 2, 2, 2, 2, 2, 2],
+      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'AA01', 2, 2, 2, 2, 2, 2],
       ['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
       ['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
     ];
@@ -1017,7 +1019,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       const result = mapFacilityToHub(facilityName, r.region, r.zone, r.woreda, masterHfItems);
       return {
         ...r,
-        hub: result.hubCode || r.hub || 'HO01'
+        hub: (result.hubCode && result.hubCode !== 'HO01') ? result.hubCode : ((r.hub && r.hub !== 'HO01') ? r.hub : 'AA01')
       };
     });
 
@@ -2550,7 +2552,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       material: c.code,
                       description: c.name,
                       quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-                      plant: 'EPSS Central Hub'
+                      plant: 'Addis Central ⬡'
                     })),
                     notes: `Official Health Facility Breakdown Matrix submitted by ${manualSignatoryName} (${manualSignatoryRole}, ${manualSignatoryOrg || 'RHB'}) to ${targetOrg}.`
                   };
@@ -2838,7 +2840,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   <tr>
                     <th className="p-2.5 border-r border-slate-700">Health Facility Name</th>
                     <th className="p-2.5 border-r border-slate-700">Zone / Woreda</th>
-                    <th className="p-2.5 border-r border-slate-700">Delivering EPSS Hub</th>
+                    <th className="p-2.5 border-r border-slate-700">Delivering ⬡</th>
                     <th className="p-2.5 text-center">Allocated Units</th>
                   </tr>
                 </thead>

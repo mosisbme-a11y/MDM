@@ -630,9 +630,9 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     ];
 
     const sampleRows = [
-      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'HO01', 2, 2, 2, 2, 2, 2],
+      ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'AA01', 2, 2, 2, 2, 2, 2],
       ['Oromia', 'East Shewa', 'Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
-      ['Dire Dawa', 'Dire Dawa', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
+      ['Dire Dawa', 'Dire Dawa', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DI01', 2, 2, 2, 2, 2, 2]
     ];
 
     if (format === 'csv') {
@@ -952,7 +952,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                     <thead>
                       {/* Header Row 1 */}
                       <tr className="border-b border-slate-300">
-                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 min-w-[90px]">Hub</th>
+                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 min-w-[90px]">⬡</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Anesthesia machine - with Patient mon</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bed - Patient, Fowler, Adult</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bowel - With Stand, Stainless Steel.</th>
@@ -963,7 +963,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
                       {/* Header Row 2 (Material Codes) */}
                       <tr className="border-b border-slate-300 bg-white font-mono text-[11px] text-slate-700">
-                        <td className="p-2 border-r border-slate-300 bg-yellow-100 font-bold text-yellow-950">Hub</td>
+                        <td className="p-2 border-r border-slate-300 bg-yellow-100 font-bold text-yellow-950">⬡</td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRD-0101</td>
                         <td className="p-2 border-r border-slate-300 font-bold">403-XRRB-0101N</td>
@@ -1021,7 +1021,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Woreda</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold italic border-r border-slate-300">Name of health facility</th>
                         <th className="p-2.5 bg-[#dbeafe] text-slate-900 font-semibold italic border-r border-slate-300 text-center">List of Packeges</th>
-                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 text-center">Hub</th>
+                        <th className="p-2.5 bg-yellow-300 text-slate-950 font-black border-r border-slate-300 text-center">⬡</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Anesthesia machine - with Patient mon</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bed - Patient, Fowler, Adult</th>
                         <th className="p-2.5 bg-[#fed7aa] text-slate-900 font-semibold border-r border-slate-300">Bowel - With Stand, Stainless Steel.</th>
@@ -1053,7 +1053,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <td className="p-2 border-r border-slate-200">Woreda 01</td>
                         <td className="p-2 border-r border-slate-200 font-sans font-medium">Tikur Anbessa Specialized Hospital</td>
                         <td className="p-2 border-r border-slate-200 text-center font-sans">MCH</td>
-                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">HO01</td>
+                        <td className="p-2 border-r border-slate-200 text-center font-bold bg-yellow-50">AA01</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>
                         <td className="p-2 border-r border-slate-200 text-center font-bold">2</td>

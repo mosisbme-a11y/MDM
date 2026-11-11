@@ -17,7 +17,7 @@ export interface EpssHubInfo {
 export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   {
     code: 'AA01',
-    name: 'Addis Ababa Hub 1',
+    name: 'AA01',
     region: 'Addis Ababa',
     manager: 'Abebe Bekele',
     phone: '+251 11 123 4567',
@@ -27,7 +27,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'AA02',
-    name: 'Addis Ababa Hub 2',
+    name: 'AA02',
     region: 'Addis Ababa',
     manager: 'Aster Wolde',
     phone: '+251 11 123 4568',
@@ -37,7 +37,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'AD01',
-    name: 'Adama Hub',
+    name: 'AD01',
     region: 'Oromia',
     manager: 'Kebede Chala',
     phone: '+251 22 111 2233',
@@ -47,7 +47,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'AR01',
-    name: 'Arba Minch Hub',
+    name: 'AR01',
     region: 'South Ethiopia',
     manager: 'Daniel Dawit',
     phone: '+251 46 881 3344',
@@ -57,7 +57,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'AS01',
-    name: 'Assosa Hub',
+    name: 'AS01',
     region: 'Benishangul-Gumuz',
     manager: 'Tariku Jene',
     phone: '+251 57 775 6677',
@@ -67,7 +67,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'BD01',
-    name: 'Bahir Dar Hub',
+    name: 'BD01',
     region: 'Amhara',
     manager: 'Muluken Ayalew',
     phone: '+251 58 220 3344',
@@ -77,7 +77,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'DE01',
-    name: 'Dessie Hub',
+    name: 'DE01',
     region: 'Amhara',
     manager: 'Yohannes Abebe',
     phone: '+251 33 111 4455',
@@ -87,7 +87,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'DI01',
-    name: 'Dire Dawa Hub',
+    name: 'DI01',
     region: 'Dire Dawa',
     manager: 'Mohammed Ali',
     phone: '+251 25 111 5566',
@@ -97,7 +97,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'GA01',
-    name: 'Gambella Hub',
+    name: 'GA01',
     region: 'Gambella',
     manager: 'Okwor Obang',
     phone: '+251 47 551 5566',
@@ -107,7 +107,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'GO01',
-    name: 'Gondar Hub',
+    name: 'GO01',
     region: 'Amhara',
     manager: 'Assefa Belay',
     phone: '+251 58 111 6677',
@@ -117,7 +117,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'HA01',
-    name: 'Hawassa Hub',
+    name: 'HA01',
     region: 'Sidama',
     manager: 'Tewodros Lemma',
     phone: '+251 46 220 1122',
@@ -127,7 +127,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'JI01',
-    name: 'Jimma Hub',
+    name: 'JI01',
     region: 'Oromia',
     manager: 'Fikru Tolosa',
     phone: '+251 47 111 7788',
@@ -137,7 +137,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'JJ01',
-    name: 'Jijiga Hub',
+    name: 'JJ01',
     region: 'Somali',
     manager: 'Abdi Omar',
     phone: '+251 25 775 4455',
@@ -147,7 +147,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'KD01',
-    name: 'Kebri-Dehar Hub',
+    name: 'KD01',
     region: 'Somali',
     manager: 'Farah Abdi',
     phone: '+251 25 123 4569',
@@ -157,7 +157,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'MK01',
-    name: 'Mekelle Hub',
+    name: 'MK01',
     region: 'Tigray',
     manager: 'Haile Selassie',
     phone: '+251 34 440 8899',
@@ -167,7 +167,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'NB01',
-    name: 'Negele Hub',
+    name: 'NB01',
     region: 'Oromia',
     manager: 'Demissew Tadesse',
     phone: '+251 46 445 9900',
@@ -177,7 +177,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'NK01',
-    name: 'Nekemte Hub',
+    name: 'NK01',
     region: 'Oromia',
     manager: 'Girma Feyisa',
     phone: '+251 57 661 1122',
@@ -187,7 +187,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'SE01',
-    name: 'Semera Hub',
+    name: 'SE01',
     region: 'Afar',
     manager: 'Ali Humed',
     phone: '+251 33 666 7788',
@@ -197,7 +197,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'SH01',
-    name: 'Shire Hub',
+    name: 'SH01',
     region: 'Tigray',
     manager: 'Gebre Tsadkan',
     phone: '+251 34 111 2233',
@@ -207,7 +207,7 @@ export const EPSS_HUBS_REGISTRY: EpssHubInfo[] = [
   },
   {
     code: 'HO01',
-    name: 'Head Office (Central)',
+    name: 'HO01',
     region: 'Central / Addis Ababa',
     manager: 'Dr. Solomon Abebe',
     phone: '+251 11 123 0001',
@@ -267,8 +267,11 @@ export function mapFacilityToHub(
     });
 
     if (exactMatch && exactMatch.deliveringPlant) {
-      const hub = getHubByCode(exactMatch.deliveringPlant);
-      if (hub) {
+      const pCode = exactMatch.deliveringPlant.toUpperCase().trim();
+      // Exclude Head Office (HO01) during Health Facility -> Hub mapping
+      const finalCode = (pCode === 'HO01' || pCode.includes('HEAD')) ? 'AA01' : pCode;
+      const hub = getHubByCode(finalCode);
+      if (hub && hub.code !== 'HO01') {
         return {
           hubCode: hub.code,
           hubName: hub.name,
@@ -291,8 +294,11 @@ export function mapFacilityToHub(
       });
 
       if (fuzzyMatch && fuzzyMatch.deliveringPlant) {
-        const hub = getHubByCode(fuzzyMatch.deliveringPlant);
-        if (hub) {
+        const pCode = fuzzyMatch.deliveringPlant.toUpperCase().trim();
+        // Exclude Head Office (HO01) during Health Facility -> Hub mapping
+        const finalCode = (pCode === 'HO01' || pCode.includes('HEAD')) ? 'AA01' : pCode;
+        const hub = getHubByCode(finalCode);
+        if (hub && hub.code !== 'HO01') {
           return {
             hubCode: hub.code,
             hubName: hub.name,
@@ -306,8 +312,9 @@ export function mapFacilityToHub(
     }
   }
 
-  // Step 2: Zone Catchment lookup in EPSS Hubs Registry
+  // Step 2: Zone Catchment lookup in EPSS Hubs Registry (Exclude HO01 Head Office from HF mapping)
   for (const hub of EPSS_HUBS_REGISTRY) {
+    if (hub.code === 'HO01') continue; // Exclude Head Office from HF catchment mapping
     if (hub.catchmentZones) {
       for (const cz of hub.catchmentZones) {
         const czNorm = cz.toLowerCase();
@@ -329,76 +336,76 @@ export function mapFacilityToHub(
   // Step 3: Regional Fallback Rules based on Ethiopian logistics structure
   if (normRegion.includes('oromia')) {
     if (normZone.includes('jimma') || normZone.includes('bedele') || normZone.includes('bor')) {
-      return { hubCode: 'JI01', hubName: 'Jimma Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+      return { hubCode: 'JI01', hubName: 'JI01', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
     if (normZone.includes('wollega') || normZone.includes('nekemte')) {
-      return { hubCode: 'NK01', hubName: 'Nekemte Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+      return { hubCode: 'NK01', hubName: 'NK01', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
     if (normZone.includes('guji') || normZone.includes('borena') || normZone.includes('negele')) {
-      return { hubCode: 'NB01', hubName: 'Negele Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+      return { hubCode: 'NB01', hubName: 'NB01', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
     }
-    return { hubCode: 'AD01', hubName: 'Adama Hub', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
+    return { hubCode: 'AD01', hubName: 'AD01', matchMethod: 'zone-region-fallback', matchConfidence: 75 };
   }
 
   if (normRegion.includes('addis ababa')) {
     if (normZone.includes('gullele') || normZone.includes('kolfe') || normZone.includes('yeka')) {
-      return { hubCode: 'AA02', hubName: 'Addis Ababa Hub 2', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'AA02', hubName: 'AA02', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
-    return { hubCode: 'AA01', hubName: 'Addis Ababa Hub 1', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'AA01', hubName: 'AA01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('sidama') || normRegion.includes('snnpr') || normRegion.includes('central ethiopia')) {
-    return { hubCode: 'HA01', hubName: 'Hawassa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'HA01', hubName: 'HA01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('south ethiopia') || normRegion.includes('south omo') || normRegion.includes('gamo')) {
-    return { hubCode: 'AR01', hubName: 'Arba Minch Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'AR01', hubName: 'AR01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('amhara')) {
     if (normZone.includes('gondar')) {
-      return { hubCode: 'GO01', hubName: 'Gondar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'GO01', hubName: 'GO01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
     if (normZone.includes('wollo') || normZone.includes('dessie')) {
-      return { hubCode: 'DE01', hubName: 'Dessie Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'DE01', hubName: 'DE01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
-    return { hubCode: 'BD01', hubName: 'Bahir Dar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'BD01', hubName: 'BD01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('tigray')) {
     if (normZone.includes('shire') || normZone.includes('north western')) {
-      return { hubCode: 'SH01', hubName: 'Shire Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'SH01', hubName: 'SH01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
-    return { hubCode: 'MK01', hubName: 'Mekelle Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'MK01', hubName: 'MK01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('somali')) {
     if (normZone.includes('korahe') || normZone.includes('doollo') || normZone.includes('shabelle') || normZone.includes('kebridahar')) {
-      return { hubCode: 'KD01', hubName: 'Kebri-Dehar Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+      return { hubCode: 'KD01', hubName: 'KD01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
     }
-    return { hubCode: 'JJ01', hubName: 'Jijiga Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'JJ01', hubName: 'JJ01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('dire dawa') || normRegion.includes('harari') || normRegion.includes('harar')) {
-    return { hubCode: 'DI01', hubName: 'Dire Dawa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'DI01', hubName: 'DI01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('afar')) {
-    return { hubCode: 'SE01', hubName: 'Semera Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'SE01', hubName: 'SE01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('benishangul')) {
-    return { hubCode: 'AS01', hubName: 'Assosa Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'AS01', hubName: 'AS01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
   if (normRegion.includes('gambella')) {
-    return { hubCode: 'GA01', hubName: 'Gambella Hub', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
+    return { hubCode: 'GA01', hubName: 'GA01', matchMethod: 'zone-region-fallback', matchConfidence: 80 };
   }
 
-  // Default fallback: Head Office Central
+  // Default fallback: AA01
   return {
-    hubCode: 'HO01',
-    hubName: 'Head Office (Central)',
+    hubCode: 'AA01',
+    hubName: 'AA01',
     matchMethod: 'unmapped',
     matchConfidence: 40
   };
