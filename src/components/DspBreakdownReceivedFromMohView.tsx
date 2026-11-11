@@ -645,85 +645,176 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
                 </button>
               </div>
 
-              {/* Exact Source Data Equipment Table */}
-              <div className="px-4 pb-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                      Exact Equipment Items Transmitted ({selectedDossier.itemsIncluded.length} Line Items)
-                    </h4>
+              {/* Exact Source Data Equipment Table & MOH Regional Quota Matrix */}
+              <div className="px-4 pb-4 space-y-4">
+                {/* Image 3 Template: MOH Regional Quota Horizontal Matrix Format */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                        MOH Regional Quota Transmittal Matrix (Sub-step 3.1 Received Format)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
+                      Official Ministerial Quota Format
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    Total Earmarked: {formatNumber(selectedDossier.totalQuantity)} Units • {formatCurrency(selectedDossier.totalValuationETB)}
-                  </span>
+
+                  <div className="border border-slate-300 rounded-xl overflow-x-auto shadow-2xs bg-white">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        {/* Header Row 1: Item Descriptions */}
+                        <tr className="border-b border-slate-300 text-xs font-medium bg-[#ffedd5]">
+                          <th className="p-2.5 italic text-slate-900 border-r border-slate-300 font-semibold min-w-[90px]">
+                            Date
+                          </th>
+                          <th className="p-2.5 italic text-slate-900 border-r border-slate-300 font-semibold min-w-[110px]">
+                            Region
+                          </th>
+                          <th className="p-2.5 font-bold bg-[#f97316] text-white border-r border-slate-300 text-center min-w-[110px]">
+                            Budget Source
+                          </th>
+                          {selectedDossier.itemsIncluded.map((item, idx) => (
+                            <th 
+                              key={idx} 
+                              className="p-2.5 bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[150px] leading-tight"
+                            >
+                              <div className="line-clamp-2" title={item.description}>{item.description}</div>
+                            </th>
+                          ))}
+                        </tr>
+                        {/* Header Row 2: Material Codes */}
+                        <tr className="border-b border-slate-300 bg-white font-mono text-[11px]">
+                          <th className="p-2 bg-[#fff7ed] border-r border-slate-300"></th>
+                          <th className="p-2 bg-[#fff7ed] border-r border-slate-300"></th>
+                          <th className="p-2 bg-[#eff6ff] text-blue-900 border-r border-slate-300 text-center font-bold text-[10px]">Budget</th>
+                          {selectedDossier.itemsIncluded.map((item, idx) => (
+                            <th key={idx} className="p-2 border-r border-slate-300 font-bold text-slate-700">
+                              {item.material}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {(selectedDossier.targetedRegions?.length ? selectedDossier.targetedRegions : ['Oromia']).map((reg, regIdx) => (
+                          <tr key={regIdx} className="hover:bg-amber-50/30 transition-colors">
+                            <td className="p-2.5 border-r border-slate-200 font-mono text-slate-600">
+                              {selectedDossier.dateSubmitted}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 font-bold text-slate-900">
+                              {reg}
+                            </td>
+                            <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-center bg-[#dbeafe]/40 text-blue-900">
+                              MCH
+                            </td>
+                            {selectedDossier.itemsIncluded.map((item, idx) => (
+                              <td key={idx} className="p-2.5 border-r border-slate-200 font-mono font-black text-right text-slate-900 bg-slate-50/30">
+                                {item.quantity}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-900 text-xs">
+                          <td colSpan={2} className="p-2.5 border-r border-slate-300 uppercase tracking-wider font-black text-[11px]">
+                            Total Regional Quota:
+                          </td>
+                          <td className="p-2.5 border-r border-slate-300 text-center font-mono font-bold text-blue-900">
+                            MCH
+                          </td>
+                          {selectedDossier.itemsIncluded.map((item, idx) => (
+                            <td key={idx} className="p-2.5 border-r border-slate-300 text-right font-mono font-black text-amber-800 bg-amber-50/60">
+                              {item.quantity * (selectedDossier.targetedRegions?.length || 1)}
+                            </td>
+                          ))}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
 
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold select-none text-[11px]">
-                        <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center">S/N</th>
-                        <th className="py-2.5 px-3 border-r border-slate-200 w-36">SAP Material Code</th>
-                        <th className="py-2.5 px-3 border-r border-slate-200 min-w-[200px]">Exact Equipment Item Description</th>
-                        <th className="py-2.5 px-3 border-r border-slate-200 w-24 text-right">Quota Qty</th>
-                        <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-right">Est. Unit (ETB)</th>
-                        <th className="py-2.5 px-3 border-r border-slate-200 w-32 text-right">Total Value (ETB)</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {selectedDossier.itemsIncluded.map((item, idx) => {
-                        const unitVal = (selectedDossier.totalValuationETB && selectedDossier.totalQuantity) ? Math.round(selectedDossier.totalValuationETB / selectedDossier.totalQuantity) : 250000;
-                        const lineTotal = item.quantity * unitVal;
-                        return (
-                          <tr key={idx} className="hover:bg-amber-50/40 transition-colors">
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono font-bold text-slate-500 bg-slate-50/30">
-                              {idx + 1}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-mono font-bold text-indigo-700 bg-indigo-50/10">
-                              {item.material}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900">
-                              {item.description}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-right font-black text-amber-700 font-mono">
-                              {formatNumber(item.quantity)} units
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-right font-mono text-slate-600">
-                              {formatCurrency(unitVal)}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-right font-mono font-bold text-emerald-700">
-                              {formatCurrency(lineTotal)}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <button
-                                onClick={() => handleBreakItemForFacility(selectedDossier)}
-                                className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 transition cursor-pointer"
-                              >
-                                Break Row
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
-                        <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider font-black text-[11px]">
-                          Total Quota Summary:
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-black text-amber-800 font-mono">
-                          {formatNumber(selectedDossier.totalQuantity)} units
-                        </td>
-                        <td className="py-2.5 px-3"></td>
-                        <td className="py-2.5 px-3 text-right font-black text-emerald-800 font-mono">
-                          {formatCurrency(selectedDossier.totalValuationETB)}
-                        </td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                {/* Line Item Detailed Valuation Table */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                        Line Item Equipment Specifications ({selectedDossier.itemsIncluded.length} Material Codes)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Total Earmarked: {formatNumber(selectedDossier.totalQuantity)} Units • {formatCurrency(selectedDossier.totalValuationETB)}
+                    </span>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold select-none text-[11px]">
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center">S/N</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-36">SAP Material Code</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[200px]">Exact Equipment Item Description</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-24 text-right">Quota Qty</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-right">Est. Unit (ETB)</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-32 text-right">Total Value (ETB)</th>
+                          <th className="py-2.5 px-3 w-28 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {selectedDossier.itemsIncluded.map((item, idx) => {
+                          const unitVal = (selectedDossier.totalValuationETB && selectedDossier.totalQuantity) ? Math.round(selectedDossier.totalValuationETB / selectedDossier.totalQuantity) : 250000;
+                          const lineTotal = item.quantity * unitVal;
+                          return (
+                            <tr key={idx} className="hover:bg-amber-50/40 transition-colors">
+                              <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono font-bold text-slate-500 bg-slate-50/30">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-100 font-mono font-bold text-indigo-700 bg-indigo-50/10">
+                                {item.material}
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900">
+                                {item.description}
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-100 text-right font-black text-amber-700 font-mono">
+                                {formatNumber(item.quantity)} units
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-100 text-right font-mono text-slate-600">
+                                {formatCurrency(unitVal)}
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-100 text-right font-mono font-bold text-emerald-700">
+                                {formatCurrency(lineTotal)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <button
+                                  onClick={() => handleBreakItemForFacility(selectedDossier)}
+                                  className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 transition cursor-pointer"
+                                >
+                                  Break Row
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
+                          <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider font-black text-[11px]">
+                            Total Quota Summary:
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-black text-amber-800 font-mono">
+                            {formatNumber(selectedDossier.totalQuantity)} units
+                          </td>
+                          <td className="py-2.5 px-3"></td>
+                          <td className="py-2.5 px-3 text-right font-black text-emerald-800 font-mono">
+                            {formatCurrency(selectedDossier.totalValuationETB)}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               </div>
 
