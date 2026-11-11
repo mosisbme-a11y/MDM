@@ -704,7 +704,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* ITEM AGGREGATION Pill Button Matching attachment _0D7D8109-E684-41CC-9BFC-B6A88FAA19BD__7f931cf6.png */}
+            {/* ITEM AGGREGATION Pill Button */}
             <button
               onClick={() => {
                 setActiveTemplateTab('item-agg');
@@ -719,7 +719,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               </span>
             </button>
 
-            {/* MAP HF TO HUB Pill Button Matching attachment _E4BE8B7E-0C62-4157-8AA7-5F3B2A9919DC__0001f039.png */}
+            {/* MAP HF TO HUB Pill Button */}
             <button
               onClick={handleMapWithHubs}
               disabled={isAnalyzing || (!adHocDataActive && hfListItems.length === 0)}
@@ -732,7 +732,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               </span>
             </button>
 
-            {/* GET TEMPLATE Button Matching attachment _94FE6776-C928-45B7-9B5E-5EABF286140A__4ab74c57.png */}
+            {/* GET TEMPLATE Button */}
             <button
               onClick={() => setShowTemplateModal(true)}
               className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full font-black text-sm shadow-xl transition-all active:scale-95 cursor-pointer uppercase tracking-wider"
