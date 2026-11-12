@@ -225,6 +225,8 @@ interface RegionBreakdownMatrixTableProps {
   onSelectBreakdownRequest?: (requestId: string, requestRecord?: any) => void;
   disableBreakdownLink?: boolean;
   showHubColumn?: boolean;
+  isHubMappedInitially?: boolean;
+  onProceedToAggregation?: () => void;
 }
 
 export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProps> = ({
@@ -239,7 +241,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   selectedBreakdownRequestId = '',
   onSelectBreakdownRequest,
   disableBreakdownLink = false,
-  showHubColumn = false
+  showHubColumn = false,
+  isHubMappedInitially = false,
+  onProceedToAggregation
 }) => {
   const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
   const [columns, setColumns] = useState<RegionBreakdownColumn[]>(data?.columns || DEFAULT_STAGE_3_COLUMNS);
