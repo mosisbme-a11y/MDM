@@ -370,6 +370,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   const [matrixData, setMatrixData] = useState<RegionBreakdownMatrixData | undefined>(undefined);
   const [adHocDataActive, setAdHocDataActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isHubMapped, setIsHubMapped] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -423,6 +424,8 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         columns: baseCols, // PRESERVE 100% EXACT ITEM COLUMNS AND CODES
         rows: updatedRows
       });
+
+      setIsHubMapped(true); // AUTO INSERT HUB COLUMN UPON MAPPING
 
       if (hfListItems && hfListItems.length > 0 && onUploadHFData) {
         const updatedMaster = hfListItems.map(hf => {
@@ -478,8 +481,9 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         });
 
         setAdHocDataActive(true);
+        setIsHubMapped(false); // Reset mapped hub flag on new file upload until "MAP HF TO HUB" is clicked
         setUploadFeedback({ 
-          message: `✓ Analysis complete for "${file.name}". Processed ${parsedResult.rows.length} facilities and ${parsedResult.columns.length} data columns. Auto-detected Facility: "${parsedResult.detectedFacilityHeader}" & Region: "${parsedResult.detectedRegionHeader}". Click "Map with Hub" to perform regional hub allocation.`, 
+          message: `✓ Analysis complete for "${file.name}". Processed ${parsedResult.rows.length} facilities and ${parsedResult.columns.length} exact equipment columns. Auto-detected Facility: "${parsedResult.detectedFacilityHeader}" & Region: "${parsedResult.detectedRegionHeader}". Click "MAP HF TO HUB" to auto-insert the HUB column and perform regional hub mapping.`, 
           type: 'success' 
         });
 
@@ -554,6 +558,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   const handleResetToMaster = () => {
     setMatrixData(undefined);
     setAdHocDataActive(false);
+    setIsHubMapped(false);
     setUploadFeedback({ message: 'Reset to System Master Health Facility records.', type: 'info' });
   };
 
@@ -595,8 +600,8 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         'Woreda',
         'Name of health facility',
         'List of Packeges',
-        'HUB',
-        ...activeCols.map(c => c.name) // Exact item names as uploaded
+        ...(isHubMapped ? ['HUB'] : []),
+        ...activeCols.map(c => c.name) // EXACT item names as uploaded - NEVER altered
       ]);
       aoa.push([
         '',
@@ -604,7 +609,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         '',
         '',
         'List of Packeges',
-        'HUB',
+        ...(isHubMapped ? ['HUB'] : []),
         ...activeCols.map(c => c.code)
       ]);
 
@@ -615,7 +620,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           r.woreda,
           r.healthFacility || r.customerDescription,
           r.packages || 'MCH',
-          r.hub || 'AA01',
+          ...(isHubMapped ? [r.hub || 'AA01'] : []),
           ...activeCols.map(c => {
             const val = r.quantities[c.id];
             return val === undefined || val === null ? 0 : val;
@@ -630,20 +635,21 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         '',
         `${activeRows.length} Facilities`,
         '',
-        '',
+        ...(isHubMapped ? [''] : []),
         ...activeCols.map(c => activeRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0))
       ]);
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws['!cols'] = [
-        { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 16 }, { wch: 12 },
+        { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 38 }, { wch: 16 },
+        ...(isHubMapped ? [{ wch: 12 }] : []),
         ...activeCols.map(() => ({ wch: 22 }))
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Mapped Breakdown Matrix');
       XLSX.writeFile(wb, `Mapped_Breakdown_Matrix_${currentDateStr}.xlsx`);
-      setUploadFeedback({ message: `✓ Exported complete Excel file (.xlsx) with ${activeRows.length} facilities, mapped Hubs, and ${activeCols.length} exact equipment columns.`, type: 'success' });
+      setUploadFeedback({ message: `✓ Exported complete Excel file (.xlsx) with ${activeRows.length} facilities${isHubMapped ? ', auto-inserted HUBs' : ''}, and ${activeCols.length} exact equipment columns.`, type: 'success' });
     } else {
       // CSV format
       const exportData = activeRows.map(row => {
@@ -652,9 +658,11 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           'Zone': row.zone,
           'Woreda': row.woreda,
           'Name of health facility': row.healthFacility || row.customerDescription,
-          'List of Packages': row.packages || 'MCH',
-          'HUB': row.hub || 'AA01'
+          'List of Packages': row.packages || 'MCH'
         };
+        if (isHubMapped) {
+          entry['HUB'] = row.hub || 'AA01';
+        }
         activeCols.forEach(col => {
           entry[col.name] = row.quantities[col.id] !== undefined ? row.quantities[col.id] : 0;
         });
@@ -662,7 +670,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       });
 
       downloadCSV(`Mapped_Breakdown_Matrix_${currentDateStr}.csv`, exportData);
-      setUploadFeedback({ message: `✓ Exported complete CSV with ${activeRows.length} facilities, mapped Hubs, and ${activeCols.length} exact equipment columns.`, type: 'success' });
+      setUploadFeedback({ message: `✓ Exported complete CSV with ${activeRows.length} facilities${isHubMapped ? ', auto-inserted HUBs' : ''}, and ${activeCols.length} exact equipment columns.`, type: 'success' });
     }
   };
 
@@ -945,6 +953,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           data={matrixData}
           onUpdateData={setMatrixData}
           disableBreakdownLink={true}
+          showHubColumn={isHubMapped}
         />
       </div>
 

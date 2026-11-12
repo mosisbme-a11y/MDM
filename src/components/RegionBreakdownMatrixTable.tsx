@@ -217,6 +217,7 @@ interface RegionBreakdownMatrixTableProps {
   selectedBreakdownRequestId?: string;
   onSelectBreakdownRequest?: (requestId: string, requestRecord?: any) => void;
   disableBreakdownLink?: boolean;
+  showHubColumn?: boolean;
 }
 
 export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProps> = ({
@@ -230,7 +231,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   breakdownRequests = [],
   selectedBreakdownRequestId = '',
   onSelectBreakdownRequest,
-  disableBreakdownLink = false
+  disableBreakdownLink = false,
+  showHubColumn = false
 }) => {
   const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
   const [columns, setColumns] = useState<RegionBreakdownColumn[]>(data?.columns || DEFAULT_STAGE_3_COLUMNS);
@@ -1559,6 +1561,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                   List of Packeges
                 </th>
+                {showHubColumn && (
+                  <th className="p-2.5 bg-[#fef08a] text-amber-950 font-black border-r border-slate-300 min-w-[90px] text-center uppercase tracking-wider">
+                    HUB
+                  </th>
+                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1604,6 +1611,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
+                {showHubColumn && (
+                  <th className="p-2 bg-[#fef9c3] border-r border-slate-300 text-center font-bold text-amber-900 text-[10px]">HUB</th>
+                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <th 
                     key={col.id} 
@@ -1855,6 +1865,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         )}
                       </td>
 
+                      {/* 6. HUB Column (Auto-inserted when Map HF to Hub is clicked) */}
+                      {showHubColumn && (
+                        <td className="p-2.5 text-center font-mono font-black border-r border-slate-200 bg-amber-100/70 text-amber-950 min-w-[90px]">
+                          {row.hub || 'AA01'}
+                        </td>
+                      )}
+
                       {/* Equipment Quantity Cells (Only if not ITEM AGGREGATION mode) */}
                       {matrixTemplateFormat !== 'item' && columns.map(col => {
                         const qty = row.quantities[col.id];
@@ -1943,6 +1960,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
+                {showHubColumn && (
+                  <td className="p-2.5 border-r border-slate-300 text-center font-mono font-black text-amber-900 bg-amber-100/60 text-[11px]">
+                    -
+                  </td>
+                )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
                   <td 
                     key={col.id} 
