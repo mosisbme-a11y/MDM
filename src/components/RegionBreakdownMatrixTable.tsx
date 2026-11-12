@@ -28,7 +28,11 @@ import {
   Eye,
   ArrowLeft,
   ChevronDown,
-  Link2
+  Link2,
+  AlertTriangle,
+  Bell,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
@@ -279,6 +283,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isSubmitDropdownOpen, setIsSubmitDropdownOpen] = useState(false);
 
   const [dspProjectName, setDspProjectName] = useState('Regional Health Facility Allocation Matrix');
   const [emailTo, setEmailTo] = useState('moh.pmd@moh.gov.et');
@@ -302,19 +307,84 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [newColumnCode, setNewColumnCode] = useState<string>('');
   const [batchQtyInputs, setBatchQtyInputs] = useState<Record<string, string>>({});
 
+  // EPSS Base Benchmark & Alarm State
+  const [itemBenchmarks, setItemBenchmarks] = useState<Record<string, number>>({
+    'col-default-1': 10,
+    'col-default-2': 10,
+    'col-default-3': 10,
+    'col-default-4': 10,
+    'col-default-5': 10,
+    'col-default-6': 10
+  });
+  const [audioAlarmEnabled, setAudioAlarmEnabled] = useState<boolean>(true);
+  const [showBenchmarkPanel, setShowBenchmarkPanel] = useState<boolean>(false);
+
+  // Audio Alarm Sound Synthesizer (dual alert chime)
+  const triggerBenchmarkAlarmSound = () => {
+    if (!audioAlarmEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sawtooth';
+      osc2.type = 'sine';
+
+      osc1.frequency.setValueAtTime(880, ctx.currentTime);
+      osc1.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.15);
+
+      osc2.frequency.setValueAtTime(440, ctx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(587.33, ctx.currentTime + 0.15);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start();
+      osc1.stop(ctx.currentTime + 0.35);
+      osc2.stop(ctx.currentTime + 0.35);
+    } catch (e) {
+      // Audio synth fallback
+    }
+  };
+
+  // Helper to get EPSS Base Benchmark limit for a column
+  const getItemBenchmarkLimit = (col: RegionBreakdownColumn): number => {
+    if (itemBenchmarks[col.id] !== undefined) return itemBenchmarks[col.id];
+    if (itemBenchmarks[col.code] !== undefined) return itemBenchmarks[col.code];
+    return 10; // Default EPSS Base Benchmark to send for MOH
+  };
+
   const handleBatchApplyQtyToAllRows = (colId: string, customQty?: number) => {
     const valToApply = customQty !== undefined ? customQty : (Number(batchQtyInputs[colId]) || 0);
-    setRows(prevRows =>
-      prevRows.map(row => ({
-        ...row,
-        quantities: {
-          ...row.quantities,
-          [colId]: valToApply
-        }
-      }))
-    );
+    const updated = rows.map(row => ({
+      ...row,
+      quantities: {
+        ...row.quantities,
+        [colId]: valToApply
+      }
+    }));
+    setRows(updated);
+    
+    // Evaluate benchmark over-allocation
     const targetCol = columns.find(c => c.id === colId);
-    showToast(`✓ Applied ${valToApply} units of "${targetCol?.name || 'Equipment'}" across all ${rows.length} health facility rows!`);
+    if (targetCol) {
+      const colBase = getItemBenchmarkLimit(targetCol);
+      const newTotal = updated.reduce((sum, r) => sum + (Number(r.quantities[colId]) || 0), 0);
+      if (newTotal > colBase) {
+        triggerBenchmarkAlarmSound();
+        showToast(`🚨 ALARM: "${targetCol.name}" total (${newTotal}) EXCEEDS EPSS Base (${colBase}) by +${newTotal - colBase} units!`);
+      } else {
+        showToast(`✓ Applied ${valToApply} units of "${targetCol.name}" across all ${rows.length} rows!`);
+      }
+    }
   };
 
   // RHB Summary Table (Attachment 1 Format: S/N | Region | DSP Name | Date | View)
@@ -590,7 +660,42 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     return Object.values(columnTotals).reduce((sum, v) => sum + v, 0);
   }, [columnTotals]);
 
-  // Cell change handler
+  // Evaluate over-allocation against EPSS Base Benchmark limits
+  const overAllocatedColumns = useMemo(() => {
+    const list: { col: RegionBreakdownColumn; total: number; base: number; excess: number }[] = [];
+    columns.forEach(col => {
+      const total = columnTotals[col.id] || 0;
+      const base = getItemBenchmarkLimit(col);
+      if (total > base) {
+        list.push({ col, total, base, excess: total - base });
+      }
+    });
+    return list;
+  }, [columns, columnTotals, itemBenchmarks]);
+
+  // Auto Rebalance / Trim handler to meet EPSS Base Benchmarks
+  const handleAutoTrimToBaseBenchmark = () => {
+    const updatedRows = rows.map(r => {
+      const newQ = { ...r.quantities };
+      columns.forEach(col => {
+        const base = getItemBenchmarkLimit(col);
+        const total = columnTotals[col.id] || 0;
+        if (total > base && rows.length > 0) {
+          const currentVal = newQ[col.id] || 0;
+          if (currentVal > 0) {
+            const ratio = base / total;
+            newQ[col.id] = Math.max(0, Math.floor(currentVal * ratio));
+          }
+        }
+      });
+      return { ...r, quantities: newQ };
+    });
+    setRows(updatedRows);
+    notifyChange(internalDate, columns, updatedRows);
+    showToast('⚡ Auto-rebalanced breakdown quantities to match EPSS Base Benchmarks!');
+  };
+
+  // Cell change handler with EPSS Benchmark alarm check
   const handleCellChange = (rowId: string, colId: string, value: string) => {
     const num = value === '' ? 0 : Number(value);
     const updatedRows = rows.map(r => {
@@ -605,6 +710,18 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       }
       return r;
     });
+
+    // Check if cell edit causes or maintains over-allocation
+    const targetCol = columns.find(c => c.id === colId);
+    if (targetCol) {
+      const colBase = getItemBenchmarkLimit(targetCol);
+      const newTotal = updatedRows.reduce((sum, r) => sum + (Number(r.quantities[colId]) || 0), 0);
+      if (newTotal > colBase) {
+        triggerBenchmarkAlarmSound();
+        showToast(`🚨 ALARM: Total for "${targetCol.name}" (${newTotal}) EXCEEDS EPSS Base Benchmark (${colBase}) by +${newTotal - colBase} units!`);
+      }
+    }
+
     setRows(updatedRows);
     notifyChange(internalDate, columns, updatedRows);
   };
@@ -1037,6 +1154,63 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       )}
 
+      {/* 🚨 BENCHMARK OVER-ALLOCATION ALARM BANNER */}
+      {overAllocatedColumns.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-900 via-rose-950 to-red-900 border-2 border-rose-400 rounded-2xl p-4 text-white shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-lg shrink-0 border border-rose-400 animate-bounce">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm uppercase tracking-wider text-rose-200">
+                  🚨 BENCHMARK OVER-ALLOCATION ALARM TRIGGERED!
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500 text-white font-mono border border-rose-300">
+                  {overAllocatedColumns.length} Item(s) Exceeded
+                </span>
+              </div>
+              <p className="text-xs text-rose-100/90 leading-relaxed font-medium">
+                Current breakdown quantities filled manually or automatically exceed the official <strong>EPSS Base Quantity Benchmark to send for MOH</strong>:
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {overAllocatedColumns.map(({ col, total, base, excess }) => (
+                  <span key={col.id} className="px-2.5 py-1 rounded-lg bg-rose-950/90 border border-rose-400 text-[11px] font-mono text-rose-200 font-bold shadow-sm">
+                    ⚠️ {col.name}: <strong className="text-white">{total} allocated</strong> / {base} EPSS Base (<span className="text-amber-300 font-black">+{excess} OVER LIMIT</span>)
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleAutoTrimToBaseBenchmark}
+              className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border border-amber-300"
+              title="Automatically scale down allocated quantities to meet EPSS Base Benchmarks"
+            >
+              <Sparkles size={15} className="text-slate-950" />
+              <span>⚡ Auto-Rebalance to Base Benchmark</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAudioAlarmEnabled(!audioAlarmEnabled)}
+              className={`p-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+                audioAlarmEnabled 
+                  ? 'bg-rose-800/80 hover:bg-rose-800 text-rose-100 border-rose-500' 
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+              title={audioAlarmEnabled ? 'Audio Alarm ON (Click to Mute)' : 'Audio Alarm Muted (Click to Enable)'}
+            >
+              {audioAlarmEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              <span className="hidden sm:inline">{audioAlarmEnabled ? 'Audio ON' : 'Muted'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -1058,6 +1232,92 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
         </div>
 
+        {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsSubmitDropdownOpen(!isSubmitDropdownOpen)}
+            className="flex items-center gap-3 px-6 py-2.5 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs sm:text-sm shadow-xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
+            title="Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"
+          >
+            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
+            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
+              SUBMIT BREAKDOWN TO MOH
+            </span>
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1">
+              3
+            </span>
+            <ChevronDown className={`w-4 h-4 text-amber-400 transition-transform ${isSubmitDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Submission Channels Dropdown Popover */}
+          {isSubmitDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-72 bg-[#0a0f1d] border-2 border-amber-400/80 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="px-3 py-2 border-b border-slate-800">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
+                  Select MOH Submission Channel:
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Official dispatch routes for PMD MOH
+                </span>
+              </div>
+
+              <div className="space-y-1 pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSubmitDropdownOpen(false);
+                    setTransmittalDestination('MOH');
+                    setIsTransmitModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                >
+                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white group-hover:text-amber-300">1. Direct System Transmittal</div>
+                    <div className="text-[10px] text-slate-400">Digital authorization & audit log</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSubmitDropdownOpen(false);
+                    setIsEmailModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                >
+                  <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white group-hover:text-cyan-300">2. Send via Email</div>
+                    <div className="text-[10px] text-slate-400">Targeting moh.pmd@moh.gov.et</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSubmitDropdownOpen(false);
+                    setIsWhatsAppModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                >
+                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white group-hover:text-emerald-300">3. Send via WhatsApp Desk</div>
+                    <div className="text-[10px] text-slate-400">Web dispatch & auto Excel matrix</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
 
@@ -1089,6 +1349,25 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* EPSS Base Benchmark Control Button */}
+            <button
+              type="button"
+              onClick={() => setShowBenchmarkPanel(!showBenchmarkPanel)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
+                overAllocatedColumns.length > 0 
+                  ? 'bg-rose-600 text-white border-rose-500 animate-pulse font-black' 
+                  : showBenchmarkPanel 
+                    ? 'bg-amber-600 text-white border-amber-500' 
+                    : 'bg-white hover:bg-amber-50 text-slate-800 border-amber-300'
+              }`}
+              title="Configure EPSS Base Quantity Benchmarks per equipment item"
+            >
+              <Bell className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                EPSS Base Limits {overAllocatedColumns.length > 0 ? `(🚨 ${overAllocatedColumns.length} OVER)` : `(${columns.length} Items)`}
+              </span>
+            </button>
+
             {/* Breakdown Request Selector - Clean button opening 8-column Table Modal */}
             {!disableBreakdownLink && breakdownRequests && breakdownRequests.length > 0 && (
               <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-amber-300 shadow-2xs">
@@ -1116,6 +1395,95 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
           </div>
         </div>
+
+        {/* EPSS Base Benchmark Control Panel Drawer */}
+        {showBenchmarkPanel && (
+          <div className="p-3.5 bg-slate-900 border-2 border-amber-400 rounded-2xl text-white space-y-3 animate-in fade-in shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="font-black text-xs uppercase tracking-wider text-amber-300">
+                  EPSS Base Quantity Benchmarks to Send for MOH (Master Allocation Limits)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={handleAutoTrimToBaseBenchmark}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg transition cursor-pointer text-[11px] uppercase tracking-wider"
+                >
+                  ⚡ Auto-Trim All to Base Benchmark
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBenchmarkPanel(false)}
+                  className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
+              {columns.map(col => {
+                const total = columnTotals[col.id] || 0;
+                const baseLimit = getItemBenchmarkLimit(col);
+                const isExceeded = total > baseLimit;
+                const pct = Math.min(100, Math.round((total / Math.max(1, baseLimit)) * 100));
+
+                return (
+                  <div
+                    key={`bm-${col.id}`}
+                    className={`p-2.5 rounded-xl border transition ${
+                      isExceeded
+                        ? 'bg-rose-950/80 border-rose-500 text-rose-100 shadow-md'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="truncate flex-1">
+                        <div className="font-bold text-xs truncate text-white" title={col.name}>{col.name}</div>
+                        <div className="text-[10px] font-mono text-slate-400">{col.code}</div>
+                      </div>
+                      {isExceeded && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white font-mono animate-bounce shrink-0">
+                          +{total - baseLimit} OVER
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between text-[11px] font-mono">
+                      <span>Total Allocated: <strong className={isExceeded ? 'text-rose-300 font-extrabold' : 'text-emerald-400'}>{total}</strong></span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400">EPSS Base:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={baseLimit}
+                          onChange={(e) => {
+                            const val = Math.max(1, Number(e.target.value) || 1);
+                            setItemBenchmarks(prev => ({ ...prev, [col.id]: val, [col.code]: val }));
+                          }}
+                          className="w-12 px-1 py-0.5 bg-slate-950 border border-slate-600 rounded text-center text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Progress Bar Meter */}
+                    <div className="w-full bg-slate-950 h-2 rounded-full mt-1.5 overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          isExceeded ? 'bg-rose-500 animate-pulse' : total === baseLimit ? 'bg-emerald-400' : 'bg-cyan-400'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
 
 
@@ -1566,24 +1934,41 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     HUB
                   </th>
                 )}
-                {matrixTemplateFormat !== 'item' && columns.map(col => (
-                  <th 
-                    key={col.id} 
-                    className="p-2.5 bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold text-left min-w-[160px] max-w-[200px] leading-tight"
-                  >
-                    {isEditingMode ? (
-                      <input
-                        type="text"
-                        value={col.name}
-                        onChange={(e) => handleUpdateColumn(col.id, e.target.value, col.code)}
-                        className="w-full bg-white border border-amber-300 rounded p-1 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-                        placeholder="Item / Equipment Name..."
-                      />
-                    ) : (
-                      <div className="line-clamp-2" title={col.name}>{col.name}</div>
-                    )}
-                  </th>
-                ))}
+                {matrixTemplateFormat !== 'item' && columns.map(col => {
+                  const total = columnTotals[col.id] || 0;
+                  const base = getItemBenchmarkLimit(col);
+                  const isOver = total > base;
+                  return (
+                    <th 
+                      key={col.id} 
+                      className={`p-2.5 border-r border-slate-300 font-semibold text-left min-w-[160px] max-w-[200px] leading-tight transition-colors ${
+                        isOver 
+                          ? 'bg-rose-200 text-rose-950 border-rose-400 font-black shadow-inner' 
+                          : 'bg-[#fed7aa] text-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          isOver ? 'bg-rose-600 text-white font-black animate-pulse' : 'bg-amber-200/80 text-amber-900'
+                        }`}>
+                          {isOver ? `🚨 OVER (+${total - base})` : `Base: ${base}`}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-700 font-bold">{total}/{base}</span>
+                      </div>
+                      {isEditingMode ? (
+                        <input
+                          type="text"
+                          value={col.name}
+                          onChange={(e) => handleUpdateColumn(col.id, e.target.value, col.code)}
+                          className="w-full bg-white border border-amber-300 rounded p-1 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                          placeholder="Item / Equipment Name..."
+                        />
+                      ) : (
+                        <div className="line-clamp-2" title={col.name}>{col.name}</div>
+                      )}
+                    </th>
+                  );
+                })}
                 {matrixTemplateFormat !== 'item' && (
                   <th className="p-2 bg-indigo-50/80 border-r border-slate-300 text-center min-w-[120px]">
                     <button
@@ -1875,10 +2260,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       {/* Equipment Quantity Cells (Only if not ITEM AGGREGATION mode) */}
                       {matrixTemplateFormat !== 'item' && columns.map(col => {
                         const qty = row.quantities[col.id];
+                        const colTotal = columnTotals[col.id] || 0;
+                        const colBase = getItemBenchmarkLimit(col);
+                        const isColOver = colTotal > colBase;
+                        const hasQty = qty !== undefined && qty > 0;
+
                         return (
                           <td 
                             key={col.id} 
-                            className="p-2.5 border-r border-slate-200 text-right font-mono font-bold text-slate-800"
+                            className={`p-2.5 border-r border-slate-200 text-right font-mono font-bold transition-colors ${
+                              isColOver && hasQty
+                                ? 'bg-rose-100/90 text-rose-950 border-rose-300 font-black'
+                                : 'text-slate-800'
+                            }`}
                           >
                             {isEditingMode ? (
                               <input
@@ -1887,11 +2281,16 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                                 value={qty !== undefined && qty !== 0 ? qty : ''}
                                 placeholder="0"
                                 onChange={(e) => handleCellChange(row.id, col.id, e.target.value)}
-                                className="w-16 p-1 border border-slate-300 rounded text-right font-mono font-bold text-xs"
+                                className={`w-16 p-1 border rounded text-right font-mono font-bold text-xs ${
+                                  isColOver && hasQty
+                                    ? 'border-rose-500 bg-rose-50 text-rose-900 ring-2 ring-rose-400'
+                                    : 'border-slate-300'
+                                }`}
+                                title={isColOver ? `🚨 Column "${col.name}" exceeds EPSS Base Benchmark (${colTotal}/${colBase})` : ''}
                               />
                             ) : (
                               qty && qty > 0 ? (
-                                <span>{qty}</span>
+                                <span className={isColOver ? 'text-rose-900 font-black' : ''}>{qty}</span>
                               ) : (
                                 <span className="text-slate-300 font-normal">-</span>
                               )
