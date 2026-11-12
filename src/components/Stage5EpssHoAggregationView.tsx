@@ -117,8 +117,20 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   onTriggerCloudSync
 }) => {
   // Stage 5 dossiers
+  // Stage 5 dossiers (including any dossier with facilityMatrixData, hubAggregationData, or Stage 1.3/Stage 4/Stage 5)
   const stage5Dossiers = useMemo(() => {
-    return records.filter(r => r.stage === 'epss-ho-aggregation');
+    const list = records.filter(r => 
+      r.stage === 'epss-ho-aggregation' ||
+      r.subStage === '1.3' ||
+      r.subStage === '1.3.1' ||
+      r.subStage === '1.3.3' ||
+      r.subStage === '1.2' ||
+      Boolean(r.hubAggregationData) ||
+      Boolean(r.facilityMatrixData) ||
+      Boolean(r.stage4MatrixData)
+    );
+    if (list.length > 0) return list;
+    return records;
   }, [records]);
 
   // Stage 4 dossiers (MOH to EPSS)
@@ -211,19 +223,46 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
 
   // Exact Equipment Columns matching user uploaded dossier or sample STO
   const equipmentColumns: Stage5Column[] = useMemo(() => {
+    // 1. Current dossier hubAggregationData
     if (currentDossier?.hubAggregationData?.columns && currentDossier.hubAggregationData.columns.length > 0) {
       return currentDossier.hubAggregationData.columns;
     }
+    // 2. Current dossier facilityMatrixData (MOH to EPSS breakdown)
+    if (currentDossier?.facilityMatrixData?.columns && currentDossier.facilityMatrixData.columns.length > 0) {
+      return currentDossier.facilityMatrixData.columns.map(c => ({
+        id: c.id,
+        name: c.name,
+        code: c.code
+      }));
+    }
+    // 3. Current dossier stage4MatrixData
     if (currentDossier?.stage4MatrixData?.columns && currentDossier.stage4MatrixData.columns.length > 0) {
       return currentDossier.stage4MatrixData.columns;
     }
+    // 4. Any record in records with facilityMatrixData columns
+    const anyFac = records.find(r => r.facilityMatrixData?.columns && r.facilityMatrixData.columns.length > 0);
+    if (anyFac?.facilityMatrixData?.columns) {
+      return anyFac.facilityMatrixData.columns.map(c => ({
+        id: c.id,
+        name: c.name,
+        code: c.code
+      }));
+    }
+    const anyHub = records.find(r => r.hubAggregationData?.columns && r.hubAggregationData.columns.length > 0);
+    if (anyHub?.hubAggregationData?.columns) {
+      return anyHub.hubAggregationData.columns;
+    }
+
+    // Default 6 columns matching exact screenshot _D82057D4-6528-4990-821E-C28804094B45__80caff29.png
     return [
-      { id: 'col-1', code: '403-XRRD-0101', name: 'Anesthesia machine - with Patient monitor' },
-      { id: 'col-2', code: '403-XRRD-0101', name: 'Bed - Patient, Fowler, Adult' },
-      { id: 'col-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless Steel.' },
-      { id: 'col-4', code: '403-XRRD-0101-001', name: 'Cold box' }
+      { id: 'col-default-1', code: '403-XRRD-0101', name: 'Anesthesia machine - with Patient mon' },
+      { id: 'col-default-2', code: '403-XRRD-0101', name: 'Bed - Patient, Fowler, Adult' },
+      { id: 'col-default-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless Steel.' },
+      { id: 'col-default-4', code: '403-XRRD-0101-001', name: 'Cold box' },
+      { id: 'col-default-5', code: '401-WICU-0101N', name: 'Couch - Delivery' },
+      { id: 'col-default-6', code: '401-WICU-0101N', name: 'Couch - Examination' }
     ];
-  }, [currentDossier]);
+  }, [currentDossier, records]);
 
   // Allocations list
   const allocations: Stage5AllocationItem[] = useMemo(() => {
@@ -231,23 +270,39 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       return currentDossier.hubAggregationData.allocations;
     }
 
-    // Fallback: build from Stage 4 or sample data matching user screenshot
-    const sourceRows = currentDossier?.stage4MatrixData?.rows || [];
+    // Source rows: facilityMatrixData or stage4MatrixData
+    const sourceRows = (currentDossier?.facilityMatrixData?.rows && currentDossier.facilityMatrixData.rows.length > 0)
+      ? currentDossier.facilityMatrixData.rows
+      : ((currentDossier?.stage4MatrixData?.rows && currentDossier.stage4MatrixData.rows.length > 0)
+          ? currentDossier.stage4MatrixData.rows
+          : (records.find(r => r.facilityMatrixData?.rows?.length)?.facilityMatrixData?.rows ||
+             records.find(r => r.stage4MatrixData?.rows?.length)?.stage4MatrixData?.rows || []));
+
     if (sourceRows.length > 0) {
       return sourceRows.map((r: any, idx: number) => {
-        const match = mapFacilityToHub(r.healthFacility, r.region, r.zone, r.woreda, hfListItems);
+        const match = mapFacilityToHub(
+          r.healthFacility || r.customerDescription || '',
+          r.region || '',
+          r.zone || '',
+          r.woreda || '',
+          hfListItems
+        );
+        const hubCode = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD'))
+          ? r.hub
+          : (match.hubCode && match.hubCode !== 'HO01' ? match.hubCode : 'AA01');
+        const hubInfo = getHubByCode(hubCode);
         const quantities = r.quantities || {};
         const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
 
         return {
           id: r.id || `alloc-s5-${idx}`,
-          healthFacility: r.healthFacility || 'Health Facility',
-          region: r.region || 'Oromia',
-          zone: r.zone || 'Central Zone',
-          woreda: r.woreda || 'Woreda 01',
+          healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
+          region: r.region || match.region || 'Oromia',
+          zone: r.zone || match.zone || 'Central Zone',
+          woreda: r.woreda || match.woreda || 'Woreda 01',
           packages: r.packages || 'MCH',
-          hubCode: match.hubCode,
-          hubName: match.hubName,
+          hubCode: hubCode,
+          hubName: hubInfo?.name || match.hubName || hubCode,
           masterCustomerCode: match.masterCustomerCode,
           masterFacilityName: match.masterFacilityName,
           matchMethod: match.matchMethod,
@@ -258,7 +313,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       });
     }
 
-    // Default sample allocations matching user screenshot (Plants AA01, AD01, DI01 with exact 4 columns)
+    // Default sample allocations matching screenshot _D82057D4-6528-4990-821E-C28804094B45__80caff29.png
     return [
       {
         id: 'alloc-aa01-1',
@@ -270,12 +325,14 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         hubCode: 'AA01',
         hubName: 'AA01',
         quantities: {
-          'col-1': 6,
-          'col-2': 6,
-          'col-3': 2,
-          'col-4': 2
+          'col-default-1': 2,
+          'col-default-2': 2,
+          'col-default-3': 2,
+          'col-default-4': 2,
+          'col-default-5': 2,
+          'col-default-6': 2
         },
-        totalQty: 16
+        totalQty: 12
       },
       {
         id: 'alloc-ad01-1',
@@ -287,12 +344,14 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         hubCode: 'AD01',
         hubName: 'AD01',
         quantities: {
-          'col-1': 2,
-          'col-2': 2,
-          'col-3': 2,
-          'col-4': 2
+          'col-default-1': 2,
+          'col-default-2': 2,
+          'col-default-3': 2,
+          'col-default-4': 2,
+          'col-default-5': 2,
+          'col-default-6': 2
         },
-        totalQty: 8
+        totalQty: 12
       },
       {
         id: 'alloc-di01-1',
@@ -304,15 +363,17 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         hubCode: 'DI01',
         hubName: 'DI01',
         quantities: {
-          'col-1': 2,
-          'col-2': 2,
-          'col-3': 2,
-          'col-4': 2
+          'col-default-1': 2,
+          'col-default-2': 2,
+          'col-default-3': 2,
+          'col-default-4': 2,
+          'col-default-5': 2,
+          'col-default-6': 2
         },
-        totalQty: 8
+        totalQty: 12
       }
     ];
-  }, [currentDossier, hfListItems]);
+  }, [currentDossier, records, hfListItems]);
 
   // Filtered allocations for Matrix
   const filteredAllocations = useMemo(() => {

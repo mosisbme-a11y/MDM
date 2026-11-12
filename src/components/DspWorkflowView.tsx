@@ -93,6 +93,7 @@ import {
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
+import { mapFacilityToHub, getHubByCode } from '../data/epssHubs';
 
 export interface DateCountInfo {
   days: number;
@@ -445,6 +446,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage3ViewMode, setStage3ViewMode] = useState<'matrix' | 'ledger'>('matrix');
   const [stage4ViewMode, setStage4ViewMode] = useState<'matrix' | 'ledger'>('matrix');
   const [stage5ViewMode, setStage5ViewMode] = useState<'hub-aggregation' | 'ledger'>('hub-aggregation');
+  const [stage131ViewMode, setStage131ViewMode] = useState<'matrix' | 'tools'>('matrix');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
 
@@ -1629,17 +1631,153 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '1.3.1' || (currentSubTab as string) === 'dsp-ho-1-3-1' || (currentSubTab as string) === 'map-hf-hub') ? (
-        <MappingBreakdownView 
-          hfListItems={hfListItems} 
-          onUploadHFData={(items, mode) => {
-            if (mode === 'replace') {
-              setHfListItems?.(items);
-            } else {
-              setHfListItems?.(prev => [...prev, ...items]);
-            }
-          }}
-          isAdmin={true}
-        />
+        <div className="space-y-4">
+          {/* Sub-view toggle bar: Matrix Template (Official) vs Master Data / Upload */}
+          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-2.5 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStage131ViewMode('matrix')}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                  stage131ViewMode === 'matrix'
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>Map HF to HUB Matrix Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStage131ViewMode('tools')}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                  stage131ViewMode === 'tools'
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
+                <span>Batch Upload & Master Facility Engine</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectSubTab?.('dsp-ho-1-3-3')}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <span>Proceed to Item Aggregation (1.3.3)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {stage131ViewMode === 'matrix' ? (
+            <RegionBreakdownMatrixTable
+              data={
+                selectedRecord?.facilityMatrixData ||
+                records.find(r => r.facilityMatrixData)?.facilityMatrixData || {
+                  date: new Date().toISOString().split('T')[0],
+                  region: 'all',
+                  columns: DEFAULT_STAGE_3_COLUMNS,
+                  rows: DEFAULT_STAGE_3_ROWS
+                }
+              }
+              hfListItems={hfListItems}
+              isEditable={true}
+              showHubColumn={true}
+              isHubMappedInitially={true}
+              breakdownRequests={records}
+              selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.facilityMatrixData)?.id || ''}
+              onSelectBreakdownRequest={(reqId) => {
+                const req = records.find(r => r.id === reqId);
+                if (req) {
+                  setSelectedRecord(req);
+                }
+              }}
+              onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
+              onProceedToAggregation={() => {
+                onSelectSubTab?.('dsp-ho-1-3-3');
+              }}
+              onUpdateData={(updated) => {
+                setRecords(prev => {
+                  const targetId = selectedRecord?.id || prev.find(r => r.facilityMatrixData)?.id || prev[0]?.id;
+                  const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
+                  
+                  // Compute allocations and hubAggregationData so Item Aggregation (1.3.3) is immediately ready
+                  const newAllocations = updated.rows.map((r, idx) => {
+                    const match = mapFacilityToHub(
+                      r.healthFacility || r.customerDescription || '',
+                      r.region || '',
+                      r.zone || '',
+                      r.woreda || '',
+                      hfListItems
+                    );
+                    const hubCode = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD'))
+                      ? r.hub
+                      : (match.hubCode && match.hubCode !== 'HO01' ? match.hubCode : 'AA01');
+                    const hubInfo = getHubByCode(hubCode);
+                    const quantities = r.quantities || {};
+                    const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
+
+                    return {
+                      id: r.id || `alloc-s5-${idx}`,
+                      healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
+                      region: r.region || match.region || 'Oromia',
+                      zone: r.zone || match.zone || 'Central Zone',
+                      woreda: r.woreda || match.woreda || 'Woreda 01',
+                      packages: r.packages || 'MCH',
+                      hubCode: hubCode,
+                      hubName: hubInfo?.name || match.hubName || hubCode,
+                      masterCustomerCode: match.masterCustomerCode,
+                      masterFacilityName: match.masterFacilityName,
+                      matchMethod: match.matchMethod,
+                      matchConfidence: match.matchConfidence,
+                      quantities,
+                      totalQty: totalQty || 12
+                    };
+                  });
+
+                  if (existingIdx >= 0 && prev[existingIdx]) {
+                    const updatedRec = {
+                      ...prev[existingIdx],
+                      facilityMatrixData: updated,
+                      targetedFacilitiesCount: updated.rows.length,
+                      totalQuantity: updated.rows.reduce((sum, r) => {
+                        return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+                      }, 0),
+                      hubAggregationData: {
+                        dossierId: prev[existingIdx].id,
+                        dspRefNumber: prev[existingIdx].dspRefNumber,
+                        generatedDate: new Date().toISOString().split('T')[0],
+                        status: 'Mapped & Ready',
+                        columns: updated.columns,
+                        allocations: newAllocations
+                      }
+                    };
+                    const copy = [...prev];
+                    copy[existingIdx] = updatedRec;
+                    return copy;
+                  }
+                  return prev;
+                });
+              }}
+              title="1.3.1 Map HF to EPSS Hub — Health Facility Breakdown Matrix"
+              subtitle="Official Map HF to HUB matrix template showing delivering plants and health facility allocations"
+            />
+          ) : (
+            <MappingBreakdownView 
+              hfListItems={hfListItems} 
+              onUploadHFData={(items, mode) => {
+                if (mode === 'replace') {
+                  setHfListItems?.(items);
+                } else {
+                  setHfListItems?.(prev => [...prev, ...items]);
+                }
+              }}
+              isAdmin={true}
+            />
+          )}
+        </div>
       ) : (currentSubStep === '1.3.2' || (currentSubTab as string) === 'dsp-ho-1-3-2' || (currentSubTab as string) === 'send-dsp-hub') ? (
         <Stage6EpssBranchDispatchView
           records={records}

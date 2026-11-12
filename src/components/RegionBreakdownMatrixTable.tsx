@@ -27,6 +27,7 @@ import {
   ExternalLink,
   Eye,
   ArrowLeft,
+  ArrowRight,
   ChevronDown,
   Link2,
   AlertTriangle,
