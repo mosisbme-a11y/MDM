@@ -229,11 +229,14 @@ export function App() {
 
   // Global Dashboard Filters
   const [dashboardPlantFilter, setDashboardPlantFilter] = useState<string | string[]>('all');
+  const [dashboardRegionFilter, setDashboardRegionFilter] = useState<string | string[]>('all');
   const [dashboardGroupFilter, setDashboardGroupFilter] = useState<string>('all');
   const [dashboardStartDate, setDashboardStartDate] = useState<string>('');
   const [dashboardEndDate, setDashboardEndDate] = useState<string>('');
   const [dashboardWbsFilter, setDashboardWbsFilter] = useState<string>('all');
   const [dashboardStreamFilter, setDashboardStreamFilter] = useState<'all' | 'RDF' | 'HP'>('all');
+
+
 
   useEffect(() => {
     if (
@@ -270,6 +273,21 @@ export function App() {
 
 
   const [items, setItems] = useState<MedicalDeviceItem[]>([]);
+
+  const availableRegions = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach(i => {
+      if ((i as any).region) set.add((i as any).region);
+      if (i.plantName) set.add(i.plantName);
+      if (i.additionalAttributes?.region) set.add(i.additionalAttributes.region);
+    });
+    const stdRegions = [
+      'Addis Ababa', 'Afar', 'Amhara', 'Benishangul-Gumuz', 'Central Ethiopia', 'Dire Dawa',
+      'Gambella', 'Harari', 'Oromia', 'Sidama', 'Somali', 'South Ethiopia', 'South West Ethiopia', 'Tigray'
+    ];
+    stdRegions.forEach(r => set.add(r));
+    return Array.from(set).filter(Boolean).sort();
+  }, [items]);
 
   const [noBkdItems, setNoBkdItems] = useState<NoBkdItem[]>([]);
 
@@ -1802,8 +1820,20 @@ export function App() {
       });
     }
 
+    // 8. Dashboard Region Filter (Multi-select)
+    if (dashboardRegionFilter !== 'all' && (!Array.isArray(dashboardRegionFilter) || dashboardRegionFilter.length > 0)) {
+      const regions = Array.isArray(dashboardRegionFilter) ? dashboardRegionFilter : [dashboardRegionFilter];
+      if (regions.length > 0) {
+        result = result.filter(item => {
+          const itemRegion = (item as any).region || item.plantName || item.additionalAttributes?.region || '';
+          if (!itemRegion) return false;
+          return regions.some(r => itemRegion.toLowerCase().includes(r.toLowerCase()) || r.toLowerCase().includes(itemRegion.toLowerCase()));
+        });
+      }
+    }
+
     return result;
-  }, [items, globalSearchQuery, dashboardPlantFilter, dashboardGroupFilter, selectedStatusFilter, dashboardStreamFilter, dashboardStartDate, dashboardEndDate, dashboardWbsFilter]);
+  }, [items, globalSearchQuery, dashboardPlantFilter, dashboardRegionFilter, dashboardGroupFilter, selectedStatusFilter, dashboardStreamFilter, dashboardStartDate, dashboardEndDate, dashboardWbsFilter]);
 
   // EPSS Central Stockpile / Master SOH Items
   const epssFilteredItems = useMemo(() => {
@@ -2860,6 +2890,9 @@ export function App() {
             setDashboardEndDate={setDashboardEndDate}
             dashboardWbsFilter={dashboardWbsFilter}
             setDashboardWbsFilter={setDashboardWbsFilter}
+            dashboardRegionFilter={dashboardRegionFilter}
+            setDashboardRegionFilter={setDashboardRegionFilter}
+            availableRegions={availableRegions}
             availablePlants={availablePlants}
             availableGroups={availableGroups}
             isAdmin={isAdmin}

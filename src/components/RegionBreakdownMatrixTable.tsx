@@ -32,7 +32,9 @@ import {
   AlertTriangle,
   Bell,
   Volume2,
-  VolumeX
+  VolumeX,
+  Map as MapIcon,
+  RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
@@ -247,6 +249,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isHubMapped, setIsHubMapped] = useState(showHubColumn);
   const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
 
   const handleSelectAllCatalogItems = () => {
@@ -284,6 +287,40 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isSubmitDropdownOpen, setIsSubmitDropdownOpen] = useState(false);
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleMapHfToHub = () => {
+    if (rows.length === 0) {
+      showToast('⚠️ No health facility rows to map.');
+      return;
+    }
+    setIsAnalyzing(true);
+    showToast('Mapping facilities to official EPSS regional distribution hubs...');
+    setTimeout(() => {
+      const updatedRows = rows.map(row => {
+        const mapping = mapFacilityToHub(
+          row.healthFacility || row.customerDescription || '',
+          row.region || '',
+          row.zone || '',
+          row.woreda || '',
+          hfListItems
+        );
+        const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
+          ? mapping.hubCode
+          : (row.hub && row.hub !== 'HO01' ? row.hub : 'AA01');
+        return {
+          ...row,
+          hub: hubSymbol
+        };
+      });
+      setRows(updatedRows);
+      setIsHubMapped(true);
+      notifyChange(internalDate, columns, updatedRows);
+      showToast('✓ Successfully mapped facilities to EPSS Hubs! Hub column auto-inserted.');
+      setIsAnalyzing(false);
+    }, 600);
+  };
 
   const [dspProjectName, setDspProjectName] = useState('Regional Health Facility Allocation Matrix');
   const [emailTo, setEmailTo] = useState('moh.pmd@moh.gov.et');
@@ -423,6 +460,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     showToast(`✓ Selected "${itemName} (${itemCode})" & added as column!`);
   };
 
+
+
   const toggleItemOneByOne = (item: { name: string; code: string }) => {
     const existingCol = columns.find(c => c.code === item.code || c.name.toLowerCase() === item.name.toLowerCase());
     if (existingCol) {
@@ -470,6 +509,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       }));
       setColumns(newCols);
 
+      // SECURITY & BENCHMARK: Set EPSS Base Benchmark to EXACTLY what MOH sent for this region/total
+      const newBenchmarks: Record<string, number> = {};
+      newCols.forEach(col => {
+        const item = matched.itemsIncluded.find((i: any) => i.material === col.code);
+        newBenchmarks[col.id] = item?.quantity || 10;
+        newBenchmarks[col.code] = item?.quantity || 10;
+      });
+      setItemBenchmarks(newBenchmarks);
+
       const reg = matched.targetedRegions?.[0] || matched.senderOrg || 'Oromia';
       const initialRows: RegionBreakdownRow[] = matched.itemsIncluded.map((item: any, idx: number) => {
         const qtyObj: Record<string, number> = {};
@@ -483,6 +531,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           zone: item.plant || 'Zone 1',
           woreda: '1',
           healthFacility: item.allocatedFacility || `${reg} Health Center ${idx + 1}`,
+          customerDescription: item.allocatedFacility || `${reg} Health Center ${idx + 1}`,
           packages: 'MCH',
           quantities: qtyObj
         };
@@ -962,7 +1011,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'Zone',
         'Woreda',
         'Name of health facility',
-        'List of Packeges',
+        'List of Packages',
+        ...(isHubMapped ? ['HUB'] : []),
         ...columns.map(c => c.name)
       ]);
       aoa.push([
@@ -970,7 +1020,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         '',
         '',
         '',
-        'List of Packeges',
+        'List of Packages',
+        ...(isHubMapped ? [''] : []),
         ...columns.map(c => c.code)
       ]);
       filteredRows.forEach(r => {
@@ -980,6 +1031,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           r.woreda,
           r.healthFacility || r.customerDescription,
           r.packages || 'MCH',
+          ...(isHubMapped ? [r.hub || 'AA01'] : []),
           ...columns.map(c => {
             const val = r.quantities[c.id];
             return val === 0 ? '' : (val ?? '');
@@ -1084,11 +1136,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       ['DD01', 2, 2, 2, 2, 2, 2]
     ] : fmt === 'submit-breakdown-to-moh' ? [
       [
-        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges',
+        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packages',
         'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
       ],
       [
-        '', '', '', '', 'List of Packeges',
+        '', '', '', '', 'List of Packages',
         '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
       ],
       ['Oromia', 'Gurage', 'Abeshige', 'Abeshige Woreda Health Office', 'MCH', 2, 3, 3, 2, 2, 2],
@@ -1098,11 +1150,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       ['Afar', 'Kilbati', 'Abala', 'Abala Primary Hospital', 'MCH', 2, 3, 3, 2, 2, 2]
     ] : [
       [
-        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packeges', '⬡',
+        'Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packages', 'HUB',
         'Anesthesia machine - with Patient mon', 'Bed - Patient, Fowler, Adult', 'Bowel - With Stand, Stainless Steel.', 'Cold box', 'Couch - Delivery', 'Couch - Examination'
       ],
       [
-        '', '', '', '', 'List of Packeges', '',
+        '', '', '', '', 'List of Packages', '',
         '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
       ],
       ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'AA01', 2, 2, 2, 2, 2, 2],
@@ -1124,25 +1176,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   };
 
   // Auto map facilities to hub using mapFacilityToHub algorithm
-  const handleMapHfToHub = () => {
-    if (rows.length === 0) {
-      showToast('⚠️ No health facility rows to map.');
-      return;
-    }
 
-    const updatedRows = rows.map((r) => {
-      const facilityName = r.customerDescription || r.healthFacility || '';
-      const result = mapFacilityToHub(facilityName, r.region, r.zone, r.woreda, masterHfItems);
-      return {
-        ...r,
-        hub: (result.hubCode && result.hubCode !== 'HO01') ? result.hubCode : ((r.hub && r.hub !== 'HO01') ? r.hub : 'AA01')
-      };
-    });
-
-    setRows(updatedRows);
-    notifyChange(internalDate, columns, updatedRows);
-    showToast(`⚡ Successfully mapped all ${updatedRows.length} facilities to designated EPSS Distribution Hubs!`);
-  };
 
   return (
     <div className={`space-y-4 ${isFullScreen ? 'fixed inset-0 z-50 bg-slate-100 p-6 overflow-y-auto' : ''}`}>
@@ -1234,9 +1268,23 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
         {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setIsSubmitDropdownOpen(!isSubmitDropdownOpen)}
+            <button
+              type="button"
+              onClick={handleMapHfToHub}
+              disabled={isAnalyzing}
+              className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
+                isHubMapped 
+                  ? 'bg-emerald-600 border-emerald-400 text-white' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
+              }`}
+            >
+              {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
+              <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSubmitDropdownOpen(!isSubmitDropdownOpen)}
             className="flex items-center gap-3 px-6 py-2.5 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs sm:text-sm shadow-xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
             title="Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"
           >
@@ -1926,14 +1974,14 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     Name of health facility
                   </th>
                 )}
-                <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
-                  List of Packeges
-                </th>
-                {showHubColumn && (
-                  <th className="p-2.5 bg-[#fef08a] text-amber-950 font-black border-r border-slate-300 min-w-[90px] text-center uppercase tracking-wider">
-                    HUB
-                  </th>
-                )}
+                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
+                   List of Packages
+                 </th>
+                 {isHubMapped && (
+                   <th className="p-2.5 bg-[#fef08a] text-amber-950 font-black border-r border-slate-300 min-w-[90px] text-center uppercase tracking-wider">
+                     HUB
+                   </th>
+                 )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => {
                   const total = columnTotals[col.id] || 0;
                   const base = getItemBenchmarkLimit(col);
@@ -1995,8 +2043,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
-                <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packeges</th>
-                {showHubColumn && (
+                <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packages</th>
+                {isHubMapped && (
                   <th className="p-2 bg-[#fef9c3] border-r border-slate-300 text-center font-bold text-amber-900 text-[10px]">HUB</th>
                 )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
@@ -2359,7 +2407,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
-                {showHubColumn && (
+                {isHubMapped && (
                   <td className="p-2.5 border-r border-slate-300 text-center font-mono font-black text-amber-900 bg-amber-100/60 text-[11px]">
                     -
                   </td>

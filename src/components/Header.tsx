@@ -109,6 +109,9 @@ interface HeaderProps {
   setDashboardWbsFilter: (val: string) => void;
   availablePlants: {code: string, name: string}[];
   availableGroups: string[];
+  dashboardRegionFilter: string | string[];
+  setDashboardRegionFilter: (val: string | string[]) => void;
+  availableRegions: string[];
   receivingAlertCount?: number;
   isAdmin?: boolean;
   fileCount?: number;
@@ -158,6 +161,9 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectDeliverySubTab,
   dashboardPlantFilter,
   setDashboardPlantFilter,
+  dashboardRegionFilter = 'all',
+  setDashboardRegionFilter,
+  availableRegions = [],
   dashboardGroupFilter,
   setDashboardGroupFilter,
   isAdmin = false,
@@ -185,6 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isCdssDropdownOpen, setIsCdssDropdownOpen] = useState(false);
   const [isAgreementDropdownOpen, setIsAgreementDropdownOpen] = useState(false);
   const [isDonationDropdownOpen, setIsDonationDropdownOpen] = useState(false);
+  const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -683,6 +690,94 @@ export const Header: React.FC<HeaderProps> = ({
             {availablePlants.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
           </select>
 
+          {/* Region Multi-Select Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
+              className="bg-slate-800 text-white text-[11px] font-semibold rounded-lg px-2.5 py-1 border border-slate-600 focus:ring-1 focus:ring-cyan-500 flex items-center gap-1.5 cursor-pointer"
+              title="Filter by Region (Multi-Select)"
+            >
+              <span>
+                {dashboardRegionFilter === 'all' || (Array.isArray(dashboardRegionFilter) && dashboardRegionFilter.length === 0)
+                  ? 'All Regions'
+                  : Array.isArray(dashboardRegionFilter)
+                  ? `${dashboardRegionFilter.length} Region(s)`
+                  : dashboardRegionFilter}
+              </span>
+              <ChevronDown className="w-3 h-3 text-cyan-400" />
+            </button>
+
+            {isRegionDropdownOpen && (
+              <div className="absolute left-0 mt-1 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2.5 z-50 space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-xs">
+                  <span className="font-bold text-cyan-400 uppercase tracking-wider">Select Regions</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDashboardRegionFilter('all');
+                      setIsRegionDropdownOpen(false);
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                  {availableRegions.map(reg => {
+                    const currentSelected = dashboardRegionFilter === 'all' ? [] : (Array.isArray(dashboardRegionFilter) ? dashboardRegionFilter : [dashboardRegionFilter]);
+                    const isChecked = currentSelected.includes(reg);
+                    return (
+                      <label
+                        key={reg}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 text-slate-200 text-xs cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (dashboardRegionFilter === 'all') {
+                              setDashboardRegionFilter([reg]);
+                            } else {
+                              const arr = Array.isArray(dashboardRegionFilter) ? [...dashboardRegionFilter] : [dashboardRegionFilter];
+                              if (e.target.checked) {
+                                arr.push(reg);
+                              } else {
+                                const idx = arr.indexOf(reg);
+                                if (idx > -1) arr.splice(idx, 1);
+                              }
+                              setDashboardRegionFilter(arr.length === 0 ? 'all' : arr);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded text-cyan-600 focus:ring-cyan-500 border-slate-700 bg-slate-800 cursor-pointer"
+                        />
+                        <span className="truncate">{reg}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDashboardRegionFilter('all');
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-bold cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsRegionDropdownOpen(false)}
+                    className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Group */}
           <select 
             value={dashboardGroupFilter} 
@@ -750,6 +845,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Reset Filters button */}
           {(dashboardPlantFilter !== 'all' ||
+            dashboardRegionFilter !== 'all' ||
             dashboardGroupFilter !== 'all' ||
             dashboardStreamFilter !== 'all' ||
             dashboardStatusFilter !== 'all' ||
@@ -760,6 +856,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => {
                 setDashboardPlantFilter('all');
+                setDashboardRegionFilter('all');
                 setDashboardGroupFilter('all');
                 setDashboardStreamFilter?.('all');
                 setDashboardStatusFilter?.('all');
@@ -777,6 +874,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="flex items-center gap-1 ml-auto flex-wrap">
             {dashboardPlantFilter !== 'all' && <span className="text-[10px] bg-cyan-900 text-cyan-100 px-1.5 py-0.5 rounded">Plant: {availablePlants.find(p => p.code === dashboardPlantFilter)?.name || dashboardPlantFilter}</span>}
+            {dashboardRegionFilter !== 'all' && <span className="text-[10px] bg-indigo-900 text-indigo-100 px-1.5 py-0.5 rounded">Region: {Array.isArray(dashboardRegionFilter) ? dashboardRegionFilter.join(', ') : dashboardRegionFilter}</span>}
             {dashboardGroupFilter !== 'all' && <span className="text-[10px] bg-amber-900 text-amber-100 px-1.5 py-0.5 rounded">Group: {dashboardGroupFilter}</span>}
             {dashboardStreamFilter !== 'all' && <span className="text-[10px] bg-emerald-900 text-emerald-100 px-1.5 py-0.5 rounded">Fund: {dashboardStreamFilter}</span>}
             {dashboardStatusFilter !== 'all' && <span className="text-[10px] bg-rose-900 text-rose-100 px-1.5 py-0.5 rounded">Status: {dashboardStatusFilter}</span>}

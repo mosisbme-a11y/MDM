@@ -64,6 +64,8 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
     const list = records.filter(r => {
       const sub = canonicalizeSubStage(r.subStage, r.stage);
       return (
+        r.stage === 'moh-to-epss' ||
+        r.stage === 'moh-to-epss-ho' ||
         sub === '3.1' ||
         r.subStage === '3.1' ||
         (r.stage === 'rhb-breakdown-management' && (r.subStage === '3.1' || !r.subStage)) ||
@@ -149,6 +151,13 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
     receivedMohDossiers[0]?.id || ''
   );
 
+  // Security: Regional Access Filter
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const ALL_REGIONS = [
+    'Addis Ababa', 'Afar', 'Amhara', 'Benishangul-Gumuz', 'Central Ethiopia', 'Dire Dawa',
+    'Gambela', 'Harari', 'Oromia', 'Sidama', 'Somali', 'South Ethiopia', 'South West Ethiopia', 'Tigray'
+  ];
+
   const selectedDossier = useMemo(() => {
     return (
       receivedMohDossiers.find(d => d.id === selectedDossierId) ||
@@ -190,23 +199,30 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
     }));
 
     // 2. Build initial rows from the region's health facilities or default facility structure
-    const regionName = dossier.targetedRegions?.[0] || 'Oromia';
+    // SECURITY: Use selectedRegion if it's set to a specific region, otherwise use the first targeted region
+    const regionName = (selectedRegion && selectedRegion !== 'all') 
+      ? selectedRegion 
+      : (dossier.targetedRegions?.[0] || 'Oromia');
+
     const regionFacilities = hfListItems.filter(h =>
-      h.region?.toLowerCase() === regionName.toLowerCase() ||
+      (h.region?.toLowerCase() === regionName.toLowerCase()) ||
       (h.deliveringPlantDescr && h.deliveringPlantDescr.toLowerCase().includes(regionName.toLowerCase()))
     );
 
     let rows: RegionBreakdownRow[] = [];
 
     if (regionFacilities.length > 0) {
-      rows = regionFacilities.slice(0, 10).map((hf, idx) => {
+      // Limit to 15 facilities for initial view
+      rows = regionFacilities.slice(0, 15).map((hf, idx) => {
         const qObj: Record<string, number> = {};
         columns.forEach(col => {
-          // Distribute initial equal portions or leave blank/2 for manual entry
-          qObj[col.id] = 2;
+          // Find if this item was in the dossier and get its regional quota
+          const dossierItem = dossier.itemsIncluded.find(i => i.material === col.code);
+          const baseQty = dossierItem ? Math.max(1, Math.floor(dossierItem.quantity / Math.min(10, regionFacilities.length))) : 2;
+          qObj[col.id] = baseQty;
         });
         return {
-          id: `row-hf-${hf.id || idx}`,
+          id: `row-hf-${hf.id || idx}-${Date.now()}`,
           region: hf.region || regionName,
           zone: hf.zoneDescription || hf.zoneCode || 'Zone 1',
           woreda: hf.woredaDescription || hf.woreda || 'Woreda 01',
@@ -231,10 +247,12 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
       rows = standardFacilityNames.map((name, idx) => {
         const qObj: Record<string, number> = {};
         columns.forEach(col => {
-          qObj[col.id] = 2;
+          const dossierItem = dossier.itemsIncluded.find(i => i.material === col.code);
+          const baseQty = dossierItem ? Math.max(1, Math.floor(dossierItem.quantity / standardFacilityNames.length)) : 2;
+          qObj[col.id] = baseQty;
         });
         return {
-          id: `row-std-${idx}`,
+          id: `row-std-${idx}-${Date.now()}`,
           region: regionName,
           zone: `${regionName} Central Zone`,
           woreda: `Woreda 0${idx + 1}`,
@@ -277,14 +295,14 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
     }
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`✓ Loaded MOH Dossier ${dossier.dspRefNumber} for Health Facility Breakdown!`, {
+      onTriggerCloudSync(`✓ Loaded MOH Dossier ${dossier.dspRefNumber} for ${regionName} Health Facility Breakdown!`, {
         type: 'UPDATE',
         title: `Breakdown for Facilities (${dossier.dspRefNumber})`,
         payload: updatedRecord
       });
     }
 
-    showToast(`✓ Loaded ${columns.length} items from MOH Dossier! Opening Stage 3.2 Health Facility Matrix...`);
+    showToast(`✓ Loaded ${columns.length} items for ${regionName}! Opening Stage 3.2 Health Facility Matrix...`);
 
     // Switch to Sub-step 3.2
     if (onSelectSubTab) {
@@ -649,16 +667,29 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
               <div className="px-4 pb-4 space-y-4">
                 {/* Image 3 Template: MOH Regional Quota Horizontal Matrix Format */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <FileSpreadsheet className="w-4 h-4 text-amber-600" />
                       <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
                         MOH Regional Quota Transmittal Matrix (Sub-step 3.1 Received Format)
                       </h4>
                     </div>
-                    <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
-                      Official Ministerial Quota Format
-                    </span>
+                    
+                    {/* Security: Regional Access Filter Dropdown */}
+                    <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shadow-3xs">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                      <span className="text-[10px] font-black text-slate-500 uppercase">Regional Access:</span>
+                      <select
+                        value={selectedRegion}
+                        onChange={(e) => setSelectedRegion(e.target.value)}
+                        className="bg-transparent border-none text-[11px] font-black text-slate-900 focus:ring-0 cursor-pointer outline-none"
+                      >
+                        <option value="all">🌍 NATIONAL VIEW (ALL REGIONS)</option>
+                        {ALL_REGIONS.map(reg => (
+                          <option key={reg} value={reg}>{reg.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="border border-slate-300 rounded-xl overflow-x-auto shadow-2xs bg-white">
@@ -697,7 +728,9 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {(selectedDossier.targetedRegions?.length ? selectedDossier.targetedRegions : ['Oromia']).map((reg, regIdx) => (
+                        {(selectedDossier.targetedRegions?.length ? selectedDossier.targetedRegions : ['Oromia'])
+                          .filter(reg => selectedRegion === 'all' || reg.toLowerCase() === selectedRegion.toLowerCase())
+                          .map((reg, regIdx) => (
                           <tr key={regIdx} className="hover:bg-amber-50/30 transition-colors">
                             <td className="p-2.5 border-r border-slate-200 font-mono text-slate-600">
                               {selectedDossier.dateSubmitted}

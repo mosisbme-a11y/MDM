@@ -1529,6 +1529,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           }
           hfListItems={hfListItems}
           isEditable={true}
+          showHubColumn={true}
           breakdownRequests={records}
           selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id || ''}
           onSelectBreakdownRequest={(reqId) => {

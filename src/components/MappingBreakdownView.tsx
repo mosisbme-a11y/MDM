@@ -966,21 +966,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
 
 
-      {/* Main Interactive Matrix Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <RegionBreakdownMatrixTable 
-          title={adHocDataActive ? "Ad-hoc Mapping Analysis Matrix" : "Equipment Distribution Mapping Matrix"}
-          subtitle={adHocDataActive ? "Currently analyzing uploaded file data with auto-detected columns" : "Map medical device shipments to health facilities linked to master registry"}
-          hfListItems={hfListItems}
-          isEditable={isAdmin}
-          data={matrixData}
-          onUpdateData={setMatrixData}
-          disableBreakdownLink={true}
-          showHubColumn={isHubMapped}
-        />
-      </div>
-
-
 
       {/* Official Matrix Template Preview & Download Modal matching {94FE6776-C928-45B7-9B5E-5EABF286140A}.png */}
       {showTemplateModal && (

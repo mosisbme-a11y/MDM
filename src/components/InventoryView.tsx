@@ -864,9 +864,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Quick Triage:</span>
             {[
               { id: 'all', label: 'All Items', icon: Package, color: 'slate' },
-              { id: 'lowStock', label: 'Urgent/Low Stock', icon: AlertTriangle, color: 'rose' },
-              { id: 'requiresInstallation', label: 'Requires Installation', icon: Wrench, color: 'amber' },
-              { id: 'defective', label: 'Defective / Faulty', icon: ShieldAlert, color: 'purple' },
             ].map((chip) => {
               const isActive = statusFilter === chip.id;
               return (
@@ -878,17 +875,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border cursor-pointer ${
                     isActive
-                      ? chip.color === 'rose' ? 'bg-rose-600 text-white border-rose-600 shadow-sm' :
-                        chip.color === 'amber' ? 'bg-amber-500 text-white border-amber-500 shadow-sm' :
-                        chip.color === 'purple' ? 'bg-purple-600 text-white border-purple-600 shadow-sm' :
-                        'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
-                  <chip.icon className={`w-3 h-3 ${isActive ? 'text-white' : 
-                    chip.color === 'rose' ? 'text-rose-500' :
-                    chip.color === 'amber' ? 'text-amber-500' :
-                    chip.color === 'purple' ? 'text-purple-500' : 'text-slate-400'}`} />
+                  <chip.icon className={`w-3 h-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                   <span>{chip.label}</span>
                 </button>
               );
@@ -920,118 +911,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </button>
         </div>
 
-        {/* Active Multi-Select Filters Bar (displays chips for selected warehouses and operational statuses) */}
-        {(multiSelectedWarehouses.length > 0 || multiSelectedStatuses.length > 0) && (
-          <div className="flex flex-wrap items-center gap-2 p-2.5 bg-gradient-to-r from-cyan-50/90 via-indigo-50/50 to-slate-50 border border-cyan-200/80 rounded-xl text-xs animate-in fade-in duration-200">
-            <span className="font-extrabold text-slate-800 flex items-center gap-1.5 mr-1">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600" />
-              <span>Simultaneous Multi-Filters:</span>
-            </span>
 
-            {/* Warehouse Chips */}
-            {multiSelectedWarehouses.map((wh) => (
-              <span
-                key={wh}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-amber-900 font-semibold text-[11px] shadow-2xs"
-              >
-                <Warehouse className="w-3 h-3 text-amber-600 shrink-0" />
-                <span className="truncate max-w-[150px]">{wh}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMultiSelectedWarehouses((prev) => prev.filter((w) => w !== wh));
-                    setCurrentPage(1);
-                  }}
-                  className="hover:text-rose-600 text-slate-400 ml-0.5 cursor-pointer"
-                  title="Remove this warehouse filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-
-            {/* Operational Status Chips */}
-            {multiSelectedStatuses.map((st) => {
-              const opt = OPERATIONAL_STATUS_OPTIONS.find((o) => o.id === st);
-              return (
-                <span
-                  key={st}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-cyan-200 text-cyan-900 font-semibold text-[11px] shadow-2xs"
-                >
-                  <CheckCircle2 className="w-3 h-3 text-cyan-600 shrink-0" />
-                  <span>{opt?.label || st}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMultiSelectedStatuses((prev) => prev.filter((s) => s !== st));
-                      setCurrentPage(1);
-                    }}
-                    className="hover:text-rose-600 text-slate-400 ml-0.5 cursor-pointer"
-                    title="Remove this status filter"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              );
-            })}
-
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                type="button"
-                onClick={() => setIsWarehouseStatusModalOpen(true)}
-                className="text-[11px] font-bold text-cyan-700 hover:text-cyan-900 hover:underline cursor-pointer"
-              >
-                Edit in Modal
-              </button>
-              <span className="text-slate-300">|</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setMultiSelectedWarehouses([]);
-                  setMultiSelectedStatuses([]);
-                  setCurrentPage(1);
-                }}
-                className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
-              >
-                Clear Multi-Filters
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Interactive Filter Pills */}
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs font-semibold text-slate-500 self-center mr-1">Category:</span>
-          {categories.slice(0, 8).map(c => (
-            <button
-              key={c}
-              onClick={() => setActiveCategory(activeCategory === c ? null : c)}
-              className={`px-3 py-1 rounded-full text-[11px] font-medium transition cursor-pointer ${activeCategory === c ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-            >
-              {c}
-            </button>
-          ))}
-          <span className="text-xs font-semibold text-slate-500 self-center ml-2 mr-1">Manufacturer:</span>
-          {manufacturers.slice(0, 8).map(m => (
-            <button
-              key={m}
-              onClick={() => setSelectedManufacturer(selectedManufacturer === m ? 'all' : m)}
-              className={`px-3 py-1 rounded-full text-[11px] font-medium transition cursor-pointer ${selectedManufacturer === m ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-            >
-              {m}
-            </button>
-          ))}
-          <span className="text-xs font-semibold text-slate-500 self-center ml-2 mr-1">Warehouse:</span>
-          {warehouses.slice(0, 8).map(w => (
-            <button
-              key={w}
-              onClick={() => setActiveWarehouse(activeWarehouse === w ? null : w)}
-              className={`px-3 py-1 rounded-full text-[11px] font-medium transition cursor-pointer ${activeWarehouse === w ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-            >
-              {w}
-            </button>
-          ))}
-        </div>
 
         {/* Targeted Column Search & Filter Bar Container */}
         <div id="inventory-targeted-filter-bar" className="bg-gradient-to-r from-slate-50 via-cyan-50/20 to-indigo-50/20 rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs space-y-3">
