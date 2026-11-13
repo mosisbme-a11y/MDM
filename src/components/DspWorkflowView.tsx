@@ -1469,9 +1469,13 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
         {/* Sub-Steps Selector Pills Bar */}
         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 overflow-x-auto">
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 ml-1">SUB-STEPS:</span>
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 ml-1">
+            {currentStage === 'all'
+              ? 'ALL SUB-STEPS:'
+              : `${stagesList.find(s => s.stageKey === currentStage)?.label || ''} SUB-STEPS:`}
+          </span>
           {stagesList
-            .filter(stg => currentStage === 'all' || currentStage === stg.stageKey)
+            .filter(stg => currentStage === 'all' || stg.stageKey === currentStage)
             .flatMap(stg => stg.subSteps)
             .map((sub) => {
               const isSubSelected = currentSubStep === sub.id;
@@ -1527,17 +1531,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <button
                   key={sub.id}
                   onClick={() => onSelectSubTab?.(sub.subTab)}
-                  className={`group relative px-4 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
+                  className={`group relative px-3.5 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                     isSubSelected
                       ? 'bg-[#0B1527] text-white border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]'
                       : 'bg-[#EBF1F6] text-[#1E3A5F] hover:bg-[#DEE7EF] border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] hover:border-[#CAD6E2]'
                   }`}
-                  title={sub.label}
+                  title={`${sub.id} ${sub.label}`}
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSubSelected ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]' : 'bg-[#8292A2]'}`} />
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black shrink-0 ${
+                    isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-white text-slate-700 border border-slate-200'
+                  }`}>
+                    {sub.id}
+                  </span>
                   <span className="tracking-tight uppercase">{sub.label}</span>
                   {subCount > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${isSubSelected ? 'bg-amber-400 text-slate-900' : 'bg-[#D5E1EC] text-[#1E3A5F]'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${isSubSelected ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40' : 'bg-[#D5E1EC] text-[#1E3A5F]'}`}>
                       {subCount}
                     </span>
                   )}
@@ -2237,9 +2245,54 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         />
       ) : (
         <>
+          {/* Clear Stage Sub-Steps Directory when clicking one of the 4 main DSP Management sections */}
+          {currentStage !== 'all' && currentSubStep === 'all' && (() => {
+            const activeStageObj = stagesList.find(s => s.stageKey === currentStage);
+            if (!activeStageObj) return null;
+            return (
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${activeStageObj.color}`} />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                      {activeStageObj.label} — Sub-Steps
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
+                    {activeStageObj.subSteps.length} Sub-Steps
+                  </span>
+                </div>
 
-
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {activeStageObj.subSteps.map((sub) => {
+                    const meta = SUBMITTING_CRITERIA_MAP[sub.id];
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => onSelectSubTab?.(sub.subTab)}
+                        className="group text-left p-3.5 rounded-xl bg-slate-50/80 hover:bg-[#0B1527] border border-slate-200 hover:border-[#0B1527] transition-all cursor-pointer flex items-start justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-slate-900 group-hover:text-white truncate transition-colors">
+                              {sub.label}
+                            </span>
+                          </div>
+                          {meta && (
+                            <p className="text-[10px] text-slate-500 group-hover:text-slate-300 truncate transition-colors">
+                              {meta.sender} → {meta.recipient}
+                            </p>
+                          )}
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 shrink-0 mt-0.5 transition-colors" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Filter and Search Bar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">

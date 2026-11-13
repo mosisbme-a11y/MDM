@@ -171,14 +171,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isFeatureOpen, setIsFeatureOpen] = useState(activeTab === 'defective');
   const [isMasterDataOpen, setIsMasterDataOpen] = useState(false);
   const [isInventoryMgmtOpen, setIsInventoryMgmtOpen] = useState(true);
+  const getDspStageFromSubTab = (tab: string): 'head-office-dsp' | 'moh-osp-management' | 'rhb-breakdown-management' | 'branches-dsp-management' | null => {
+    if (
+      tab === 'head-office-dsp' ||
+      tab === 'dsp-request-moh-epss' ||
+      tab === 'dsp-aggregation-epss-ho' ||
+      tab.startsWith('dsp-ho-')
+    ) return 'head-office-dsp';
+    if (
+      tab === 'moh-osp-management' ||
+      tab === 'dsp-breakdown-moh-rhb' ||
+      tab === 'dsp-submitted-moh-epss-ho' ||
+      tab.startsWith('dsp-moh-')
+    ) return 'moh-osp-management';
+    if (
+      tab === 'rhb-breakdown-management' ||
+      tab === 'dsp-submitted-rhb-moh' ||
+      tab.startsWith('dsp-rhb-')
+    ) return 'rhb-breakdown-management';
+    if (
+      tab === 'branches-dsp-management' ||
+      tab === 'dsp-submitted-epss-branch' ||
+      tab.startsWith('dsp-branches-')
+    ) return 'branches-dsp-management';
+    return null;
+  };
+
   const [isDspMgmtOpen, setIsDspMgmtOpen] = useState(
     epssSubTab === 'dsp-mgmt' ||
-    epssSubTab === 'dsp-request-moh-epss' ||
-    epssSubTab === 'dsp-breakdown-moh-rhb' ||
-    epssSubTab === 'dsp-submitted-rhb-moh' ||
-    epssSubTab === 'dsp-submitted-moh-epss-ho' ||
-    epssSubTab === 'dsp-aggregation-epss-ho' ||
-    epssSubTab === 'dsp-submitted-epss-branch'
+    getDspStageFromSubTab(epssSubTab) !== null
+  );
+  const [openDspStage, setOpenDspStage] = useState<'head-office-dsp' | 'moh-osp-management' | 'rhb-breakdown-management' | 'branches-dsp-management' | null>(
+    () => getDspStageFromSubTab(epssSubTab)
   );
   const [isPlantDspOpen, setIsPlantDspOpen] = useState(
     epssSubTab === 'plant-dsp' ||
@@ -254,6 +278,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       epssSubTab !== 'donation-analysis'
     ) {
       setIsDonationMgmtOpen(false);
+    }
+    const matchedDspStage = getDspStageFromSubTab(epssSubTab);
+    if (matchedDspStage) {
+      setIsDspMgmtOpen(true);
+      setOpenDspStage(matchedDspStage);
     }
   }, [epssSubTab]);
 
@@ -729,70 +758,133 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       {/* Visible only when expanded / clicked */}
                       {isDspMgmtOpen && (
                         <div className="ml-3 pl-2.5 border-l-2 border-amber-500/30 space-y-1 py-0.5">
-                          {/* Head office DSP management */}
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('head-office-dsp');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'head-office-dsp')
-                                ? 'text-amber-400 font-bold border border-amber-500/40'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Send className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span className="truncate">Head Office DSP Management</span>
-                          </button>
+                          {[
+                            {
+                              id: 'head-office-dsp' as const,
+                              label: 'Head Office DSP Management',
+                              icon: Send,
+                              iconColor: 'text-amber-400',
+                              activeCls: 'text-amber-400 font-bold border border-amber-500/40 bg-amber-500/10',
+                              subBorderCls: 'border-amber-500/40',
+                              subActiveCls: 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40',
+                              badgeCls: 'bg-amber-500/20 text-amber-300',
+                              steps: [
+                                { label: 'DSP Request to MOH', tab: 'dsp-ho-1-1' as EpssSubTab },
+                                { label: 'DSP Received from MOH', tab: 'dsp-ho-1-2' as EpssSubTab },
+                                { label: 'Map HF to Hub', tab: 'dsp-ho-1-3-1' as EpssSubTab },
+                                { label: 'Send DSP to Hub', tab: 'dsp-ho-1-3-2' as EpssSubTab },
+                                { label: 'Item Aggregation', tab: 'dsp-ho-1-3-3' as EpssSubTab },
+                                { label: 'Order Process', tab: 'dsp-ho-1-3-4' as EpssSubTab },
+                              ],
+                            },
+                            {
+                              id: 'moh-osp-management' as const,
+                              label: 'MOH DSP Management',
+                              icon: FileText,
+                              iconColor: 'text-cyan-400',
+                              activeCls: 'text-cyan-400 font-bold border border-cyan-500/40 bg-cyan-500/10',
+                              subBorderCls: 'border-cyan-500/40',
+                              subActiveCls: 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40',
+                              badgeCls: 'bg-cyan-500/20 text-cyan-300',
+                              steps: [
+                                { label: 'DSP Received from EPSS', tab: 'dsp-moh-2-1' as EpssSubTab },
+                                { label: 'DSP Request to RHB', tab: 'dsp-moh-2-2' as EpssSubTab },
+                                { label: 'Breakdown Received from RHB', tab: 'dsp-moh-2-3' as EpssSubTab },
+                                { label: 'Breakdown Aggregation by RHB', tab: 'dsp-moh-2-4' as EpssSubTab },
+                                { label: 'DSP Aggr. Submitted to EPSS', tab: 'dsp-moh-2-5' as EpssSubTab },
+                              ],
+                            },
+                            {
+                              id: 'rhb-breakdown-management' as const,
+                              label: 'RHB Breakdown Management',
+                              icon: Building2,
+                              iconColor: 'text-orange-400',
+                              activeCls: 'text-orange-400 font-bold border border-orange-500/40 bg-orange-500/10',
+                              subBorderCls: 'border-orange-500/40',
+                              subActiveCls: 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/40',
+                              badgeCls: 'bg-orange-500/20 text-orange-300',
+                              steps: [
+                                { label: 'Breakdown Received from MOH', tab: 'dsp-rhb-3-1' as EpssSubTab },
+                                { label: 'Submit Breakdown to MOH', tab: 'dsp-rhb-3-2' as EpssSubTab },
+                              ],
+                            },
+                            {
+                              id: 'branches-dsp-management' as const,
+                              label: 'Branches DSP Management',
+                              icon: Warehouse,
+                              iconColor: 'text-purple-400',
+                              activeCls: 'text-purple-400 font-bold border border-purple-500/40 bg-purple-500/10',
+                              subBorderCls: 'border-purple-500/40',
+                              subActiveCls: 'bg-purple-500/20 text-purple-300 font-bold border border-purple-500/40',
+                              badgeCls: 'bg-purple-500/20 text-purple-300',
+                              steps: [
+                                { label: 'Received DSP', tab: 'dsp-branches-4-1' as EpssSubTab },
+                                { label: 'Analysis & Compare with DSP', tab: 'dsp-branches-4-2' as EpssSubTab },
+                              ],
+                            },
+                          ].map((stageGroup) => {
+                            const StageIcon = stageGroup.icon;
+                            const isStageSelected = isActive && getDspStageFromSubTab(epssSubTab) === stageGroup.id;
+                            const isStageExpanded = openDspStage === stageGroup.id;
 
+                            return (
+                              <div key={stageGroup.id} className="space-y-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveTab('inventory');
+                                    onSelectEpssSubTab?.(stageGroup.id);
+                                    setOpenDspStage((prev) =>
+                                      prev === stageGroup.id && epssSubTab === stageGroup.id ? null : stageGroup.id
+                                    );
+                                  }}
+                                  className={`w-full flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                                    isStageSelected
+                                      ? stageGroup.activeCls
+                                      : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <StageIcon className={`w-3 h-3 ${stageGroup.iconColor} shrink-0`} />
+                                    <span className="truncate">{stageGroup.label}</span>
+                                  </div>
+                                  {isStageExpanded ? (
+                                    <ChevronDown className="w-3 h-3 shrink-0 opacity-80" />
+                                  ) : (
+                                    <ChevronRight className="w-3 h-3 shrink-0 opacity-60" />
+                                  )}
+                                </button>
 
-                          {/* MOH DSP management */}
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('moh-osp-management');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'moh-osp-management' || epssSubTab?.startsWith('dsp-moh-'))
-                                ? 'text-cyan-400 font-bold border border-cyan-500/40'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <FileText className="w-3 h-3 text-cyan-400 shrink-0" />
-                            <span className="truncate">MOH DSP Management</span>
-                          </button>
-
-                          {/* RHB Break down management */}
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('rhb-breakdown-management');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'rhb-breakdown-management' || epssSubTab?.startsWith('dsp-rhb-'))
-                                ? 'text-orange-400 font-bold border border-orange-500/40'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Building2 className="w-3 h-3 text-orange-400 shrink-0" />
-                            <span className="truncate">RHB Breakdown Management</span>
-                          </button>
-
-                          {/* Branches DSP management */}
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('branches-dsp-management');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'branches-dsp-management' || epssSubTab?.startsWith('dsp-branches-'))
-                                ? 'text-purple-400 font-bold border border-purple-500/40'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Warehouse className="w-3 h-3 text-purple-400 shrink-0" />
-                            <span className="truncate">Branches DSP Management</span>
-                          </button>
+                                {isStageExpanded && (
+                                  <div className={`ml-2.5 pl-2 border-l-2 ${stageGroup.subBorderCls} space-y-0.5 py-0.5`}>
+                                    {stageGroup.steps.map((step) => {
+                                      const isStepActive = isActive && epssSubTab === step.tab;
+                                      return (
+                                        <button
+                                          key={step.tab}
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveTab('inventory');
+                                            onSelectEpssSubTab?.(step.tab);
+                                          }}
+                                          className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer text-left ${
+                                            isStepActive
+                                              ? stageGroup.subActiveCls
+                                              : (navTheme.category === 'light'
+                                                  ? 'text-slate-700 hover:bg-slate-200/80'
+                                                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50')
+                                          }`}
+                                          title={step.label}
+                                        >
+                                          <span className="truncate">{step.label}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
