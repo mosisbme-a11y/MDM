@@ -644,6 +644,8 @@ export interface RegionBreakdownRow {
   woreda: string;
   hub: string;
   healthFacility: string;
+  customerDescription?: string;
+  customerId?: string;
   packages: string;
   quantities: Record<string, number>;
 }

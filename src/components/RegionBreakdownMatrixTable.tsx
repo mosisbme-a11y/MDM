@@ -227,6 +227,7 @@ interface RegionBreakdownMatrixTableProps {
   showHubColumn?: boolean;
   isHubMappedInitially?: boolean;
   onProceedToAggregation?: () => void;
+  onTransmitRecord?: (record: DspWorkflowRecord) => void;
 }
 
 export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProps> = ({
@@ -243,7 +244,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   disableBreakdownLink = false,
   showHubColumn = false,
   isHubMappedInitially = false,
-  onProceedToAggregation
+  onProceedToAggregation,
+  onTransmitRecord
 }) => {
   const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
   const [columns, setColumns] = useState<RegionBreakdownColumn[]>(data?.columns || DEFAULT_STAGE_3_COLUMNS);
@@ -2694,20 +2696,22 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   const rhbRecord: DspWorkflowRecord = {
                     id: `dsp-rhb-${transmittalDestination.toLowerCase()}-${Date.now()}`,
                     dspRefNumber: brkRef,
-                    stage: transmittalDestination === 'EPSS' ? 'epss-ho-aggregation' : 'rhb-breakdown-management',
+                    stage: transmittalDestination === 'EPSS' ? 'epss-ho-aggregation' : 'rhb-to-moh',
                     subStage: transmittalDestination === 'EPSS' ? '4.1' : '3.2',
-                    stageTitle: transmittalDestination === 'EPSS' ? 'EPSS Aggregated Dispatch' : 'RHB Breakdown Management',
+                    stageTitle: transmittalDestination === 'EPSS' ? 'EPSS Aggregated Dispatch' : '3.2 Submit Breakdown to MOH',
                     senderOrg: manualSignatoryOrg || `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
-                    recipientOrg: transmittalDestination,
+                    recipientOrg: targetOrg,
                     dspName: cleanDspName,
                     subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Transmitted to ${targetOrg} (${filteredRows.length} Facilities)`,
-                    status: 'Endorsed & Approved',
+                    status: 'Submitted & Pending',
                     dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
                     approvedDate: internalDate || new Date().toISOString().split('T')[0],
                     totalDevices: columns.length,
                     totalQuantity: grandTotalUnits,
                     totalValuationETB: grandTotalUnits * 250000,
-                    targetedRegions: selectedRegionFilter === 'all' ? ALL_ETHIOPIAN_REGIONS : [selectedRegionFilter],
+                    targetedRegions: selectedRegionFilter === 'all'
+                      ? Array.from(new Set(filteredRows.map(r => r.region).filter(Boolean)))
+                      : [selectedRegionFilter],
                     targetedFacilitiesCount: filteredRows.length,
                     officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
                     signatory: manualSignatoryName,
@@ -2722,10 +2726,12 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       material: c.code,
                       description: c.name,
                       quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-                      plant: 'Addis Central ⬡'
+                      plant: filteredRows[0]?.hub || 'Addis Central'
                     })),
                     notes: `Official Health Facility Breakdown Matrix submitted by ${manualSignatoryName} (${manualSignatoryRole}, ${manualSignatoryOrg || 'RHB'}) to ${targetOrg}.`
                   };
+
+                  onTransmitRecord?.(rhbRecord);
 
                   try {
                     pushCentralMasterData({

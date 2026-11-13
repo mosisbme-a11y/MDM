@@ -94,6 +94,8 @@ import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 import { mapFacilityToHub, getHubByCode } from '../data/epssHubs';
+import { RhbBreakdownAggregationView } from './RhbBreakdownAggregationView';
+import { aggregateRhbSubmissionsToMoh, isRhbSubmittedToMohRecord } from '../utils/rhbAggregation';
 
 export interface DateCountInfo {
   days: number;
@@ -695,6 +697,26 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     }
   }, [currentSubTab]);
 
+  const liveAggregatedStage4Data = useMemo<Stage4MatrixData>(() => {
+    const agg = aggregateRhbSubmissionsToMoh(records);
+    return {
+      date: agg.latestDate,
+      region: agg.regionSummaries.length === 1 ? agg.regionSummaries[0].region : 'All Regions',
+      columns: agg.unifiedColumns.map((c) => ({ id: c.id, name: c.name, code: c.code })),
+      rows: agg.facilityRows.map((r, idx) => ({
+        id: `s4-live-${idx}`,
+        date: r.submissionDate !== '-' ? r.submissionDate : agg.latestDate,
+        region: r.region,
+        zone: r.zone,
+        woreda: r.woreda,
+        healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
+        packages: r.packages || 'MCH',
+        plant: r.hub || undefined,
+        quantities: { ...r.quantities }
+      }))
+    };
+  }, [records]);
+
   const stagesList = [
     { 
       id: 'head-office-dsp', 
@@ -1295,6 +1317,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
                   }
                 } catch {}
+              } else if (sub.id === '2.3' || sub.id === '2.4') {
+                subCount = records.filter(isRhbSubmittedToMohRecord).length;
+              } else if (sub.id === '2.5') {
+                const r25Count = records.filter(
+                  (r) => canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho'
+                ).length;
+                subCount = r25Count > 0 ? r25Count : (liveAggregatedStage4Data.rows.length > 0 ? 1 : 0);
+              } else if (sub.id === '3.2') {
+                subCount = records.filter(
+                  (r) => canonicalizeSubStage(r.subStage, r.stage) === '3.2' || isRhbSubmittedToMohRecord(r)
+                ).length;
               }
 
               return (
@@ -1541,6 +1574,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             }
           }}
           onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
+          onTransmitRecord={(newRec) => {
+            setRecords(prev => [newRec, ...prev]);
+            setSelectedRecord(newRec);
+            onTriggerCloudSync?.(
+              `Submitted ${newRec.targetedRegions?.[0] || 'Regional'} breakdown (${newRec.targetedFacilitiesCount} facilities) to ${newRec.recipientOrg}`,
+              {
+                type: 'CREATE',
+                title: `RHB Breakdown Submitted to ${newRec.recipientOrg}`
+              }
+            );
+            setActionFeedbackToast(
+              `✓ Submitted ${newRec.targetedRegions?.[0] || 'Regional'} breakdown to ${newRec.recipientOrg}. Now visible in 2.3 & 2.4 Aggregation.`
+            );
+            setTimeout(() => setActionFeedbackToast(null), 5000);
+          }}
           onUpdateData={(updated) => {
             setRecords(prev => {
               const targetId = selectedRecord?.id || prev.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id;
@@ -1846,65 +1894,109 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       ) : (currentSubStep === '2.3' || currentSubTab === 'dsp-moh-2-3') ? (
         <RegionalSubmittedDataView records={records} />
       ) : (currentSubStep === '2.4' || currentSubTab === 'dsp-moh-2-4' || currentSubTab === 'regional-aggregator') ? (
-        <RegionBreakdownMatrixTable
-          data={
-            selectedRecord?.facilityMatrixData ||
-            records.find(r => r.facilityMatrixData)?.facilityMatrixData || {
-              date: new Date().toISOString().split('T')[0],
-              region: 'all',
-              columns: DEFAULT_STAGE_3_COLUMNS,
-              rows: DEFAULT_STAGE_3_ROWS
-            }
-          }
+        <RhbBreakdownAggregationView
+          records={records}
+          setRecords={setRecords}
           hfListItems={hfListItems}
-          isEditable={true}
-          breakdownRequests={records}
-          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.facilityMatrixData)?.id || ''}
-          onSelectBreakdownRequest={(reqId) => {
-            const req = records.find(r => r.id === reqId);
-            if (req) {
-              setSelectedRecord(req);
-            }
-          }}
-          onOpenUploadModal={() => setIsRegionBreakdownModalOpen(true)}
-          onUpdateData={(updated) => {
-            setRecords(prev => {
-              const targetId = selectedRecord?.id || prev.find(r => r.facilityMatrixData)?.id;
-              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
-              if (existingIdx >= 0 && prev[existingIdx]) {
-                const updatedRec = {
-                  ...prev[existingIdx],
-                  facilityMatrixData: updated,
-                  targetedFacilitiesCount: updated.rows.length,
-                  totalQuantity: updated.rows.reduce((sum, r) => {
-                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
-                  }, 0)
-                };
+          onTriggerCloudSync={onTriggerCloudSync}
+          onNavigateToSubmitToMoh={() => onSelectSubTab?.('dsp-rhb-3-2')}
+          onProceedToEpss={(matrixData, summary) => {
+            const existingIdx = records.findIndex(
+              (r) =>
+                r.id === 'dsp-moh-aggr-2-5' ||
+                (canonicalizeSubStage(r.subStage, r.stage) === '2.5' && r.stage === 'moh-osp-management')
+            );
+            const aggrRecord: DspWorkflowRecord = {
+              id: existingIdx >= 0 ? records[existingIdx].id : 'dsp-moh-aggr-2-5',
+              dspRefNumber:
+                existingIdx >= 0
+                  ? records[existingIdx].dspRefNumber
+                  : `MOH/EPSS-AGGR/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+              stage: 'moh-osp-management',
+              subStage: '2.5',
+              stageTitle: '2.5 DSP Aggr. Submitted to EPSS',
+              senderOrg: 'Ministry of Health (PMD Directorate)',
+              recipientOrg: 'EPSS Head Office',
+              dspName: `Consolidated RHB Aggregation (${summary.regions.length} Region${summary.regions.length !== 1 ? 's' : ''})`,
+              subject: `DSP Aggregated RHB Submissions Ready for EPSS (${summary.regions.join(', ') || 'All Regions'} — ${summary.facilityCount} Facilities)`,
+              status: 'Submitted & Pending',
+              dateSubmitted: summary.latestDate,
+              totalDevices: summary.columnCount,
+              totalQuantity: summary.totalUnits,
+              totalValuationETB: summary.totalUnits * 250000,
+              targetedRegions: summary.regions,
+              targetedFacilitiesCount: summary.facilityCount,
+              officialLetterRef:
+                existingIdx >= 0
+                  ? records[existingIdx].officialLetterRef
+                  : `MOH/PMD/AGGR/${new Date().getFullYear()}`,
+              signatory: 'MOH PMD Directorate',
+              signatoryRole: 'PMD Coordinator',
+              itemsIncluded: matrixData.columns.map((c) => ({
+                material: c.code,
+                description: c.name,
+                quantity: matrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+                plant: 'HO01 Central'
+              })),
+              stage4MatrixData: matrixData,
+              notes: `Consolidated directly from Sub-step 2.4 RHB Submissions (${summary.regions.length} regions, ${summary.facilityCount} facilities, ${summary.columnCount} equipment columns, ${summary.totalUnits} total units).`
+            };
+
+            setRecords((prev) => {
+              const idx = prev.findIndex((r) => r.id === aggrRecord.id);
+              if (idx >= 0) {
                 const copy = [...prev];
-                copy[existingIdx] = updatedRec;
+                copy[idx] = aggrRecord;
                 return copy;
               }
-              return prev;
+              return [aggrRecord, ...prev];
             });
+            setSelectedRecord(aggrRecord);
+            onTriggerCloudSync?.(
+              `Forwarded ${summary.regions.length} RHB submissions (${summary.facilityCount} facilities, ${summary.totalUnits} units) to 2.5 DSP Aggr. Submitted to EPSS`,
+              {
+                type: 'UPDATE',
+                title: `Aggregated ${summary.regions.length} RHB Submissions for EPSS`
+              }
+            );
+            setActionFeedbackToast(
+              `✓ Aggregated ${summary.regions.length} region(s) & ${summary.facilityCount} facilities forwarded to 2.5 DSP Aggr. Submitted to EPSS.`
+            );
+            setTimeout(() => setActionFeedbackToast(null), 5000);
+            onSelectSubTab?.('dsp-moh-2-5');
           }}
-          title="2.4 Breakdown Aggregation by RHB - Multi-Regional Matrix"
-          subtitle="Official two-tier matrix aggregating health facility breakdowns across all Ethiopian regions submitted to MOH"
         />
       ) : (currentSubStep === '2.5' || currentSubTab === 'dsp-moh-2-5' || currentSubTab === 'dsp-submitted-moh-epss-ho') ? (
         <Stage4MohSubmittedMatrixTable
           data={
-            selectedRecord?.stage4MatrixData ||
-            records.find(r => r.stage4MatrixData)?.stage4MatrixData || {
-              date: new Date().toISOString().split('T')[0],
-              region: 'Oromia',
-              columns: DEFAULT_STAGE_4_COLUMNS,
-              rows: DEFAULT_STAGE_4_ROWS
-            }
+            (selectedRecord &&
+            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
+              selectedRecord.stage === 'moh-to-epss-ho') &&
+            selectedRecord.stage4MatrixData
+              ? selectedRecord.stage4MatrixData
+              : records.find(
+                  (r) =>
+                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    r.stage4MatrixData
+                )?.stage4MatrixData) || liveAggregatedStage4Data
           }
           hfListItems={hfListItems}
           isEditable={true}
-          dossiers={records}
-          selectedDossierId={selectedRecord?.id || records.find(r => r.stage4MatrixData)?.id || ''}
+          dossiers={records.filter(
+            (r) => canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho'
+          )}
+          selectedDossierId={
+            (selectedRecord &&
+            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
+              selectedRecord.stage === 'moh-to-epss-ho') &&
+            selectedRecord.stage4MatrixData
+              ? selectedRecord.id
+              : records.find(
+                  (r) =>
+                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    r.stage4MatrixData
+                )?.id) || ''
+          }
           onSelectDossier={(dId) => {
             const req = records.find(r => r.id === dId);
             if (req) {
@@ -1913,22 +2005,61 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           }}
           onUpdateData={(updated) => {
             setRecords(prev => {
-              const targetId = selectedRecord?.id || prev.find(r => r.stage4MatrixData)?.id;
-              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
+              const targetId =
+                (selectedRecord &&
+                (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
+                  selectedRecord.stage === 'moh-to-epss-ho')
+                  ? selectedRecord.id
+                  : undefined) ||
+                prev.find(
+                  (r) =>
+                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    r.stage4MatrixData
+                )?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : -1;
+              const totalQty = updated.rows.reduce((sum, r) => {
+                return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
+              }, 0);
               if (existingIdx >= 0 && prev[existingIdx]) {
                 const updatedRec = {
                   ...prev[existingIdx],
                   stage4MatrixData: updated,
                   targetedFacilitiesCount: updated.rows.length,
-                  totalQuantity: updated.rows.reduce((sum, r) => {
-                    return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
-                  }, 0)
+                  totalDevices: updated.columns.length,
+                  totalQuantity: totalQty
                 };
                 const copy = [...prev];
                 copy[existingIdx] = updatedRec;
                 return copy;
               }
-              return prev;
+              const newRec: DspWorkflowRecord = {
+                id: 'dsp-moh-aggr-2-5',
+                dspRefNumber: `MOH/EPSS-AGGR/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+                stage: 'moh-osp-management',
+                subStage: '2.5',
+                stageTitle: '2.5 DSP Aggr. Submitted to EPSS',
+                senderOrg: 'Ministry of Health (PMD Directorate)',
+                recipientOrg: 'EPSS Head Office',
+                subject: `DSP Aggregated RHB Breakdown (${updated.rows.length} Facilities)`,
+                status: 'Submitted & Pending',
+                dateSubmitted: updated.date || new Date().toISOString().split('T')[0],
+                totalDevices: updated.columns.length,
+                totalQuantity: totalQty,
+                totalValuationETB: totalQty * 250000,
+                targetedRegions: Array.from(new Set(updated.rows.map(r => r.region).filter(Boolean))),
+                targetedFacilitiesCount: updated.rows.length,
+                officialLetterRef: `MOH/PMD/AGGR/${new Date().getFullYear()}`,
+                signatory: 'MOH PMD Directorate',
+                signatoryRole: 'PMD Coordinator',
+                itemsIncluded: updated.columns.map(c => ({
+                  material: c.code,
+                  description: c.name,
+                  quantity: updated.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+                  plant: 'HO01 Central'
+                })),
+                stage4MatrixData: updated
+              };
+              return [newRec, ...prev];
             });
           }}
           onTransmitEPSS={(metadata) => {

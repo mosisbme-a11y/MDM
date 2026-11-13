@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { DspWorkflowRecord } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { Building2, Layers, AlertCircle, FileSpreadsheet, Hospital } from 'lucide-react';
+import { isRhbSubmittedToMohRecord } from '../utils/rhbAggregation';
 
 interface Props {
   records: DspWorkflowRecord[];
@@ -9,7 +10,7 @@ interface Props {
 
 export const RegionalSubmittedDataView: React.FC<Props> = ({ records }) => {
   const regionalRecords = useMemo(() => 
-    records.filter(r => r.stage === 'rhb-to-moh'),
+    records.filter(isRhbSubmittedToMohRecord),
     [records]
   );
 
@@ -141,7 +142,7 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records }) => {
             <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
                <div className="flex items-center gap-1">
                  <Building2 className="w-3 h-3" />
-                 {record.senderOrg.split(' ')[0]} Region
+                 {(record.senderOrg || 'Regional').split(' ')[0]} Region
                </div>
                <div className="flex items-center gap-1">
                  <Hospital className="w-3 h-3" />

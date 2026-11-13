@@ -342,6 +342,7 @@ export const RegionBreakdownModal: React.FC<RegionBreakdownModalProps> = ({
       id: `dsp-reg-${Date.now().toString().slice(-6)}`,
       dspRefNumber: refNumber,
       stage: 'rhb-to-moh',
+      subStage: '3.2',
       stageTitle: '3. DSP Submitted RHB to MOH',
       senderOrg: `${regionName} Regional Health Bureau`,
       recipientOrg: 'Ministry of Health (PMD Directorate)',

@@ -357,10 +357,12 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   useEffect(() => {
     if (data) {
       if (data.date) setInternalDate(data.date);
-      if (data.columns && data.columns.length > 0) setColumns(data.columns);
-      if (data.rows && data.rows.length > 0) setRows(data.rows);
+      setColumns(data.columns || []);
+      setRows(data.rows || []);
     }
   }, [data]);
+
+  const hasPlantColumn = useMemo(() => rows.some(r => Boolean(r.plant && r.plant.trim())), [rows]);
 
   const uniqueRegions = useMemo(() => {
     const set = new Set<string>();
@@ -533,11 +535,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   // Export to Excel with two-tier header
   const handleExportExcel = () => {
     const headerRow1: string[] = [
+      'Date',
       'Region',
       'Zone',
       'Woreda',
       'Name of health facility',
       'List of Packeges',
+      ...(hasPlantColumn ? ['HUB'] : []),
       ...columns.map(c => c.name)
     ];
 
@@ -546,25 +550,31 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
       '',
       '',
       '',
+      '',
       'List of Packeges',
+      ...(hasPlantColumn ? ['Plant'] : []),
       ...columns.map(c => c.code)
     ];
 
     const dataRows = filteredRows.map(r => [
+      r.date || internalDate,
       r.region,
       r.zone,
       r.woreda,
       r.healthFacility,
       r.packages,
+      ...(hasPlantColumn ? [r.plant || ''] : []),
       ...columns.map(c => r.quantities[c.id] !== undefined ? r.quantities[c.id] : 0)
     ]);
 
     const totalRow = [
+      '',
       'TOTAL',
       '',
       '',
       `${filteredRows.length} Facilities`,
       '',
+      ...(hasPlantColumn ? [''] : []),
       ...columns.map(c => columnTotals[c.id] || 0)
     ];
 
@@ -573,11 +583,13 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
     // Set column widths
     ws['!cols'] = [
+      { wch: 12 },
       { wch: 16 },
       { wch: 18 },
       { wch: 12 },
       { wch: 28 },
       { wch: 18 },
+      ...(hasPlantColumn ? [{ wch: 12 }] : []),
       ...columns.map(() => ({ wch: 22 }))
     ];
 
@@ -1216,6 +1228,11 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[130px] text-center">
                   List of Packeges
                 </th>
+                {hasPlantColumn && (
+                  <th className="p-2.5 bg-yellow-300 text-slate-900 border-r border-slate-300 font-bold min-w-[90px] text-center">
+                    HUB
+                  </th>
+                )}
                 {columns.map(col => (
                   <th
                     key={col.id}
@@ -1251,6 +1268,11 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <th className="p-2 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold text-center">
                   List of Packeges
                 </th>
+                {hasPlantColumn && (
+                  <th className="p-2 bg-yellow-100 text-amber-900 border-r border-slate-300 font-bold text-center">
+                    Plant
+                  </th>
+                )}
                 {columns.map(col => (
                   <th
                     key={col.id}
@@ -1279,7 +1301,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + (isEditingMode ? 7 : 6)} className="py-12 text-center text-slate-400">
+                  <td colSpan={columns.length + (hasPlantColumn ? 1 : 0) + (isEditingMode ? 7 : 6)} className="py-12 text-center text-slate-400">
                     No matching facilities found in this filter. Click "+ Add Facility Row" to add a new record.
                   </td>
                 </tr>
@@ -1348,13 +1370,25 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     {/* Name of health facility */}
                     <td className="p-2 border-r border-slate-200">
                       {isEditingMode ? (
-                        <select
-                          value={row.healthFacility}
-                          onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
-                          className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900 cursor-pointer"
-                        >
-                          {hfListItems.map(hf => <option key={hf.id} value={hf.customerDescription}>{hf.customerDescription}</option>)}
-                        </select>
+                        hfListItems.length > 0 ? (
+                          <select
+                            value={row.healthFacility}
+                            onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
+                            className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900 cursor-pointer"
+                          >
+                            {!hfListItems.some(hf => hf.customerDescription === row.healthFacility) && row.healthFacility && (
+                              <option value={row.healthFacility}>{row.healthFacility}</option>
+                            )}
+                            {hfListItems.map(hf => <option key={hf.id} value={hf.customerDescription}>{hf.customerDescription}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={row.healthFacility}
+                            onChange={(e) => handleRowFieldChange(row.id, 'healthFacility', e.target.value)}
+                            className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:bg-white px-1 py-0.5 rounded text-xs font-medium text-slate-900"
+                          />
+                        )
                       ) : (
                         <span className="font-semibold text-slate-900">{row.healthFacility}</span>
                       )}
@@ -1373,6 +1407,21 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                         <span>{row.packages}</span>
                       )}
                     </td>
+
+                    {hasPlantColumn && (
+                      <td className="p-2 border-r border-slate-200 text-center bg-yellow-50 font-mono font-bold text-amber-900">
+                        {isEditingMode ? (
+                          <input
+                            type="text"
+                            value={row.plant || ''}
+                            onChange={(e) => handleRowFieldChange(row.id, 'plant', e.target.value)}
+                            className="w-full text-center bg-white border border-amber-200 rounded px-1 py-0.5 text-xs font-mono font-bold text-amber-900"
+                          />
+                        ) : (
+                          <span>{row.plant || '-'}</span>
+                        )}
+                      </td>
+                    )}
 
 
                     {/* Equipment Quantities Cells */}
@@ -1424,6 +1473,11 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 <td className="p-2.5 border-r border-slate-300 text-center bg-[#dbeafe] text-blue-900 font-mono font-bold">
                   TOTAL
                 </td>
+                {hasPlantColumn && (
+                  <td className="p-2.5 border-r border-slate-300 text-center bg-yellow-100 text-amber-900 font-mono font-bold">
+                    HUB
+                  </td>
+                )}
                 {columns.map(col => (
                   <td key={col.id} className="p-2.5 border-r border-slate-300 text-right font-mono font-black text-purple-900">
                     {formatNumber(columnTotals[col.id] || 0)}
