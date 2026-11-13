@@ -589,15 +589,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
       {/* KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Submitted Regions</div>
-          <div className="text-xl font-black font-mono text-[#0B1527] mt-1 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-amber-500" />
-            <span>{regionSummaries.length}</span>
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Individual RHBs sent to MOH</div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
           <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">RHB Dossiers</div>
           <div className="text-xl font-black font-mono text-indigo-700 mt-1 flex items-center gap-2">
             <FileText className="w-4 h-4 text-indigo-500" />
