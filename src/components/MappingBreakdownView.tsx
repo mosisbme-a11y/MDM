@@ -21,7 +21,11 @@ import {
   Send,
   Mail,
   MessageCircle,
-  ChevronDown
+  ChevronDown,
+  Building,
+  Truck,
+  Check,
+  Share2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -35,6 +39,7 @@ import {
 import { HealthFacilityRecord } from '../types';
 import { downloadCSV } from '../utils/formatters';
 import Papa from 'papaparse';
+import { pushCentralMasterData } from '../utils/centralSyncService';
 
 import { mapFacilityToHub, EPSS_HUBS_REGISTRY } from '../data/epssHubs';
 
@@ -375,9 +380,56 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   const [adHocDataActive, setAdHocDataActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isHubMapped, setIsHubMapped] = useState(false);
-  const [isMohSubmitDropdownOpen, setIsMohSubmitDropdownOpen] = useState(false);
+  const [isHubSubmitDropdownOpen, setIsHubSubmitDropdownOpen] = useState(false);
+  const [isHubTransmitModalOpen, setIsHubTransmitModalOpen] = useState(false);
+  const [isHubEmailModalOpen, setIsHubEmailModalOpen] = useState(false);
+  const [isHubWhatsAppModalOpen, setIsHubWhatsAppModalOpen] = useState(false);
+  const [transmittalRef, setTransmittalRef] = useState(`EPSS/HUB-DISPATCH/2026/${Math.floor(1000 + Math.random() * 9000)}`);
+  const [signatoryName, setSignatoryName] = useState('Dr. Kassahun M.');
+  const [signatoryRole, setSignatoryRole] = useState('EPSS Medical Devices Directorate Director');
+  const [signatoryOrg, setSignatoryOrg] = useState('EPSS Head Office - Distribution Directorate');
+  const [selectedHubTarget, setSelectedHubTarget] = useState<'all' | string>('all');
   const [uploadFeedback, setUploadFeedback] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const currentRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+    ? matrixData.rows
+    : DEFAULT_STAGE_3_ROWS;
+
+  const currentCols = (matrixData && matrixData.columns && matrixData.columns.length > 0)
+    ? matrixData.columns
+    : DEFAULT_STAGE_3_COLUMNS;
+
+  // Hub distribution breakdown
+  const hubAllocations = useMemo(() => {
+    const map: Record<string, { hubCode: string; name: string; region: string; facilitiesCount: number; unitsCount: number; manager?: string }> = {};
+    
+    currentRows.forEach(row => {
+      const hubCode = row.hub || 'AA01';
+      if (!map[hubCode]) {
+        const hubInfo = EPSS_HUBS_REGISTRY.find(h => h.code === hubCode);
+        map[hubCode] = {
+          hubCode,
+          name: hubInfo?.name || hubCode,
+          region: hubInfo?.region || row.region || 'Regional Hub',
+          facilitiesCount: 0,
+          unitsCount: 0,
+          manager: hubInfo?.manager
+        };
+      }
+      map[hubCode].facilitiesCount += 1;
+      currentCols.forEach(col => {
+        map[hubCode].unitsCount += Number(row.quantities[col.id]) || 0;
+      });
+    });
+
+    return Object.values(map).sort((a, b) => b.unitsCount - a.unitsCount);
+  }, [currentRows, currentCols]);
+
+  const uniqueHubsCount = hubAllocations.length;
+  const totalAllocatedUnits = currentRows.reduce((sum, r) => {
+    return sum + currentCols.reduce((cSum, c) => cSum + (Number(r.quantities[c.id]) || 0), 0);
+  }, 0);
 
   const stats = useMemo(() => {
     const total = hfListItems.length;
@@ -838,33 +890,74 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+            />
+
+            <button
+              type="button"
+              onClick={handleMapWithHubs}
+              disabled={isAnalyzing}
+              className={`px-5 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
+                isHubMapped 
+                  ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-400 text-white' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
+              }`}
+            >
+              {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
+              <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="px-4 py-2.5 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs sm:text-sm transition shadow-lg cursor-pointer flex items-center gap-2 border border-cyan-400/40"
+            >
+              {isUploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload size={15} />}
+              <span>Upload File</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowTemplateModal(true)}
+              className="px-4 py-2.5 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition shadow cursor-pointer flex items-center gap-2 border border-slate-600"
+            >
+              <FileSpreadsheet size={15} />
+              <span>Templates</span>
+            </button>
+
+            {/* SUBMIT BREAKDOWN FOR HUB/BRANCHES Pill Button matching user specification */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsMohSubmitDropdownOpen(!isMohSubmitDropdownOpen)}
-                className="flex items-center gap-3 px-6 py-3 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-sm shadow-2xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
-                title="Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"
+                onClick={() => setIsHubSubmitDropdownOpen(!isHubSubmitDropdownOpen)}
+                className="flex items-center gap-3 px-6 py-3 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-sm shadow-2xl hover:shadow-emerald-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
+                title="Submit official breakdown matrix to EPSS Hubs and Branches for distribution execution"
               >
-                <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
-                <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
-                  SUBMIT BREAKDOWN TO MOH
+                <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] animate-pulse shrink-0" />
+                <span className="tracking-widest font-black text-white group-hover:text-emerald-300 transition-colors">
+                  SUBMIT BREAKDOWN FOR HUB/BRANCHES
                 </span>
-                <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1">
+                <span className="w-6 h-6 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1">
                   3
                 </span>
-                <ChevronDown className={`w-4 h-4 text-amber-400 transition-transform ${isMohSubmitDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-emerald-400 transition-transform ${isHubSubmitDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Dropdown Menu */}
-              {isMohSubmitDropdownOpen && (
-                <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 bg-[#0a0f1d] border-2 border-amber-400/80 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
+              {/* Hub Submission Channels Dropdown Menu */}
+              {isHubSubmitDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-[#0a0f1d] border-2 border-emerald-400/80 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="px-3 py-2 border-b border-slate-800">
-                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
-                      Select MOH Submission Channel:
+                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider block">
+                      Select Hub / Branch Submission Channel:
                     </span>
                     <span className="text-[11px] text-slate-400 font-mono">
-                      Official dispatch routes for PMD MOH
+                      Official dispatch routes for EPSS Hubs & Delivering Branches
                     </span>
                   </div>
 
@@ -872,36 +965,25 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setIsMohSubmitDropdownOpen(false);
-                        handleDownloadMappedData('xlsx');
-                        setUploadFeedback({
-                          message: '⚡ Direct System Transmittal to MOH initialized: Matrix exported with digital audit log.',
-                          type: 'success'
-                        });
+                        setIsHubSubmitDropdownOpen(false);
+                        setIsHubTransmitModalOpen(true);
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
                     >
-                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                      <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
                         <Send className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="font-bold text-white group-hover:text-amber-300">1. Direct System Transmittal</div>
-                        <div className="text-[10px] text-slate-400">Digital authorization & audit log</div>
+                        <div className="font-bold text-white group-hover:text-emerald-300">1. Direct System Transmittal</div>
+                        <div className="text-[10px] text-slate-400">Digital dispatch manifest to {uniqueHubsCount || 20} Hubs/Branches</div>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setIsMohSubmitDropdownOpen(false);
-                        handleDownloadMappedData('xlsx');
-                        const subject = encodeURIComponent(`Official Health Facility Breakdown Matrix - EPSS PMD`);
-                        const body = encodeURIComponent(`Dear MOH PMD Team,\n\nPlease find attached the official Health Facility Breakdown Matrix.\nDate: ${new Date().toISOString().split('T')[0]}\n\nBest regards,\nEPSS Medical Device Directorate`);
-                        window.location.href = `mailto:moh.pmd@moh.gov.et?subject=${subject}&body=${body}`;
-                        setUploadFeedback({
-                          message: '📧 Opened email client targeting moh.pmd@moh.gov.et & exported matrix Excel file.',
-                          type: 'success'
-                        });
+                        setIsHubSubmitDropdownOpen(false);
+                        setIsHubEmailModalOpen(true);
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
                     >
@@ -909,22 +991,16 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <Mail className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="font-bold text-white group-hover:text-cyan-300">2. Send via Email</div>
-                        <div className="text-[10px] text-slate-400">Targeting moh.pmd@moh.gov.et</div>
+                        <div className="font-bold text-white group-hover:text-cyan-300">2. Send via Email to Hub Managers</div>
+                        <div className="text-[10px] text-slate-400">Targeting hubs-dispatch@epss.gov.et & branches</div>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setIsMohSubmitDropdownOpen(false);
-                        handleDownloadMappedData('xlsx');
-                        const msg = `*EPSS REGIONAL BREAKDOWN MATRIX TO MOH*\nDate: ${new Date().toISOString().split('T')[0]}\nStatus: Official Matrix Ready\nDispatch: EPSS PMD Directorate`;
-                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                        setUploadFeedback({
-                          message: '💬 Launched WhatsApp Web dispatch & downloaded matrix Excel file.',
-                          type: 'success'
-                        });
+                        setIsHubSubmitDropdownOpen(false);
+                        setIsHubWhatsAppModalOpen(true);
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
                     >
@@ -932,18 +1008,31 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                         <MessageCircle className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="font-bold text-white group-hover:text-emerald-300">3. Send via WhatsApp Desk</div>
-                        <div className="text-[10px] text-slate-400">Web dispatch & auto Excel matrix</div>
+                        <div className="font-bold text-white group-hover:text-emerald-300">3. Send via WhatsApp Hub Desk</div>
+                        <div className="text-[10px] text-slate-400">Regional hub coordinators & branch logistics</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHubSubmitDropdownOpen(false);
+                        handleDownloadMappedData('xlsx');
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group border-t border-slate-800 mt-1"
+                    >
+                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-white group-hover:text-amber-300">4. Export Hubs Allocation Matrix</div>
+                        <div className="text-[10px] text-slate-400">Excel (.xlsx) with HUB delivering plants</div>
                       </div>
                     </button>
                   </div>
                 </div>
               )}
             </div>
-
-
-
-
           </div>
         </div>
 
@@ -964,8 +1053,401 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         )}
       </div>
 
+      {/* Hub Distribution KPI Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-cyan-50 text-cyan-600 border border-cyan-100">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Health Facilities Mapped</div>
+            <div className="text-xl font-black text-slate-900">{currentRows.length.toLocaleString()}</div>
+            <div className="text-[10px] text-slate-500 font-medium">Mapped to Regional Catchment Areas</div>
+          </div>
+        </div>
 
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+            <Layers className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Equipment Allocated</div>
+            <div className="text-xl font-black text-slate-900">{totalAllocatedUnits.toLocaleString()} <span className="text-xs text-slate-400 font-normal">Units</span></div>
+            <div className="text-[10px] text-slate-500 font-medium">{currentCols.length} Device Types in Matrix</div>
+          </div>
+        </div>
 
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+            <Building className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Delivering Plants (Hubs)</div>
+            <div className="text-xl font-black text-indigo-700">{uniqueHubsCount} <span className="text-xs text-slate-400 font-normal">Active</span></div>
+            <div className="text-[10px] text-slate-500 font-medium">EPSS Regional Hubs & Branches</div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 shadow-sm flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-emerald-500 text-white shadow-xs">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">Dispatch Target</div>
+            <div className="text-sm font-black text-emerald-950 flex items-center gap-1.5 mt-0.5">
+              <span>Hubs / Branches</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-200 text-emerald-900 font-mono font-bold">READY</span>
+            </div>
+            <div className="text-[10px] text-emerald-700/80 font-medium">Direct Transmittal to EPSS Plants</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Breakdown Matrix Table */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+        <RegionBreakdownMatrixTable
+          data={matrixData}
+          onUpdateData={(updated) => setMatrixData(updated)}
+          isEditable={true}
+          title="EPSS Health Facility Breakdown to Hubs/Branches Matrix"
+          subtitle="Official Health Facility breakdown showing delivering plants (Hubs/Branches) and allocated medical devices"
+          hfListItems={hfListItems}
+          showHubColumn={true}
+          isHubMappedInitially={true}
+          onOpenUploadModal={() => fileInputRef.current?.click()}
+        />
+      </div>
+
+      {/* MODAL 1: TRANSMIT BREAKDOWN TO EPSS HUBS & BRANCHES */}
+      {isHubTransmitModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scale-in max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Send className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                    <span>Submit Breakdown to Hubs & Branches</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-mono font-bold">
+                      Direct Transmittal
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Official transmittal authorizing delivering plant warehouses to receive & dispatch equipment
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHubTransmitModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Target Recipients</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">{uniqueHubsCount} Regional Hubs</div>
+                  <div className="text-[10px] text-emerald-600 font-semibold">Delivering Plants Active</div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Health Facilities</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">{currentRows.length} Facilities</div>
+                  <div className="text-[10px] text-slate-500">Mapped with catchment hubs</div>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Equipment Quantity</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">{totalAllocatedUnits.toLocaleString()} Units</div>
+                  <div className="text-[10px] text-slate-500">{currentCols.length} Device Types</div>
+                </div>
+              </div>
+
+              {/* Hub Allocations Summary List */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-emerald-600" />
+                    <span>Allocations by Delivering Hub / Branch:</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500">{hubAllocations.length} Hubs assigned</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pt-1">
+                  {hubAllocations.map(hub => (
+                    <div key={hub.hubCode} className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="px-1.5 py-0.5 rounded font-black text-[10px] bg-yellow-300 text-slate-950 font-mono">
+                          {hub.hubCode}
+                        </span>
+                        <span className="font-black text-xs text-emerald-700">
+                          {hub.unitsCount} <span className="text-[9px] text-slate-400 font-normal">units</span>
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-700 truncate mt-1">{hub.name}</div>
+                      <div className="text-[9px] text-slate-400">{hub.facilitiesCount} facilities</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Transmittal Metadata */}
+              <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <h4 className="text-[11px] font-black text-slate-900 uppercase">Official Transmittal & Signatory Authority</h4>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Transmittal Ref *</label>
+                    <input 
+                      type="text"
+                      value={transmittalRef}
+                      onChange={(e) => setTransmittalRef(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-mono font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Dispatcher *</label>
+                    <input 
+                      type="text"
+                      value={signatoryName}
+                      onChange={(e) => setSignatoryName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Official Role *</label>
+                    <input 
+                      type="text"
+                      value={signatoryRole}
+                      onChange={(e) => setSignatoryRole(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsHubTransmitModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await pushCentralMasterData({
+                      dspReceivedMohRows: currentRows,
+                      updatedBy: `${signatoryName} (${signatoryRole})`,
+                      updateKind: `Transmitted Breakdown to ${uniqueHubsCount} EPSS Hubs & Branches (${currentRows.length} Facilities, ${totalAllocatedUnits} Units)`
+                    });
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                  handleDownloadMappedData('xlsx');
+                  setIsHubTransmitModalOpen(false);
+                  setUploadFeedback({
+                    message: `✓ Breakdown successfully submitted to ${uniqueHubsCount} EPSS Hubs & Branches under Transmittal Ref #${transmittalRef}. Branch dispatch manifests generated.`,
+                    type: 'success'
+                  });
+                }}
+                className="px-6 py-2.5 rounded-xl font-black transition cursor-pointer flex items-center gap-2 shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 text-xs"
+              >
+                <Send className="w-4 h-4" />
+                <span>Confirm & Dispatch to {uniqueHubsCount || 20} Hubs/Branches</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: SEND BREAKDOWN VIA EMAIL TO HUB MANAGERS */}
+      {isHubEmailModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-cyan-50 text-cyan-700 border border-cyan-200">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase">Send Breakdown Email to Hub Managers</h3>
+                  <p className="text-[11px] text-slate-400">Official dispatch payload to EPSS Regional Hub & Branch Logistics Teams</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHubEmailModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">To (Hub Distribution Logistics Desk)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value="hubs-dispatch@epss.gov.et, aa01@epss.gov.et, ad01@epss.gov.et, bd01@epss.gov.et, di01@epss.gov.et, hw01@epss.gov.et"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-800"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Subject</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`Official EPSS Health Facility Allocation Matrix for Regional Hubs & Branches - ${new Date().toISOString().split('T')[0]}`}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Payload Summary Preview</label>
+                <textarea
+                  rows={4}
+                  readOnly
+                  value={`EPSS Health Facility Breakdown Matrix for Regional Hubs & Branches\nDate: ${new Date().toISOString().split('T')[0]}\nTotal Delivering Hubs: ${uniqueHubsCount} Plants\nTotal Health Facilities: ${currentRows.length}\nTotal Equipment: ${totalAllocatedUnits} Units\nStatus: Approved for Receiving & Branch Dispatch`}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-700"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-cyan-50/70 border border-cyan-200 flex items-center justify-between text-cyan-950">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-cyan-600" />
+                  <div>
+                    <div className="font-bold text-xs">EPSS_Hub_Branch_Allocation_Matrix_${new Date().toISOString().split('T')[0]}.xlsx</div>
+                    <div className="text-[10px] text-cyan-700">Official Matrix with Delivering Plant (HUB) Column</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadMappedData('xlsx')}
+                  className="px-2.5 py-1 bg-white hover:bg-cyan-100 text-cyan-800 border border-cyan-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsHubEmailModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHubEmailModalOpen(false);
+                  handleDownloadMappedData('xlsx');
+                  const subject = encodeURIComponent(`Official EPSS Health Facility Allocation Matrix for Regional Hubs & Branches`);
+                  const body = encodeURIComponent(`Dear EPSS Hub & Branch Logistics Teams,\n\nPlease find attached the official Health Facility Breakdown & Allocation Matrix for regional warehouse dispatch and facility delivery.\nTotal Facilities: ${currentRows.length}\nTotal Equipment Units: ${totalAllocatedUnits}\nDate: ${new Date().toISOString().split('T')[0]}\n\nBest regards,\nEPSS Medical Device Directorate`);
+                  window.location.href = `mailto:hubs-dispatch@epss.gov.et?subject=${subject}&body=${body}`;
+                  setUploadFeedback({
+                    message: '📧 Opened email client targeting EPSS Hub Managers & downloaded matrix Excel file.',
+                    type: 'success'
+                  });
+                }}
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2"
+              >
+                <Mail className="w-4 h-4" />
+                <span>Open Email Client & Download Matrix</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: SEND BREAKDOWN VIA WHATSAPP HUB OPERATIONS DESK */}
+      {isHubWhatsAppModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase">Hub Logistics WhatsApp Dispatch Desk</h3>
+                  <p className="text-[11px] text-slate-400">Broadcast breakdown transmittal to EPSS Regional Hub Coordinators</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHubWhatsAppModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Dispatch Broadcast Message</label>
+                <textarea
+                  rows={6}
+                  readOnly
+                  value={`*EPSS HEALTH FACILITY BREAKDOWN DISPATCH TO HUBS & BRANCHES*\nDate: ${new Date().toISOString().split('T')[0]}\nStatus: Official Allocation Matrix Ready for Branch Receiving & Dispatch\nDelivering Hubs: Regional Hub Network (${uniqueHubsCount} Hubs)\nTotal Facilities: ${currentRows.length}\nTotal Units: ${totalAllocatedUnits} Units\nDispatch Authority: EPSS Medical Device Directorate\nAttached File: EPSS_Hub_Branch_Allocation_Matrix_${new Date().toISOString().split('T')[0]}.xlsx`}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px] text-slate-800"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs">
+                <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>Transmittal payload prepared for Regional Hub Coordinators</span>
+                </div>
+                <div className="text-[11px] text-emerald-700 mt-0.5">
+                  Clicking below will launch WhatsApp Web and automatically download the complete Excel allocation matrix.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsHubWhatsAppModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHubWhatsAppModalOpen(false);
+                  handleDownloadMappedData('xlsx');
+                  const msg = `*EPSS HEALTH FACILITY BREAKDOWN DISPATCH TO HUBS & BRANCHES*\nDate: ${new Date().toISOString().split('T')[0]}\nStatus: Official Allocation Matrix Ready for Branch Receiving & Dispatch\nDelivering Hubs: Regional Hub Network (${uniqueHubsCount} Hubs)\nTotal Facilities: ${currentRows.length}\nTotal Units: ${totalAllocatedUnits} Units\nDispatch Authority: EPSS Medical Device Directorate`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                  setUploadFeedback({
+                    message: '💬 Launched Hub WhatsApp dispatch desk & downloaded breakdown matrix Excel file.',
+                    type: 'success'
+                  });
+                }}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Launch WhatsApp Desk & Download Matrix</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Official Matrix Template Preview & Download Modal matching {94FE6776-C928-45B7-9B5E-5EABF286140A}.png */}
       {showTemplateModal && (

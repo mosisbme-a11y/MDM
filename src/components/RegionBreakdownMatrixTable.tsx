@@ -1290,88 +1290,104 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <button
               type="button"
               onClick={() => setIsSubmitDropdownOpen(!isSubmitDropdownOpen)}
-            className="flex items-center gap-3 px-6 py-2.5 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs sm:text-sm shadow-xl hover:shadow-cyan-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
-            title="Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"
-          >
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)] animate-pulse shrink-0" />
-            <span className="tracking-widest font-black text-white group-hover:text-amber-300 transition-colors">
-              SUBMIT BREAKDOWN TO MOH
-            </span>
-            <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1">
-              3
-            </span>
-            <ChevronDown className={`w-4 h-4 text-amber-400 transition-transform ${isSubmitDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
+              className="flex items-center gap-3 px-6 py-2.5 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs sm:text-sm shadow-xl hover:shadow-emerald-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
+              title={showHubColumn || isHubMapped ? "Submit official breakdown matrix to EPSS Hubs and Branches for distribution execution" : "Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full animate-pulse shrink-0 ${showHubColumn || isHubMapped ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)]' : 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)]'}`} />
+              <span className={`tracking-widest font-black text-white transition-colors ${showHubColumn || isHubMapped ? 'group-hover:text-emerald-300' : 'group-hover:text-amber-300'}`}>
+                {showHubColumn || isHubMapped ? 'SUBMIT BREAKDOWN FOR HUB/BRANCHES' : 'SUBMIT BREAKDOWN TO MOH / EPSS'}
+              </span>
+              <span className={`w-6 h-6 rounded-full text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1 ${showHubColumn || isHubMapped ? 'bg-emerald-400' : 'bg-amber-400'}`}>
+                3
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showHubColumn || isHubMapped ? 'text-emerald-400' : 'text-amber-400'} ${isSubmitDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Submission Channels Dropdown Popover */}
-          {isSubmitDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-72 bg-[#0a0f1d] border-2 border-amber-400/80 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
-              <div className="px-3 py-2 border-b border-slate-800">
-                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
-                  Select MOH Submission Channel:
-                </span>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Official dispatch routes for PMD MOH
-                </span>
+            {/* Submission Channels Dropdown Popover */}
+            {isSubmitDropdownOpen && (
+              <div className={`absolute right-0 mt-2 w-80 bg-[#0a0f1d] border-2 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 ${showHubColumn || isHubMapped ? 'border-emerald-400/80' : 'border-amber-400/80'}`}>
+                <div className="px-3 py-2 border-b border-slate-800">
+                  <span className={`text-[10px] font-black uppercase tracking-wider block ${showHubColumn || isHubMapped ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {showHubColumn || isHubMapped ? 'Select Hub / Branch Submission Channel:' : 'Select MOH Submission Channel:'}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {showHubColumn || isHubMapped ? 'Official dispatch routes for EPSS Hubs & Delivering Branches' : 'Official dispatch routes for PMD MOH'}
+                  </span>
+                </div>
+
+                <div className="space-y-1 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSubmitDropdownOpen(false);
+                      setTransmittalDestination(showHubColumn || isHubMapped ? 'EPSS' : 'MOH');
+                      setIsTransmitModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                  >
+                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+                      <Send className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white group-hover:text-emerald-300">
+                        {showHubColumn || isHubMapped ? '1. Direct System Transmittal to Hubs/Branches' : '1. Direct System Transmittal'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {showHubColumn || isHubMapped ? 'Digital authorization & branch warehouse manifests' : 'Digital authorization & audit log'}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSubmitDropdownOpen(false);
+                      if (showHubColumn || isHubMapped) {
+                        setEmailTo('hubs-dispatch@epss.gov.et, aa01@epss.gov.et, ad01@epss.gov.et, bd01@epss.gov.et, di01@epss.gov.et');
+                        setEmailSubject(`Official EPSS Health Facility Allocation Matrix for Regional Hubs & Branches - ${internalDate}`);
+                      }
+                      setIsEmailModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                  >
+                    <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white group-hover:text-cyan-300">
+                        {showHubColumn || isHubMapped ? '2. Send via Email to Hub Managers' : '2. Send via Email'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {showHubColumn || isHubMapped ? 'Targeting hubs-dispatch@epss.gov.et & branches' : 'Targeting moh.pmd@moh.gov.et'}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSubmitDropdownOpen(false);
+                      setIsWhatsAppModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
+                  >
+                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white group-hover:text-emerald-300">
+                        {showHubColumn || isHubMapped ? '3. Send via WhatsApp Hub Desk' : '3. Send via WhatsApp Desk'}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {showHubColumn || isHubMapped ? 'Regional Hub Coordinators & Logistics Network' : 'Web dispatch & auto Excel matrix'}
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
-
-              <div className="space-y-1 pt-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSubmitDropdownOpen(false);
-                    setTransmittalDestination('MOH');
-                    setIsTransmitModalOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
-                >
-                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
-                    <Send className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-white group-hover:text-amber-300">1. Direct System Transmittal</div>
-                    <div className="text-[10px] text-slate-400">Digital authorization & audit log</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSubmitDropdownOpen(false);
-                    setIsEmailModalOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
-                >
-                  <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-white group-hover:text-cyan-300">2. Send via Email</div>
-                    <div className="text-[10px] text-slate-400">Targeting moh.pmd@moh.gov.et</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSubmitDropdownOpen(false);
-                    setIsWhatsAppModalOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
-                >
-                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
-                    <MessageCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-white group-hover:text-emerald-300">3. Send via WhatsApp Desk</div>
-                    <div className="text-[10px] text-slate-400">Web dispatch & auto Excel matrix</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
 
 
