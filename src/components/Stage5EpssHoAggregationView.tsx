@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   GitMerge,
-  Building2,
   CheckCircle2,
   AlertCircle,
   Download,
@@ -10,14 +9,12 @@ import {
   Sparkles,
   ArrowRight,
   Layers,
-  MapPin,
   RefreshCw,
   Truck,
   FileSpreadsheet,
   FileText,
   ChevronDown,
   ChevronRight,
-  Send,
   Eye,
   SlidersHorizontal,
   BookmarkCheck,
@@ -28,10 +25,7 @@ import {
   Copy,
   Printer,
   Table,
-  CheckSquare,
-  Mail,
-  MessageCircle,
-  Share2
+  CheckSquare
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -39,11 +33,9 @@ import {
   HealthFacilityRecord
 } from '../types';
 import {
-  EPSS_HUBS_REGISTRY,
   EpssHubInfo,
   getHubByCode,
-  mapFacilityToHub,
-  MapHfToHubResult
+  mapFacilityToHub
 } from '../data/epssHubs';
 import { formatNumber } from '../utils/formatters';
 
@@ -97,7 +89,7 @@ interface Stage5EpssHoAggregationViewProps {
   setRecords: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   hfListItems: HealthFacilityRecord[];
   setHfListItems?: React.Dispatch<React.SetStateAction<HealthFacilityRecord[]>>;
-  initialTab?: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch';
+  initialTab?: 'aggregated-matrix' | 'order-process';
   onNavigateToMapHfToHub?: () => void;
   onProceedToOrderProcess?: () => void;
   onTriggerCloudSync?: (
@@ -153,8 +145,8 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     return stage5Dossiers.find(d => d.id === selectedDossierId) || stage5Dossiers[0] || null;
   }, [stage5Dossiers, selectedDossierId]);
 
-  // View Mode: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'
-  const [viewTab, setViewTab] = useState<'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'>(initialTab);
+  // View Mode: 'aggregated-matrix' | 'order-process'
+  const [viewTab, setViewTab] = useState<'aggregated-matrix' | 'order-process'>(initialTab);
   const [showContributingFacilities, setShowContributingFacilities] = useState(false);
 
   React.useEffect(() => {
@@ -162,35 +154,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       setViewTab(initialTab);
     }
   }, [initialTab]);
-  const [dispatchHubModal, setDispatchHubModal] = useState<{
-    hubCode: string;
-    hubName: string;
-    manager: string;
-    phone: string;
-    email: string;
-    totalQuantity: number;
-    facilities: Stage5AllocationItem[];
-    quantitiesByItem: Record<string, number>;
-  } | null>(null);
-  const [dispatchChannel, setDispatchChannel] = useState<'email' | 'whatsapp'>('email');
-  const [dispatchCopied, setDispatchCopied] = useState(false);
-
-  const handleOpenBranchDispatch = (
-    hubSummary: { hub: EpssHubInfo; facilities: Stage5AllocationItem[]; totalQuantity: number; quantitiesByItem: Record<string, number> },
-    channel: 'email' | 'whatsapp'
-  ) => {
-    setDispatchHubModal({
-      hubCode: hubSummary.hub.code,
-      hubName: hubSummary.hub.name,
-      manager: hubSummary.hub.manager || 'Branch Manager',
-      phone: hubSummary.hub.phone || '+251911000000',
-      email: `${hubSummary.hub.code.toLowerCase()}@epss.gov.et`,
-      totalQuantity: hubSummary.totalQuantity,
-      facilities: hubSummary.facilities,
-      quantitiesByItem: hubSummary.quantitiesByItem
-    });
-    setDispatchChannel(channel);
-  };
 
   // Search & Filters for Matrix
   const [searchQuery, setSearchQuery] = useState('');
@@ -874,42 +837,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
               {orderProcessItems.length}
             </span>
           </button>
-
-          <button
-            onClick={() => setViewTab('hub-summary')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              viewTab === 'hub-summary'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>By EPSS Hub ({hubSummaries.length})</span>
-          </button>
-
-          <button
-            onClick={() => setViewTab('catchment-flow')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              viewTab === 'catchment-flow'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Hub Catchment Flow</span>
-          </button>
-
-          <button
-            onClick={() => setViewTab('branch-dispatch')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              viewTab === 'branch-dispatch'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Branch Dispatch (Email & WhatsApp)</span>
-          </button>
         </div>
       </div>
 
@@ -1494,185 +1421,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         </div>
       )}
 
-      {/* ============================================================================
-          VIEW 3: BY EPSS DISTRIBUTION HUB
-          ============================================================================ */}
-      {viewTab === 'hub-summary' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {hubSummaries.map(({ hub, facilities, totalQuantity, quantitiesByItem }) => (
-              <div
-                key={hub.code}
-                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs border border-amber-200">
-                      {hub.code}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{hub.name}</h4>
-                      <p className="text-[11px] text-slate-500">{hub.region} Region</p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                    {totalQuantity} Units
-                  </span>
-                </div>
-
-                <div className="bg-slate-50 rounded-xl p-2.5 text-[11px] space-y-1 text-slate-600 border border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Hub Manager:</span>
-                    <span className="font-semibold text-slate-800">{hub.manager}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Phone:</span>
-                    <span className="font-mono text-slate-800">{hub.phone}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Facilities Mapped:</span>
-                    <span className="font-bold text-emerald-700">{facilities.length} Health Facilities</span>
-                  </div>
-                </div>
-
-                {/* Facilities List inside this Hub */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Assigned Facilities ({facilities.length})
-                  </div>
-                  <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
-                    {facilities.map(fac => (
-                      <div
-                        key={fac.id}
-                        className="bg-slate-50 hover:bg-slate-100 p-2 rounded-lg border border-slate-200/60 flex items-center justify-between text-xs transition"
-                      >
-                        <div className="truncate mr-2">
-                          <div className="font-semibold text-slate-900 truncate">{fac.healthFacility}</div>
-                          <div className="text-[10px] text-slate-500">{fac.region} · {fac.zone}</div>
-                        </div>
-                        <span className="font-bold text-amber-800 text-xs flex-shrink-0 bg-white px-2 py-0.5 rounded border border-slate-200">
-                          {fac.totalQty} units
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Equipment quantities summary */}
-                <div className="border-t border-slate-100 pt-2 flex flex-wrap gap-1">
-                  {equipmentColumns.map(col => {
-                    const q = quantitiesByItem[col.id] || 0;
-                    if (q === 0) return null;
-                    return (
-                      <span key={col.id} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
-                        {col.name.slice(0, 15)}: <strong className="text-slate-900">{q}</strong>
-                      </span>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => handleOpenBranchDispatch({ hub, facilities, totalQuantity, quantitiesByItem }, 'email')}
-                    className="flex-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-indigo-200"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Email Branch</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenBranchDispatch({ hub, facilities, totalQuantity, quantitiesByItem }, 'whatsapp')}
-                    className="flex-1 py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-emerald-200"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================================
-          VIEW 4: CATCHMENT & ROUTING FLOW
-          ============================================================================ */}
-      {viewTab === 'catchment-flow' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
-          <div className="max-w-3xl">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-amber-600" />
-              <span>EPSS National Supply Chain Catchment & Logistics Routing</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Hierarchical flow: EPSS Head Office aggregates and maps each facility to its designated EPSS branch hub for transport packing and release order dispatch.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {EPSS_HUBS_REGISTRY.map(hub => {
-              const matchedSummary = hubSummaries.find(h => h.hub.code === hub.code);
-              const isActive = !!matchedSummary;
-
-              return (
-                <div
-                  key={hub.code}
-                  className={`rounded-2xl p-4 border transition-all ${
-                    isActive
-                      ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-500/10'
-                      : 'bg-slate-50 border-slate-200 opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-mono text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {hub.code}
-                      </span>
-                      <h4 className="font-bold text-slate-900 text-sm mt-1.5">{hub.name}</h4>
-                      <p className="text-[11px] text-slate-500">{hub.region}</p>
-                    </div>
-                    {isActive ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 text-white">
-                        {matchedSummary.facilities.length} HFs Active
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-600">
-                        Standby
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 text-[11px] text-slate-600 space-y-1">
-                    <div><strong>Manager:</strong> {hub.manager}</div>
-                    <div><strong>Phone:</strong> {hub.phone}</div>
-                    <div><strong>Address:</strong> {hub.address}</div>
-                  </div>
-
-                  {hub.catchmentZones && hub.catchmentZones.length > 0 && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-200/60">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase">Catchment Zones:</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {hub.catchmentZones.map(cz => (
-                          <span key={cz} className="text-[10px] bg-white text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                            {cz}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {isActive && (
-                    <div className="mt-3 pt-2 border-t border-amber-200 flex items-center justify-between text-xs font-bold text-amber-900">
-                      <span>Total Allocated:</span>
-                      <span>{matchedSummary.totalQuantity} units</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* MODAL: ADD HEALTH FACILITY ROW */}
       {isAddFacilityModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1840,176 +1588,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                   <span>Copy TSV to Clipboard</span>
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================================
-          VIEW 5: BRANCH DISPATCH (EMAIL & WHATSAPP)
-          ============================================================================ */}
-      {viewTab === 'branch-dispatch' && (
-        <div className="space-y-4">
-          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-5 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center">
-                <Send className="w-6 h-6 text-emerald-300" />
-              </div>
-              <div>
-                <h3 className="font-black text-white text-base">EPSS Branch Dispatch & Communication Center</h3>
-                <p className="text-xs text-emerald-200 mt-0.5">
-                  Send consolidated and mapped health facility allocation data from EPSS Head Office to regional branch hubs via Email and WhatsApp.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-xl bg-white/10 border border-white/20 text-xs font-mono">
-                {hubSummaries.length} Active Branch Hubs
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {hubSummaries.map(({ hub, facilities, totalQuantity, quantitiesByItem }) => (
-              <div key={hub.code} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                      Plant: {hub.code}
-                    </span>
-                    <h4 className="font-bold text-slate-900 text-sm mt-1.5">{hub.name}</h4>
-                    <p className="text-[11px] text-slate-500">Manager: {hub.manager} ({hub.phone})</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-black bg-slate-900 text-emerald-400">
-                    {totalQuantity} Units
-                  </span>
-                </div>
-
-                <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
-                  <div><strong>Assigned Facilities:</strong> {facilities.length} Health Centers/Hospitals</div>
-                  <div><strong>Region Catchment:</strong> {hub.region}</div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => handleOpenBranchDispatch({ hub, facilities, totalQuantity, quantitiesByItem }, 'email')}
-                    className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Email Branch</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenBranchDispatch({ hub, facilities, totalQuantity, quantitiesByItem }, 'whatsapp')}
-                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: BRANCH DISPATCH (EMAIL / WHATSAPP) */}
-      {dispatchHubModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${dispatchChannel === 'email' ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
-                  {dispatchChannel === 'email' ? <Mail className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {dispatchChannel === 'email' ? 'Send Mapped Data via Email' : 'Send Mapped Data via WhatsApp'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    EPSS Hub: <strong className="text-slate-800">{dispatchHubModal.hubName} ({dispatchHubModal.hubCode})</strong>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setDispatchHubModal(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                  {dispatchChannel === 'email' ? 'Recipient Branch Email' : 'Recipient WhatsApp Phone'}
-                </label>
-                <input
-                  type="text"
-                  defaultValue={dispatchChannel === 'email' ? dispatchHubModal.email : dispatchHubModal.phone}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Formatted Dispatch Message & Summary
-                  </label>
-                  <button
-                    onClick={() => {
-                      const text = `EPSS HO MAPPED DATA DISPATCH\nHub: ${dispatchHubModal.hubName} (${dispatchHubModal.hubCode})\nManager: ${dispatchHubModal.manager}\nTotal Assigned Units: ${dispatchHubModal.totalQuantity}\nFacilities: ${dispatchHubModal.facilities.length}\n\nFacilities List:\n` +
-                        dispatchHubModal.facilities.map(f => `- ${f.healthFacility} (${f.region}): ${f.totalQty} units`).join('\n');
-                      navigator.clipboard.writeText(text);
-                      setDispatchCopied(true);
-                      setTimeout(() => setDispatchCopied(false), 2500);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>{dispatchCopied ? 'Copied!' : 'Copy Summary'}</span>
-                  </button>
-                </div>
-                <textarea
-                  readOnly
-                  rows={8}
-                  value={`EPSS HEAD OFFICE - MAPPED DATA DISPATCH\n----------------------------------------\nTo: ${dispatchHubModal.hubName} Hub Management (${dispatchHubModal.manager})\nPlant Code: ${dispatchHubModal.hubCode}\n\nWe have completed the National DSP Aggregation and mapped ${dispatchHubModal.facilities.length} health facilities in your catchment region with a total allocation of ${dispatchHubModal.totalQuantity} units.\n\nAssigned Facilities Breakdown:\n` +
-                    dispatchHubModal.facilities.map(f => `• ${f.healthFacility} (${f.region}, ${f.zone}): ${f.totalQty} units`).join('\n') +
-                    `\nPlease prepare your branch warehouse for receiving and dispatching according to the SAP STO transfer orders.\n\nEPSS Medical Equipment Directorate`}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 font-mono focus:outline-none resize-none shadow-inner leading-relaxed"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDispatchHubModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (dispatchChannel === 'email') {
-                    const subject = `EPSS Mapped Data Dispatch - ${dispatchHubModal.hubName} (${dispatchHubModal.hubCode})`;
-                    const body = `Dear ${dispatchHubModal.manager},\n\nPlease find attached the aggregated and mapped health facility allocations for ${dispatchHubModal.hubName} (${dispatchHubModal.totalQuantity} total units across ${dispatchHubModal.facilities.length} facilities).\n\nEPSS HO`;
-                    window.open(`mailto:${dispatchHubModal.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-                  } else {
-                    const text = `EPSS Mapped Data Dispatch for ${dispatchHubModal.hubName} (${dispatchHubModal.hubCode}): ${dispatchHubModal.totalQuantity} Units across ${dispatchHubModal.facilities.length} facilities. Please check SAP STO.`;
-                    window.open(`https://wa.me/${dispatchHubModal.phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
-                  }
-                  setNotification({
-                    type: 'success',
-                    message: `Dispatched mapped data for ${dispatchHubModal.hubName} via ${dispatchChannel === 'email' ? 'Email' : 'WhatsApp'} successfully!`
-                  });
-                  setDispatchHubModal(null);
-                }}
-                className={`px-5 py-2 rounded-xl text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md ${dispatchChannel === 'email' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{dispatchChannel === 'email' ? 'Launch Email Client' : 'Open WhatsApp'}</span>
-              </button>
             </div>
           </div>
         </div>
