@@ -717,6 +717,183 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     };
   }, [records]);
 
+  const convertStage4ToFacilityMatrix = (s4: Stage4MatrixData): RegionBreakdownMatrixData => ({
+    date: s4.date || new Date().toISOString().split('T')[0],
+    region: s4.region || 'all',
+    columns: s4.columns.map(c => ({ id: c.id, name: c.name, code: c.code })),
+    rows: s4.rows.map((r, idx) => ({
+      id: r.id || `mhf-row-${idx}`,
+      date: r.date || s4.date || new Date().toISOString().split('T')[0],
+      region: r.region || '',
+      zone: r.zone || '',
+      woreda: r.woreda || '',
+      healthFacility: r.healthFacility || '',
+      packages: r.packages || 'MCH',
+      hub: r.plant || '',
+      quantities: { ...(r.quantities || {}) }
+    }))
+  });
+
+  const activeStage131Record = useMemo(() => {
+    if (
+      selectedRecord &&
+      (selectedRecord.facilityMatrixData ||
+        (selectedRecord.stage === 'epss-ho-aggregation' && selectedRecord.stage4MatrixData))
+    ) {
+      return selectedRecord;
+    }
+    return (
+      records.find(r => r.stage === 'epss-ho-aggregation' && (r.facilityMatrixData || r.stage4MatrixData)) ||
+      records.find(r => r.facilityMatrixData) ||
+      records.find(r => r.stage4MatrixData) ||
+      null
+    );
+  }, [selectedRecord, records]);
+
+  const activeStage131MatrixData = useMemo<RegionBreakdownMatrixData>(() => {
+    if (activeStage131Record?.facilityMatrixData) {
+      return activeStage131Record.facilityMatrixData;
+    }
+    if (activeStage131Record?.stage4MatrixData) {
+      return convertStage4ToFacilityMatrix(activeStage131Record.stage4MatrixData);
+    }
+    return {
+      date: new Date().toISOString().split('T')[0],
+      region: 'all',
+      columns: DEFAULT_STAGE_3_COLUMNS,
+      rows: DEFAULT_STAGE_3_ROWS
+    };
+  }, [activeStage131Record]);
+
+  const commitStage131MappedData = (updated: RegionBreakdownMatrixData) => {
+    const newAllocations = updated.rows.map((r, idx) => {
+      const match = mapFacilityToHub(
+        r.healthFacility || r.customerDescription || '',
+        r.region || '',
+        r.zone || '',
+        r.woreda || '',
+        hfListItems
+      );
+      const hubCode =
+        r.hub && r.hub.trim() && r.hub !== 'HO01' && !r.hub.includes('HEAD')
+          ? r.hub.trim()
+          : match.hubCode && match.hubCode !== 'HO01'
+          ? match.hubCode
+          : 'AA01';
+      const hubInfo = getHubByCode(hubCode);
+      const quantities = r.quantities || {};
+      const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
+
+      return {
+        id: r.id || `alloc-s5-${idx}`,
+        healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
+        region: r.region || match.region || 'Unspecified',
+        zone: r.zone || match.zone || '-',
+        woreda: r.woreda || match.woreda || '-',
+        packages: r.packages || 'MCH',
+        hubCode,
+        hubName: hubInfo?.name || match.hubName || hubCode,
+        masterCustomerCode: match.masterCustomerCode,
+        masterFacilityName: match.masterFacilityName,
+        matchMethod: match.matchMethod,
+        matchConfidence: match.matchConfidence,
+        quantities,
+        totalQty
+      };
+    });
+
+    const normalizedMatrix: RegionBreakdownMatrixData = {
+      ...updated,
+      rows: updated.rows.map((r, idx) => ({
+        ...r,
+        hub: newAllocations[idx]?.hubCode || r.hub || 'AA01'
+      }))
+    };
+
+    const totalQty = newAllocations.reduce((sum, a) => sum + a.totalQty, 0);
+    const regions = Array.from(new Set(newAllocations.map(a => a.region).filter(Boolean)));
+    const is131Source =
+      activeStage131Record &&
+      (activeStage131Record.stage === 'epss-ho-aggregation' ||
+        canonicalizeSubStage(activeStage131Record.subStage, activeStage131Record.stage) === '1.3.1');
+
+    const targetId = is131Source
+      ? activeStage131Record!.id
+      : records.find(r => r.id === 'dsp-ho-1-3-1-mapped')?.id ||
+        records.find(r => r.stage === 'epss-ho-aggregation' && canonicalizeSubStage(r.subStage, r.stage) === '1.3.1')?.id;
+
+    const baseRec = targetId ? records.find(r => r.id === targetId) : undefined;
+
+    const nextRecord: DspWorkflowRecord = baseRec
+      ? {
+          ...baseRec,
+          stage: 'epss-ho-aggregation',
+          subStage: '1.3.1',
+          facilityMatrixData: normalizedMatrix,
+          targetedRegions: regions.length > 0 ? regions : baseRec.targetedRegions,
+          targetedFacilitiesCount: normalizedMatrix.rows.length,
+          totalDevices: normalizedMatrix.columns.length,
+          totalQuantity: totalQty,
+          hubAggregationData: {
+            dossierId: baseRec.id,
+            dspRefNumber: baseRec.dspRefNumber,
+            generatedDate: new Date().toISOString().split('T')[0],
+            status: 'Mapped & Ready',
+            mappedFromMapHfToHub: true,
+            columns: normalizedMatrix.columns,
+            allocations: newAllocations
+          }
+        }
+      : {
+          id: 'dsp-ho-1-3-1-mapped',
+          dspRefNumber: `EPSS/MAP-HUB/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+          stage: 'epss-ho-aggregation',
+          subStage: '1.3.1',
+          stageTitle: '1.3.1 Map HF to Hub',
+          senderOrg: 'EPSS Head Office (Supply Planning)',
+          recipientOrg: 'EPSS Branch Hubs',
+          subject: `Map HF to Hub Allocation (${newAllocations.length} Facilities across ${new Set(newAllocations.map(a => a.hubCode)).size} Plants)`,
+          status: 'Endorsed & Approved',
+          dateSubmitted: normalizedMatrix.date || new Date().toISOString().split('T')[0],
+          totalDevices: normalizedMatrix.columns.length,
+          totalQuantity: totalQty,
+          totalValuationETB: totalQty * 250000,
+          targetedRegions: regions,
+          targetedFacilitiesCount: normalizedMatrix.rows.length,
+          officialLetterRef: `EPSS/MHF/${new Date().getFullYear()}`,
+          signatory: 'EPSS HO Supply Planner',
+          signatoryRole: 'Logistics Coordinator',
+          itemsIncluded: normalizedMatrix.columns.map(c => ({
+            material: c.code,
+            description: c.name,
+            quantity: newAllocations.reduce((sum, a) => sum + (Number(a.quantities[c.id]) || 0), 0),
+            plant: 'HO01 Central'
+          })),
+          facilityMatrixData: normalizedMatrix,
+          hubAggregationData: {
+            dossierId: 'dsp-ho-1-3-1-mapped',
+            dspRefNumber: `EPSS/MAP-HUB/${new Date().getFullYear()}`,
+            generatedDate: new Date().toISOString().split('T')[0],
+            status: 'Mapped & Ready',
+            mappedFromMapHfToHub: true,
+            columns: normalizedMatrix.columns,
+            allocations: newAllocations
+          }
+        };
+
+    setRecords(prev => {
+      const existingIdx = prev.findIndex(r => r.id === nextRecord.id);
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = nextRecord;
+        return copy;
+      }
+      return [nextRecord, ...prev];
+    });
+
+    setSelectedRecord(nextRecord);
+  };
+
   const stagesList = [
     { 
       id: 'head-office-dsp', 
@@ -1324,6 +1501,22 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   (r) => canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho'
                 ).length;
                 subCount = r25Count > 0 ? r25Count : (liveAggregatedStage4Data.rows.length > 0 ? 1 : 0);
+              } else if (sub.id === '1.3.3') {
+                const mappedDossiers = records.filter(
+                  (r) =>
+                    r.hubAggregationData?.mappedFromMapHfToHub === true ||
+                    (r.hubAggregationData?.status === 'Mapped & Ready' &&
+                      Array.isArray(r.hubAggregationData?.allocations) &&
+                      r.hubAggregationData.allocations.length > 0)
+                );
+                const plantCodes = new Set<string>();
+                mappedDossiers.forEach((d) => {
+                  (d.hubAggregationData?.allocations || []).forEach((a: any) => {
+                    const code = (a.hubCode || '').trim().toUpperCase();
+                    if (code && code !== 'HO01') plantCodes.add(code);
+                  });
+                });
+                subCount = plantCodes.size;
               } else if (sub.id === '3.2') {
                 subCount = records.filter(
                   (r) => canonicalizeSubStage(r.subStage, r.stage) === '3.2' || isRhbSubmittedToMohRecord(r)
@@ -1711,7 +1904,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
             <button
               type="button"
-              onClick={() => onSelectSubTab?.('dsp-ho-1-3-3')}
+              onClick={() => {
+                commitStage131MappedData(activeStage131MatrixData);
+                onSelectSubTab?.('dsp-ho-1-3-3');
+              }}
               className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <span>Proceed to Item Aggregation (1.3.3)</span>
@@ -1721,21 +1917,13 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
           {stage131ViewMode === 'matrix' ? (
             <RegionBreakdownMatrixTable
-              data={
-                selectedRecord?.facilityMatrixData ||
-                records.find(r => r.facilityMatrixData)?.facilityMatrixData || {
-                  date: new Date().toISOString().split('T')[0],
-                  region: 'all',
-                  columns: DEFAULT_STAGE_3_COLUMNS,
-                  rows: DEFAULT_STAGE_3_ROWS
-                }
-              }
+              data={activeStage131MatrixData}
               hfListItems={hfListItems}
               isEditable={true}
               showHubColumn={true}
               isHubMappedInitially={true}
               breakdownRequests={records}
-              selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.facilityMatrixData)?.id || ''}
+              selectedBreakdownRequestId={activeStage131Record?.id || ''}
               onSelectBreakdownRequest={(reqId) => {
                 const req = records.find(r => r.id === reqId);
                 if (req) {
@@ -1746,69 +1934,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               onProceedToAggregation={() => {
                 onSelectSubTab?.('dsp-ho-1-3-3');
               }}
-              onUpdateData={(updated) => {
-                setRecords(prev => {
-                  const targetId = selectedRecord?.id || prev.find(r => r.facilityMatrixData)?.id || prev[0]?.id;
-                  const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : 0;
-                  
-                  // Compute allocations and hubAggregationData so Item Aggregation (1.3.3) is immediately ready
-                  const newAllocations = updated.rows.map((r, idx) => {
-                    const match = mapFacilityToHub(
-                      r.healthFacility || r.customerDescription || '',
-                      r.region || '',
-                      r.zone || '',
-                      r.woreda || '',
-                      hfListItems
-                    );
-                    const hubCode = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD'))
-                      ? r.hub
-                      : (match.hubCode && match.hubCode !== 'HO01' ? match.hubCode : 'AA01');
-                    const hubInfo = getHubByCode(hubCode);
-                    const quantities = r.quantities || {};
-                    const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
-
-                    return {
-                      id: r.id || `alloc-s5-${idx}`,
-                      healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
-                      region: r.region || match.region || 'Oromia',
-                      zone: r.zone || match.zone || 'Central Zone',
-                      woreda: r.woreda || match.woreda || 'Woreda 01',
-                      packages: r.packages || 'MCH',
-                      hubCode: hubCode,
-                      hubName: hubInfo?.name || match.hubName || hubCode,
-                      masterCustomerCode: match.masterCustomerCode,
-                      masterFacilityName: match.masterFacilityName,
-                      matchMethod: match.matchMethod,
-                      matchConfidence: match.matchConfidence,
-                      quantities,
-                      totalQty: totalQty || 12
-                    };
-                  });
-
-                  if (existingIdx >= 0 && prev[existingIdx]) {
-                    const updatedRec = {
-                      ...prev[existingIdx],
-                      facilityMatrixData: updated,
-                      targetedFacilitiesCount: updated.rows.length,
-                      totalQuantity: updated.rows.reduce((sum, r) => {
-                        return sum + updated.columns.reduce((csum, c) => csum + (Number(r.quantities[c.id]) || 0), 0);
-                      }, 0),
-                      hubAggregationData: {
-                        dossierId: prev[existingIdx].id,
-                        dspRefNumber: prev[existingIdx].dspRefNumber,
-                        generatedDate: new Date().toISOString().split('T')[0],
-                        status: 'Mapped & Ready',
-                        columns: updated.columns,
-                        allocations: newAllocations
-                      }
-                    };
-                    const copy = [...prev];
-                    copy[existingIdx] = updatedRec;
-                    return copy;
-                  }
-                  return prev;
-                });
-              }}
+              onUpdateData={commitStage131MappedData}
               title="1.3.1 Map HF to EPSS Hub — Health Facility Breakdown Matrix"
               subtitle="Official Map HF to HUB matrix template showing delivering plants and health facility allocations"
             />
@@ -1840,6 +1966,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords={setRecords}
           hfListItems={hfListItems}
           setHfListItems={setHfListItems}
+          onNavigateToMapHfToHub={() => onSelectSubTab?.('dsp-ho-1-3-1')}
+          onProceedToOrderProcess={() => onSelectSubTab?.('dsp-ho-1-3-4')}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '1.3.4' || (currentSubTab as string) === 'dsp-ho-1-3-4' || (currentSubTab as string) === 'order-process') ? (
@@ -1849,6 +1977,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords={setRecords}
           hfListItems={hfListItems}
           setHfListItems={setHfListItems}
+          onNavigateToMapHfToHub={() => onSelectSubTab?.('dsp-ho-1-3-1')}
+          onProceedToOrderProcess={() => onSelectSubTab?.('dsp-ho-1-3-4')}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation') ? (
@@ -1857,6 +1987,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           setRecords={setRecords}
           hfListItems={hfListItems}
           setHfListItems={setHfListItems}
+          onNavigateToMapHfToHub={() => onSelectSubTab?.('dsp-ho-1-3-1')}
+          onProceedToOrderProcess={() => onSelectSubTab?.('dsp-ho-1-3-4')}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentStage === 'epss-to-branch') ? (
@@ -2092,6 +2224,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 plant: 'HO01 Central'
               })),
               stage4MatrixData: metadata.matrixData,
+              facilityMatrixData: convertStage4ToFacilityMatrix(metadata.matrixData),
               notes: `Aggregated breakdown transmitted from MOH PMD to EPSS Head Office. Signatory: ${metadata.signatory} (${metadata.role})`
             };
 

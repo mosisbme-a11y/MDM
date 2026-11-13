@@ -303,30 +303,27 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       return;
     }
     setIsAnalyzing(true);
-    showToast('Mapping facilities to official EPSS regional distribution hubs...');
-    setTimeout(() => {
-      const updatedRows = rows.map(row => {
-        const mapping = mapFacilityToHub(
-          row.healthFacility || row.customerDescription || '',
-          row.region || '',
-          row.zone || '',
-          row.woreda || '',
-          hfListItems
-        );
-        const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
-          ? mapping.hubCode
-          : (row.hub && row.hub !== 'HO01' ? row.hub : 'AA01');
-        return {
-          ...row,
-          hub: hubSymbol
-        };
-      });
-      setRows(updatedRows);
-      setIsHubMapped(true);
-      notifyChange(internalDate, columns, updatedRows);
-      showToast('✓ Successfully mapped facilities to EPSS Hubs! Hub column auto-inserted.');
-      setIsAnalyzing(false);
-    }, 600);
+    const updatedRows = rows.map(row => {
+      const mapping = mapFacilityToHub(
+        row.healthFacility || row.customerDescription || '',
+        row.region || '',
+        row.zone || '',
+        row.woreda || '',
+        hfListItems
+      );
+      const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
+        ? mapping.hubCode
+        : (row.hub && row.hub !== 'HO01' ? row.hub : 'AA01');
+      return {
+        ...row,
+        hub: hubSymbol
+      };
+    });
+    setRows(updatedRows);
+    setIsHubMapped(true);
+    notifyChange(internalDate, columns, updatedRows);
+    showToast(`✓ Mapped ${updatedRows.length} facilities to EPSS Hubs! Ready for Item Aggregation (1.3.3).`);
+    setIsAnalyzing(false);
   };
 
   const [dspProjectName, setDspProjectName] = useState('Regional Health Facility Allocation Matrix');
@@ -1275,19 +1272,51 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
         {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
         <div className="relative">
-            <button
-              type="button"
-              onClick={handleMapHfToHub}
-              disabled={isAnalyzing}
-              className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
-                isHubMapped 
-                  ? 'bg-emerald-600 border-emerald-400 text-white' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
-              }`}
-            >
-              {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
-              <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleMapHfToHub}
+                disabled={isAnalyzing}
+                className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
+                  isHubMapped 
+                    ? 'bg-emerald-600 border-emerald-400 text-white' 
+                    : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
+                }`}
+              >
+                {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
+                <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
+              </button>
+
+              {onProceedToAggregation && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const mappedRows = rows.map(row => {
+                      if (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) return row;
+                      const mapping = mapFacilityToHub(
+                        row.healthFacility || row.customerDescription || '',
+                        row.region || '',
+                        row.zone || '',
+                        row.woreda || '',
+                        hfListItems
+                      );
+                      return {
+                        ...row,
+                        hub: (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01'
+                      };
+                    });
+                    setRows(mappedRows);
+                    setIsHubMapped(true);
+                    notifyChange(internalDate, columns, mappedRows);
+                    onProceedToAggregation();
+                  }}
+                  className="px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition-all active:scale-95 cursor-pointer tracking-wider uppercase flex items-center gap-2 border border-amber-300"
+                >
+                  <span>Save & Aggregate by Plant (1.3.3)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
 
             <button
               type="button"

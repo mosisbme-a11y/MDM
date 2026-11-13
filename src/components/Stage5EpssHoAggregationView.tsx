@@ -98,6 +98,8 @@ interface Stage5EpssHoAggregationViewProps {
   hfListItems: HealthFacilityRecord[];
   setHfListItems?: React.Dispatch<React.SetStateAction<HealthFacilityRecord[]>>;
   initialTab?: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch';
+  onNavigateToMapHfToHub?: () => void;
+  onProceedToOrderProcess?: () => void;
   onTriggerCloudSync?: (
     successMsg: string,
     mutation: {
@@ -114,39 +116,37 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   hfListItems = [],
   setHfListItems,
   initialTab = 'aggregated-matrix',
+  onNavigateToMapHfToHub,
+  onProceedToOrderProcess,
   onTriggerCloudSync
 }) => {
-  // Stage 5 dossiers
-  // Stage 5 dossiers (including any dossier with facilityMatrixData, hubAggregationData, or Stage 1.3/Stage 4/Stage 5)
+  // Strictly source ONLY dossiers that already received mapped HF->Hub data from 1.3.1 Map HF to Hub
   const stage5Dossiers = useMemo(() => {
-    const list = records.filter(r => 
-      r.stage === 'epss-ho-aggregation' ||
-      r.subStage === '1.3' ||
-      r.subStage === '1.3.1' ||
-      r.subStage === '1.3.3' ||
-      r.subStage === '1.2' ||
-      Boolean(r.hubAggregationData) ||
-      Boolean(r.facilityMatrixData) ||
-      Boolean(r.stage4MatrixData)
+    return records.filter(r =>
+      r.hubAggregationData?.mappedFromMapHfToHub === true ||
+      (r.hubAggregationData?.status === 'Mapped & Ready' &&
+        Array.isArray(r.hubAggregationData?.allocations) &&
+        r.hubAggregationData.allocations.length > 0 &&
+        Array.isArray(r.hubAggregationData?.columns) &&
+        r.hubAggregationData.columns.length > 0) ||
+      (r.stage === 'epss-ho-aggregation' &&
+        (r.subStage === '1.3.1' || r.subStage === '1.3') &&
+        Boolean(r.facilityMatrixData?.rows?.some(row => Boolean(row.hub && row.hub.trim() && row.hub !== 'HO01'))))
     );
-    if (list.length > 0) return list;
-    return records;
-  }, [records]);
-
-  // Stage 4 dossiers (MOH to EPSS)
-  const stage4Dossiers = useMemo(() => {
-    return records.filter(r => r.stage === 'moh-to-epss-ho');
-  }, [records]);
-
-  // Stage 3 dossiers (RHB to MOH)
-  const stage3Dossiers = useMemo(() => {
-    return records.filter(r => r.stage === 'rhb-to-moh');
   }, [records]);
 
   // Selected Dossier State
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => {
     return stage5Dossiers[0]?.id || '';
   });
+
+  React.useEffect(() => {
+    if (stage5Dossiers.length > 0 && !stage5Dossiers.some(d => d.id === selectedDossierId)) {
+      setSelectedDossierId(stage5Dossiers[0].id);
+    } else if (stage5Dossiers.length === 0 && selectedDossierId !== '') {
+      setSelectedDossierId('');
+    }
+  }, [stage5Dossiers, selectedDossierId]);
 
   // Current selected dossier
   const currentDossier = useMemo(() => {
@@ -155,6 +155,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
 
   // View Mode: 'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'
   const [viewTab, setViewTab] = useState<'aggregated-matrix' | 'order-process' | 'hub-summary' | 'catchment-flow' | 'branch-dispatch'>(initialTab);
+  const [showContributingFacilities, setShowContributingFacilities] = useState(false);
 
   React.useEffect(() => {
     if (initialTab) {
@@ -194,8 +195,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   // Search & Filters for Matrix
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHubFilter, setSelectedHubFilter] = useState<string>('all');
-  const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
-  const [groupByHub, setGroupByHub] = useState<boolean>(false);
 
   // Search & Filters for Order Process
   const [orderProcessSearch, setOrderProcessSearch] = useState('');
@@ -206,9 +205,6 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
 
   // Notifications
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
-
-  // Mapping state
-  const [isMappingRunning, setIsMappingRunning] = useState(false);
 
   // Modal to add new facility row
   const [isAddFacilityModalOpen, setIsAddFacilityModalOpen] = useState(false);
@@ -221,65 +217,39 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     defaultQty: 2
   });
 
-  // Exact Equipment Columns matching user uploaded dossier or sample STO
+  // Equipment Columns strictly from the mapped 1.3.1 Map HF to Hub dossier (no fake defaults)
   const equipmentColumns: Stage5Column[] = useMemo(() => {
-    // 1. Current dossier hubAggregationData
-    if (currentDossier?.hubAggregationData?.columns && currentDossier.hubAggregationData.columns.length > 0) {
+    if (!currentDossier) return [];
+    if (currentDossier.hubAggregationData?.columns && currentDossier.hubAggregationData.columns.length > 0) {
       return currentDossier.hubAggregationData.columns;
     }
-    // 2. Current dossier facilityMatrixData (MOH to EPSS breakdown)
-    if (currentDossier?.facilityMatrixData?.columns && currentDossier.facilityMatrixData.columns.length > 0) {
+    if (
+      currentDossier.facilityMatrixData?.columns &&
+      currentDossier.facilityMatrixData.columns.length > 0 &&
+      currentDossier.facilityMatrixData.rows?.some(row => Boolean(row.hub && row.hub.trim() && row.hub !== 'HO01'))
+    ) {
       return currentDossier.facilityMatrixData.columns.map(c => ({
         id: c.id,
         name: c.name,
         code: c.code
       }));
     }
-    // 3. Current dossier stage4MatrixData
-    if (currentDossier?.stage4MatrixData?.columns && currentDossier.stage4MatrixData.columns.length > 0) {
-      return currentDossier.stage4MatrixData.columns;
-    }
-    // 4. Any record in records with facilityMatrixData columns
-    const anyFac = records.find(r => r.facilityMatrixData?.columns && r.facilityMatrixData.columns.length > 0);
-    if (anyFac?.facilityMatrixData?.columns) {
-      return anyFac.facilityMatrixData.columns.map(c => ({
-        id: c.id,
-        name: c.name,
-        code: c.code
-      }));
-    }
-    const anyHub = records.find(r => r.hubAggregationData?.columns && r.hubAggregationData.columns.length > 0);
-    if (anyHub?.hubAggregationData?.columns) {
-      return anyHub.hubAggregationData.columns;
-    }
+    return [];
+  }, [currentDossier]);
 
-    // Default 6 columns matching exact screenshot _D82057D4-6528-4990-821E-C28804094B45__80caff29.png
-    return [
-      { id: 'col-default-1', code: '403-XRRD-0101', name: 'Anesthesia machine - with Patient mon' },
-      { id: 'col-default-2', code: '403-XRRD-0101', name: 'Bed - Patient, Fowler, Adult' },
-      { id: 'col-default-3', code: '403-XRRB-0101N', name: 'Bowel - With Stand, Stainless Steel.' },
-      { id: 'col-default-4', code: '403-XRRD-0101-001', name: 'Cold box' },
-      { id: 'col-default-5', code: '401-WICU-0101N', name: 'Couch - Delivery' },
-      { id: 'col-default-6', code: '401-WICU-0101N', name: 'Couch - Examination' }
-    ];
-  }, [currentDossier, records]);
-
-  // Allocations list
+  // Mapped Health Facility Allocations strictly from 1.3.1 Map HF to Hub (no hardcoded fake rows)
   const allocations: Stage5AllocationItem[] = useMemo(() => {
-    if (currentDossier?.hubAggregationData?.allocations && currentDossier.hubAggregationData.allocations.length > 0) {
+    if (!currentDossier) return [];
+    if (currentDossier.hubAggregationData?.allocations && currentDossier.hubAggregationData.allocations.length > 0) {
       return currentDossier.hubAggregationData.allocations;
     }
 
-    // Source rows: facilityMatrixData or stage4MatrixData
-    const sourceRows = (currentDossier?.facilityMatrixData?.rows && currentDossier.facilityMatrixData.rows.length > 0)
-      ? currentDossier.facilityMatrixData.rows
-      : ((currentDossier?.stage4MatrixData?.rows && currentDossier.stage4MatrixData.rows.length > 0)
-          ? currentDossier.stage4MatrixData.rows
-          : (records.find(r => r.facilityMatrixData?.rows?.length)?.facilityMatrixData?.rows ||
-             records.find(r => r.stage4MatrixData?.rows?.length)?.stage4MatrixData?.rows || []));
+    const mappedRows = (currentDossier.facilityMatrixData?.rows || []).filter(
+      row => Boolean(row.hub && row.hub.trim() && row.hub !== 'HO01')
+    );
 
-    if (sourceRows.length > 0) {
-      return sourceRows.map((r: any, idx: number) => {
+    if (mappedRows.length > 0) {
+      return mappedRows.map((r: any, idx: number) => {
         const match = mapFacilityToHub(
           r.healthFacility || r.customerDescription || '',
           r.region || '',
@@ -287,9 +257,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
           r.woreda || '',
           hfListItems
         );
-        const hubCode = (r.hub && r.hub !== 'HO01' && !r.hub.includes('HEAD'))
-          ? r.hub
-          : (match.hubCode && match.hubCode !== 'HO01' ? match.hubCode : 'AA01');
+        const hubCode = (r.hub || '').trim();
         const hubInfo = getHubByCode(hubCode);
         const quantities = r.quantities || {};
         const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
@@ -297,101 +265,89 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
         return {
           id: r.id || `alloc-s5-${idx}`,
           healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
-          region: r.region || match.region || 'Oromia',
-          zone: r.zone || match.zone || 'Central Zone',
-          woreda: r.woreda || match.woreda || 'Woreda 01',
+          region: r.region || match.region || 'Unspecified',
+          zone: r.zone || match.zone || '-',
+          woreda: r.woreda || match.woreda || '-',
           packages: r.packages || 'MCH',
-          hubCode: hubCode,
+          hubCode,
           hubName: hubInfo?.name || match.hubName || hubCode,
           masterCustomerCode: match.masterCustomerCode,
           masterFacilityName: match.masterFacilityName,
           matchMethod: match.matchMethod,
           matchConfidence: match.matchConfidence,
           quantities,
-          totalQty: totalQty || 12
+          totalQty
         };
       });
     }
 
-    // Default sample allocations matching screenshot _D82057D4-6528-4990-821E-C28804094B45__80caff29.png
-    return [
+    return [];
+  }, [currentDossier, hfListItems]);
+
+  // Item Aggregation grouped strictly by Plant (Mapped Hub from 1.3.1 Map HF to Hub)
+  const plantAggregatedRows = useMemo(() => {
+    if (allocations.length === 0 || equipmentColumns.length === 0) return [];
+
+    const plantMap = new Map<
+      string,
       {
-        id: 'alloc-aa01-1',
-        healthFacility: 'Tikur Anbessa Specialized Hospital',
-        region: 'Addis Ababa',
-        zone: 'Addis Ketema',
-        woreda: 'Woreda 01',
-        packages: 'MCH',
-        hubCode: 'AA01',
-        hubName: 'AA01',
-        quantities: {
-          'col-default-1': 2,
-          'col-default-2': 2,
-          'col-default-3': 2,
-          'col-default-4': 2,
-          'col-default-5': 2,
-          'col-default-6': 2
-        },
-        totalQty: 12
-      },
-      {
-        id: 'alloc-ad01-1',
-        healthFacility: 'Adama Hospital Medical College',
-        region: 'Oromia',
-        zone: 'East Shewa',
-        woreda: 'Adama Town Woreda 01',
-        packages: 'MCH',
-        hubCode: 'AD01',
-        hubName: 'AD01',
-        quantities: {
-          'col-default-1': 2,
-          'col-default-2': 2,
-          'col-default-3': 2,
-          'col-default-4': 2,
-          'col-default-5': 2,
-          'col-default-6': 2
-        },
-        totalQty: 12
-      },
-      {
-        id: 'alloc-di01-1',
-        healthFacility: 'Dire Dawa Dil Chora Hospital',
-        region: 'Dire Dawa',
-        zone: 'Dire Dawa Administration',
-        woreda: 'Woreda 01',
-        packages: 'MCH',
-        hubCode: 'DI01',
-        hubName: 'DI01',
-        quantities: {
-          'col-default-1': 2,
-          'col-default-2': 2,
-          'col-default-3': 2,
-          'col-default-4': 2,
-          'col-default-5': 2,
-          'col-default-6': 2
-        },
-        totalQty: 12
+        plant: string;
+        plantName: string;
+        facilityCount: number;
+        quantities: Record<string, number>;
+        totalQty: number;
+        facilities: Stage5AllocationItem[];
       }
-    ];
-  }, [currentDossier, records, hfListItems]);
+    >();
 
-  // Filtered allocations for Matrix
-  const filteredAllocations = useMemo(() => {
-    return allocations.filter((item) => {
-      const matchesSearch =
-        item.healthFacility.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.zone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.woreda.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.hubName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.hubCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.region.toLowerCase().includes(searchQuery.toLowerCase());
+    allocations.forEach((alloc) => {
+      const plantCode = (alloc.hubCode || '').trim().toUpperCase();
+      if (!plantCode || plantCode === 'HO01') return;
+      const hubInfo = getHubByCode(plantCode);
 
-      const matchesHub = selectedHubFilter === 'all' || item.hubCode === selectedHubFilter;
-      const matchesRegion = selectedRegionFilter === 'all' || item.region === selectedRegionFilter;
+      let entry = plantMap.get(plantCode);
+      if (!entry) {
+        entry = {
+          plant: plantCode,
+          plantName: hubInfo?.name || alloc.hubName || plantCode,
+          facilityCount: 0,
+          quantities: {},
+          totalQty: 0,
+          facilities: []
+        };
+        plantMap.set(plantCode, entry);
+      }
 
-      return matchesSearch && matchesHub && matchesRegion;
+      entry.facilityCount += 1;
+      entry.facilities.push(alloc);
+
+      equipmentColumns.forEach((col) => {
+        const qty = Number(alloc.quantities[col.id]) || 0;
+        entry!.quantities[col.id] = (entry!.quantities[col.id] || 0) + qty;
+        entry!.totalQty += qty;
+      });
     });
-  }, [allocations, searchQuery, selectedHubFilter, selectedRegionFilter]);
+
+    return Array.from(plantMap.values())
+      .sort((a, b) => a.plant.localeCompare(b.plant))
+      .map((entry, idx) => ({
+        sn: idx + 1,
+        ...entry
+      }));
+  }, [allocations, equipmentColumns]);
+
+  const filteredPlantRows = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return plantAggregatedRows.filter((row) => {
+      const matchesHub = selectedHubFilter === 'all' || row.plant === selectedHubFilter;
+      const matchesSearch =
+        !q ||
+        row.plant.toLowerCase().includes(q) ||
+        row.plantName.toLowerCase().includes(q) ||
+        row.facilities.some((f) => f.healthFacility.toLowerCase().includes(q) || f.region.toLowerCase().includes(q));
+      return matchesHub && matchesSearch;
+    });
+  }, [plantAggregatedRows, searchQuery, selectedHubFilter]);
 
   // Unique regions
   const uniqueRegions = useMemo(() => {
@@ -552,307 +508,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     };
   }, [allocations, hubSummaries, orderProcessItems]);
 
-  // 1. ACTION: Map HF to Hub based on HF Master data
-  const handleRunAutoMapping = () => {
-    if (!currentDossier) return;
-    setIsMappingRunning(true);
-
-    setTimeout(() => {
-      let exact = 0;
-      let fuzzy = 0;
-      let fallback = 0;
-
-      const updatedAllocations: Stage5AllocationItem[] = allocations.map(item => {
-        const matchResult = mapFacilityToHub(
-          item.healthFacility,
-          item.region,
-          item.zone,
-          item.woreda,
-          hfListItems
-        );
-
-        if (matchResult.matchMethod === 'exact-master') exact++;
-        else if (matchResult.matchMethod === 'fuzzy-master') fuzzy++;
-        else if (matchResult.matchMethod === 'zone-region-fallback') fallback++;
-
-        return {
-          ...item,
-          hubCode: matchResult.hubCode,
-          hubName: matchResult.hubName,
-          masterCustomerCode: matchResult.masterCustomerCode,
-          masterFacilityName: matchResult.masterFacilityName,
-          matchMethod: matchResult.matchMethod,
-          matchConfidence: matchResult.matchConfidence
-        };
-      });
-
-      const updatedDossier: DspWorkflowRecord = {
-        ...currentDossier,
-        targetedFacilitiesCount: updatedAllocations.length,
-        totalQuantity: updatedAllocations.reduce((acc, a) => acc + a.totalQty, 0),
-        hubAggregationData: {
-          dossierId: currentDossier.id,
-          dspRefNumber: currentDossier.dspRefNumber,
-          generatedDate: new Date().toISOString().split('T')[0],
-          status: 'Mapped & Ready',
-          columns: equipmentColumns,
-          allocations: updatedAllocations
-        }
-      };
-
-      setRecords(prev => prev.map(r => r.id === currentDossier.id ? updatedDossier : r));
-      setIsMappingRunning(false);
-
-      setNotification({
-        type: 'success',
-        message: `Mapped all ${updatedAllocations.length} Health Facilities to designated EPSS Hubs based on HF Master data (${exact} exact master matches, ${fuzzy} fuzzy matches, ${fallback} zone catchment assignments). Order Process summary lines refreshed automatically!`
-      });
-
-      if (onTriggerCloudSync) {
-        onTriggerCloudSync(`EPSS Hub Mapping updated for ${currentDossier.dspRefNumber}`, {
-          type: 'UPDATE',
-          title: 'EPSS Stage 5 Hub Mapping',
-          payload: updatedDossier
-        });
-      }
-    }, 500);
-  };
-
-  // 2. ACTION: Aggregate All RHB Submissions (MOH to EPSS)
-  const handleAggregateAllRHBSubmissions = () => {
-    const aggregatedRows: {
-      healthFacility: string;
-      region: string;
-      zone: string;
-      woreda: string;
-      packages: string;
-      quantities: Record<string, number>;
-    }[] = [];
-
-    // Stage 3 submissions
-    stage3Dossiers.forEach(d => {
-      const rows = d.facilityMatrixData?.rows || [];
-      rows.forEach(r => {
-        aggregatedRows.push({
-          healthFacility: r.healthFacility,
-          region: r.region || d.targetedRegions[0] || 'Oromia',
-          zone: r.zone || '',
-          woreda: r.woreda || '',
-          packages: r.packages || 'MCH',
-          quantities: r.quantities || {}
-        });
-      });
-    });
-
-    // Stage 4 submissions
-    stage4Dossiers.forEach(d => {
-      const rows = d.stage4MatrixData?.rows || [];
-      rows.forEach((r: any) => {
-        if (!aggregatedRows.some(ar => ar.healthFacility.toLowerCase() === r.healthFacility.toLowerCase())) {
-          aggregatedRows.push({
-            healthFacility: r.healthFacility,
-            region: r.region || d.targetedRegions[0] || 'Oromia',
-            zone: r.zone || '',
-            woreda: r.woreda || '',
-            packages: r.packages || 'MCH',
-            quantities: r.quantities || {}
-          });
-        }
-      });
-    });
-
-    const finalSource = aggregatedRows.length > 0 ? aggregatedRows : allocations;
-
-    const newlyMappedAllocations: Stage5AllocationItem[] = finalSource.map((r, idx) => {
-      const match = mapFacilityToHub(r.healthFacility, r.region, r.zone, r.woreda, hfListItems);
-      const quantities = r.quantities && Object.keys(r.quantities).length > 0 ? r.quantities : {
-        'col-anesthesia': 2,
-        'col-bed': 2,
-        'col-bowel': 2,
-        'col-coldbox': 2,
-        'col-delivery': 2,
-        'col-exam': 2
-      };
-      const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
-
-      return {
-        id: `agg-alloc-${Date.now()}-${idx}`,
-        healthFacility: r.healthFacility,
-        region: r.region,
-        zone: r.zone,
-        woreda: r.woreda,
-        packages: r.packages || 'MCH',
-        hubCode: match.hubCode,
-        hubName: match.hubName,
-        masterCustomerCode: match.masterCustomerCode,
-        masterFacilityName: match.masterFacilityName,
-        matchMethod: match.matchMethod,
-        matchConfidence: match.matchConfidence,
-        quantities,
-        totalQty: totalQty || 12
-      };
-    });
-
-    const regionsList = Array.from(new Set(newlyMappedAllocations.map(a => a.region)));
-
-    const newAggregatedDossier: DspWorkflowRecord = {
-      id: `dsp-ho-agg-all-${Date.now()}`,
-      dspRefNumber: `EPSS/HO-AGG/2026/${Math.floor(100 + Math.random() * 900)}`,
-      stage: 'epss-ho-aggregation',
-      stageTitle: '5. DSP Aggregation (EPSS HO)',
-      senderOrg: 'EPSS Head Office',
-      recipientOrg: 'EPSS Branch Hubs',
-      subject: `Aggregated Multi-Regional Health Facility Breakdown & EPSS Hub Allocation Manifest (${regionsList.join(', ')})`,
-      status: 'Endorsed & Approved',
-      dateSubmitted: new Date().toISOString().split('T')[0],
-      approvedDate: new Date().toISOString().split('T')[0],
-      totalDevices: equipmentColumns.length,
-      totalQuantity: newlyMappedAllocations.reduce((acc, a) => acc + a.totalQty, 0),
-      totalValuationETB: 24500000,
-      targetedRegions: regionsList,
-      targetedFacilitiesCount: newlyMappedAllocations.length,
-      officialLetterRef: `MOH-EPSS/AGG/LET/2026/${Math.floor(1000 + Math.random() * 9000)}`,
-      signatory: 'Dr. Solomon Abebe & Dr. Bethlehem',
-      signatoryRole: 'EPSS Director General & MOH PMD Lead',
-      itemsIncluded: equipmentColumns.map(c => ({
-        material: c.code,
-        description: c.name,
-        quantity: newlyMappedAllocations.reduce((sum, a) => sum + (Number(a.quantities[c.id]) || 0), 0),
-        plant: 'National Central EPSS'
-      })),
-      hubAggregationData: {
-        dossierId: `dsp-ho-agg-all-${Date.now()}`,
-        dspRefNumber: `EPSS/HO-AGG/2026/NATIONAL-AGG`,
-        generatedDate: new Date().toISOString().split('T')[0],
-        status: 'Mapped & Ready',
-        columns: equipmentColumns,
-        allocations: newlyMappedAllocations
-      }
-    };
-
-    setRecords(prev => [newAggregatedDossier, ...prev]);
-    setSelectedDossierId(newAggregatedDossier.id);
-
-    setNotification({
-      type: 'success',
-      message: `Consolidated all RHB breakdowns sent from MOH to EPSS! Mapped ${newlyMappedAllocations.length} Health Facilities across ${regionsList.length} Regions to EPSS Hubs.`
-    });
-  };
-
-  // 3. ACTION: Change Hub manual override
-  const handleHubChange = (allocationId: string, newHubCode: string) => {
-    const hub = getHubByCode(newHubCode);
-    if (!hub || !currentDossier) return;
-
-    const updatedAllocations = allocations.map(item => {
-      if (item.id === allocationId) {
-        return {
-          ...item,
-          hubCode: hub.code,
-          hubName: hub.name,
-          matchMethod: 'manual-override' as const,
-          matchConfidence: 100
-        };
-      }
-      return item;
-    });
-
-    const updatedDossier: DspWorkflowRecord = {
-      ...currentDossier,
-      hubAggregationData: {
-        ...(currentDossier.hubAggregationData || {}),
-        columns: equipmentColumns,
-        allocations: updatedAllocations
-      }
-    };
-
-    setRecords(prev => prev.map(r => r.id === currentDossier.id ? updatedDossier : r));
-
-    setNotification({
-      type: 'info',
-      message: `Assigned Hub to ${hub.name} (${hub.code}). Order Process summary updated!`
-    });
-  };
-
-  // 4. ACTION: Update quantity for equipment cell
-  const handleQuantityChange = (allocationId: string, colId: string, newQtyVal: number) => {
-    if (!currentDossier) return;
-    const safeQty = Math.max(0, newQtyVal || 0);
-
-    const updatedAllocations = allocations.map(item => {
-      if (item.id === allocationId) {
-        const newQuantities = { ...item.quantities, [colId]: safeQty };
-        const newTotal = Object.values(newQuantities).reduce((acc, q) => acc + (Number(q) || 0), 0);
-        return {
-          ...item,
-          quantities: newQuantities,
-          totalQty: newTotal
-        };
-      }
-      return item;
-    });
-
-    const updatedDossier: DspWorkflowRecord = {
-      ...currentDossier,
-      totalQuantity: updatedAllocations.reduce((sum, a) => sum + a.totalQty, 0),
-      hubAggregationData: {
-        ...(currentDossier.hubAggregationData || {}),
-        columns: equipmentColumns,
-        allocations: updatedAllocations
-      }
-    };
-
-    setRecords(prev => prev.map(r => r.id === currentDossier.id ? updatedDossier : r));
-  };
-
-  // 5. ACTION: Save Mapping to HF Master dataset
-  const handleSaveToMaster = (item: Stage5AllocationItem) => {
-    if (!setHfListItems) return;
-
-    const newMasterRecord: HealthFacilityRecord = {
-      id: `hf-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      customer: item.masterCustomerCode || `CUST-${Math.floor(1000000 + Math.random() * 9000000)}`,
-      customerDescription: item.healthFacility,
-      facilityType: item.healthFacility.toLowerCase().includes('hospital') ? 'Hospital' : 'Health Center',
-      deliveringPlant: item.hubCode,
-      ownershipCode: 'PUB',
-      ownershipDescription: 'Public Health Facility',
-      region: item.region,
-      zoneCode: `Z-${item.zone.replace(/\s+/g, '-').toUpperCase().slice(0, 4)}`,
-      zoneDescription: item.zone,
-      woreda: `W-${item.woreda.replace(/\s+/g, '-').toUpperCase().slice(0, 4)}`,
-      woredaDescription: item.woreda,
-      uploadedAt: new Date().toISOString()
-    };
-
-    setHfListItems(prev => {
-      const existsIndex = prev.findIndex(hf => 
-        (hf.customerDescription && hf.customerDescription.toLowerCase() === item.healthFacility.toLowerCase()) ||
-        (item.masterCustomerCode && hf.customer === item.masterCustomerCode)
-      );
-
-      if (existsIndex >= 0) {
-        const copy = [...prev];
-        copy[existsIndex] = {
-          ...copy[existsIndex],
-          deliveringPlant: item.hubCode,
-          region: item.region || copy[existsIndex].region,
-          zoneDescription: item.zone || copy[existsIndex].zoneDescription,
-          woredaDescription: item.woreda || copy[existsIndex].woredaDescription
-        };
-        return copy;
-      } else {
-        return [newMasterRecord, ...prev];
-      }
-    });
-
-    setNotification({
-      type: 'success',
-      message: `Saved ${item.healthFacility} mapped to ${item.hubName} (${item.hubCode}) in HF Master Data!`
-    });
-  };
-
-  // 6. ACTION: Add new health facility row
+  // 1. ACTION: Add new health facility row
   const handleAddFacilityRow = () => {
     if (!newFacilityForm.healthFacility.trim() || !currentDossier) return;
 
@@ -915,73 +571,49 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
     });
   };
 
-  // 7. ACTION: Export Official Excel (.xlsx) matching the screenshot format
+  // 7. ACTION: Export Item Aggregation Excel (.xlsx) matching exact S/N | Plant | Item Name / SAP Code format
   const handleExportExcel = () => {
-    if (!currentDossier) return;
+    if (!currentDossier || plantAggregatedRows.length === 0) return;
 
-    const row1 = [
-      'Region',
-      'Zone',
-      'Woreda',
-      'Name of health facility',
-      'Hub',
-      'List of Packeges',
-      ...equipmentColumns.map(c => c.name),
-      'Total'
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Exact Item Aggregation by Plant format
+    const aggRow1 = ['S/N', 'Plant', ...equipmentColumns.map(c => c.name)];
+    const aggRow2 = ['', '', ...equipmentColumns.map(c => c.code)];
+    const aggDataRows = filteredPlantRows.map(r => [
+      r.sn,
+      r.plant,
+      ...equipmentColumns.map(c => r.quantities[c.id] || 0)
+    ]);
+
+    const wsAgg = XLSX.utils.aoa_to_sheet([aggRow1, aggRow2, ...aggDataRows]);
+    wsAgg['!cols'] = [
+      { wch: 8 },
+      { wch: 12 },
+      ...equipmentColumns.map(() => ({ wch: 24 }))
     ];
+    XLSX.utils.book_append_sheet(wb, wsAgg, 'Item_Aggregation_By_Plant');
 
-    const row2 = [
-      '',
-      '',
-      '',
-      '',
-      '',
-      'List of Packeges',
-      ...equipmentColumns.map(c => c.code),
-      ''
-    ];
-
-    const dataRows = allocations.map(item => [
+    // Sheet 2: Source Mapped Facilities from 1.3.1 Map HF to Hub
+    const srcRow1 = ['Region', 'Zone', 'Woreda', 'Name of health facility', 'List of Packages', 'Plant', ...equipmentColumns.map(c => c.name)];
+    const srcRow2 = ['', '', '', '', 'List of Packages', 'Plant', ...equipmentColumns.map(c => c.code)];
+    const srcDataRows = allocations.map(item => [
       item.region,
       item.zone,
       item.woreda,
       item.healthFacility,
-      `${item.hubName} (${item.hubCode})`,
       item.packages,
-      ...equipmentColumns.map(c => item.quantities[c.id] || 0),
-      item.totalQty
+      item.hubCode,
+      ...equipmentColumns.map(c => item.quantities[c.id] || 0)
     ]);
+    const wsSource = XLSX.utils.aoa_to_sheet([srcRow1, srcRow2, ...srcDataRows]);
+    XLSX.utils.book_append_sheet(wb, wsSource, 'Source_Map_HF_to_Hub');
 
-    const totalRow = [
-      'GRAND TOTAL',
-      '',
-      '',
-      `${allocations.length} Health Facilities`,
-      `${hubSummaries.length} EPSS Hubs`,
-      '',
-      ...equipmentColumns.map(c => allocations.reduce((sum, a) => sum + (Number(a.quantities[c.id]) || 0), 0)),
-      stats.totalUnits
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet([row1, row2, ...dataRows, totalRow]);
-    ws['!cols'] = [
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 32 },
-      { wch: 22 },
-      { wch: 16 },
-      ...equipmentColumns.map(() => ({ wch: 22 })),
-      { wch: 12 }
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'MOH_EPSS_Hub_Mapping');
-    XLSX.writeFile(wb, `MOH_to_EPSS_Aggregated_Hub_Mapping_${currentDossier.dspRefNumber.replace(/[\/\\]/g, '_')}.xlsx`);
+    XLSX.writeFile(wb, `EPSS_Item_Aggregation_By_Plant_${currentDossier.dspRefNumber.replace(/[\/\\]/g, '_')}.xlsx`);
 
     setNotification({
       type: 'success',
-      message: 'Exported official MOH-to-EPSS Aggregated Hub Mapping spreadsheet (.xlsx) successfully!'
+      message: 'Exported Item Aggregation by Plant spreadsheet (.xlsx) matching official two-tier format!'
     });
   };
 
@@ -1207,7 +839,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             </select>
           ) : (
             <span className="text-xs text-amber-700 font-semibold bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
-              No Stage 5 Dossier yet. Click "Aggregate RHBs" above!
+              No mapped data from 1.3.1 Map HF to Hub yet.
             </span>
           )}
         </div>
@@ -1218,12 +850,12 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             onClick={() => setViewTab('aggregated-matrix')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               viewTab === 'aggregated-matrix'
-                ? 'bg-[#ea580c] text-white shadow-sm'
+                ? 'bg-[#0B1527] text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>MOH to EPSS Matrix (Hub Mapped)</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
+            <span>Item Aggregation (By Plant)</span>
           </button>
 
           <button
@@ -1282,343 +914,236 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       </div>
 
       {/* ============================================================================
-          VIEW 1: THE EXACT MOH TO EPSS AGGREGATED TABLE (MATCHING ATTACHED IMAGE)
+          VIEW 1: 1.3.3 ITEM AGGREGATION BY PLANT (EXACTLY FROM 1.3.1 MAP HF TO HUB)
+          Format: S/N | Plant (Yellow) | Equipment Description (Peach) / SAP Code (White)
           ============================================================================ */}
       {viewTab === 'aggregated-matrix' && (
         <div className="space-y-3">
-          {/* Filter & Actions Toolbar */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search facility, zone, woreda, hub..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all"
-                />
+          {plantAggregatedRows.length === 0 ? (
+            <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="space-y-1 max-w-lg mx-auto">
+                <h3 className="text-base font-black text-slate-900">
+                  No Mapped Data Received from 1.3.1 Map HF to Hub Yet
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  <strong>1.3.3 Item Aggregation</strong> aggregates equipment quantities per <strong>Plant</strong> exclusively from facilities mapped in <strong>1.3.1 Map HF to Hub</strong>. Go to <strong>Map HF to Hub</strong>, map your health facilities to EPSS Plants/Hubs, and click <strong>Save &amp; Aggregate by Plant (1.3.3)</strong>.
+                </p>
+              </div>
+              {onNavigateToMapHfToHub && (
+                <button
+                  type="button"
+                  onClick={onNavigateToMapHfToHub}
+                  className="px-5 py-2.5 rounded-xl bg-[#0B1527] hover:bg-black text-amber-400 font-black text-xs uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer shadow-md transition"
+                >
+                  <GitMerge className="w-4 h-4" />
+                  <span>Go to 1.3.1 Map HF to Hub</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Compact Summary & Action Toolbar */}
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0B1527] text-white text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span>Sourced strictly from 1.3.1 Map HF to Hub</span>
+                    <span className="text-amber-300 font-mono">
+                      ({plantAggregatedRows.length} Plants • {allocations.length} Mapped HFs • {formatNumber(stats.totalUnits)} Units)
+                    </span>
+                  </div>
+
+                  <div className="relative w-full sm:w-56">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filter Plant (AA01, AD01)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <select
+                    value={selectedHubFilter}
+                    onChange={(e) => setSelectedHubFilter(e.target.value)}
+                    className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="all">All Mapped Plants ({plantAggregatedRows.length})</option>
+                    {plantAggregatedRows.map(pr => (
+                      <option key={pr.plant} value={pr.plant}>
+                        {pr.plant} - {pr.plantName} ({pr.facilityCount} HFs)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowContributingFacilities(!showContributingFacilities)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{showContributingFacilities ? 'Hide Source HFs' : `Source HFs (${allocations.length})`}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onProceedToOrderProcess) {
+                        onProceedToOrderProcess();
+                      } else {
+                        setViewTab('order-process');
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Proceed to Order Process (1.3.4)</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
-              {/* Region Filter */}
-              <select
-                value={selectedRegionFilter}
-                onChange={(e) => setSelectedRegionFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
-              >
-                <option value="all">All Regions ({uniqueRegions.length})</option>
-                {uniqueRegions.map(reg => (
-                  <option key={reg} value={reg}>{reg}</option>
-                ))}
-              </select>
+              {/* EXACT ITEM AGGREGATION SPREADSHEET TABLE (S/N | Plant [Yellow] | Equipment Name [Peach] / SAP Code [White]) */}
+              <div className="bg-white border border-slate-400 rounded-xl shadow-md overflow-hidden">
+                <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse select-text text-xs">
+                    <thead>
+                      {/* TIER 1 HEADER ROW: S/N | Plant (Yellow) | Equipment Description (Peach) */}
+                      <tr>
+                        <th className="bg-white text-slate-900 font-semibold border border-slate-400 py-2 px-3 text-left w-14 align-bottom">
+                          S/N
+                        </th>
+                        <th className="bg-[#ffff00] text-slate-950 font-semibold border border-slate-400 py-2 px-3 text-left min-w-[110px] align-bottom">
+                          Plant
+                        </th>
+                        {equipmentColumns.map(col => (
+                          <th
+                            key={col.id}
+                            className="bg-[#fed7aa] text-slate-900 font-normal border border-slate-400 py-2 px-3 text-left min-w-[165px] leading-tight align-middle"
+                          >
+                            {col.name}
+                          </th>
+                        ))}
+                      </tr>
 
-              {/* Hub Filter */}
-              <select
-                value={selectedHubFilter}
-                onChange={(e) => setSelectedHubFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
-              >
-                <option value="all">All Mapped Hubs ({hubSummaries.length})</option>
-                {EPSS_HUBS_REGISTRY.map(hub => (
-                  <option key={hub.code} value={hub.code}>
-                    {hub.name} ({hub.code})
-                  </option>
-                ))}
-              </select>
+                      {/* TIER 2 SUBHEADER ROW: Blank | Blank | SAP Material Codes */}
+                      <tr>
+                        <th className="bg-white border border-slate-400 py-1.5 px-3"></th>
+                        <th className="bg-white border border-slate-400 py-1.5 px-3"></th>
+                        {equipmentColumns.map(col => (
+                          <th
+                            key={`code-${col.id}`}
+                            className="bg-white text-slate-900 font-mono text-xs border border-slate-400 py-1.5 px-3 text-left font-normal"
+                          >
+                            {col.code}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
 
-              {/* Quick Jump to Order Process */}
-              <button
-                onClick={() => setViewTab('order-process')}
-                className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                title="Convert this aggregated matrix into SAP Stock Transport Order (STO) format"
-              >
-                <Truck className="w-3.5 h-3.5 text-blue-600" />
-                <span>Open Order Process (SAP STO)</span>
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-              <button
-                onClick={handleRunAutoMapping}
-                disabled={isMappingRunning || !currentDossier}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                title="Map Health Facilities to official regional EPSS hubs"
-              >
-                <Sparkles className={`w-3.5 h-3.5 ${isMappingRunning ? 'animate-spin' : 'text-amber-300'}`} />
-                <span>{isMappingRunning ? 'Mapping...' : 'Map HF to Hub'}</span>
-              </button>
-
-              <button
-                onClick={handleAggregateAllRHBSubmissions}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                title="Consolidate all regional RHB breakdown submissions"
-              >
-                <Layers className="w-3.5 h-3.5 text-amber-200" />
-                <span>Aggregate RHBs</span>
-              </button>
-
-              <button
-                onClick={handleExportExcel}
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <Download className="w-3.5 h-3.5 text-amber-600" />
-                <span>Export Excel</span>
-              </button>
-
-              <button
-                onClick={() => setIsAddFacilityModalOpen(true)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Facility Row</span>
-              </button>
-            </div>
-          </div>
-
-          {/* THE EXACT SPREADSHEET TABLE */}
-          <div className="bg-white border-2 border-slate-400 rounded-xl shadow-md overflow-hidden">
-            <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
-              <table className="w-full text-left border-collapse select-text">
-                <thead>
-                  {/* TIER 1 HEADER ROW (Peach for demographics, Light Blue for Packages, Bright Yellow for Plant, Peach for Equipment Names) */}
-                  <tr className="text-xs font-semibold">
-                    <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[110px]">
-                      Region
-                    </th>
-                    <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[120px]">
-                      Zone
-                    </th>
-                    <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[110px]">
-                      Woreda
-                    </th>
-                    <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[220px]">
-                      Name of health facility
-                    </th>
-                    <th className="bg-[#dbeafe] text-slate-900 italic border border-slate-400 py-2 px-3 min-w-[120px]">
-                      List of Packeges
-                    </th>
-                    <th className="bg-[#facc15] text-slate-950 font-black border border-slate-400 py-2 px-3 min-w-[130px] text-center shadow-2xs">
-                      Plant
-                    </th>
-
-                    {/* Equipment Columns - Row 1: Equipment Name */}
-                    {equipmentColumns.map(col => (
-                      <th
-                        key={col.id}
-                        className="bg-[#fed7aa] text-slate-900 font-normal border border-slate-400 py-2 px-2 text-center min-w-[130px] leading-tight"
-                      >
-                        {col.name}
-                      </th>
-                    ))}
-
-                    <th className="bg-[#fde047]/60 text-slate-900 font-bold border border-slate-400 py-2 px-2 text-center min-w-[70px]">
-                      Total
-                    </th>
-                    <th className="bg-slate-200 text-slate-700 font-bold border border-slate-400 py-2 px-2 text-center min-w-[80px]">
-                      Action
-                    </th>
-                  </tr>
-
-                  {/* TIER 2 SUBHEADER ROW */}
-                  <tr className="text-xs font-normal">
-                    <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-                    <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-                    <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-                    <th className="bg-[#fed7aa] border border-slate-400 py-1 px-3"></th>
-                    <th className="bg-[#dbeafe] text-slate-900 italic border border-slate-400 py-1 px-3 text-left font-normal text-[11px]">
-                      List of Packeges
-                    </th>
-                    <th className="bg-[#fef08a] font-mono font-bold text-yellow-950 border border-slate-400 text-center text-[10px] py-1 px-2">
-                      Plant
-                    </th>
-
-                    {/* Equipment Columns - Row 2: Equipment Material Code */}
-                    {equipmentColumns.map(col => (
-                      <th
-                        key={`code-${col.id}`}
-                        className="bg-white text-slate-800 font-mono text-[10px] border border-slate-400 py-1 px-2 text-center font-normal"
-                      >
-                        {col.code}
-                      </th>
-                    ))}
-
-                    <th className="bg-[#fde047]/60 border border-slate-400 py-1 px-2"></th>
-                    <th className="bg-slate-200 border border-slate-400 py-1 px-2"></th>
-                  </tr>
-                </thead>
-
-                <tbody className="text-xs text-slate-900">
-                  {filteredAllocations.length > 0 ? (
-                    filteredAllocations.map((item, idx) => {
-                      const isEven = idx % 2 === 0;
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`transition-colors hover:bg-amber-50/50 ${
-                            isEven ? 'bg-white' : 'bg-slate-50/70'
-                          }`}
-                        >
-                          <td className="py-2 px-3 border border-slate-300 font-medium text-slate-800">
-                            {item.region}
+                    <tbody className="text-xs text-slate-900 bg-white">
+                      {filteredPlantRows.map((plantRow) => (
+                        <tr key={plantRow.plant} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-1.5 px-3 border border-slate-400 text-right font-mono tabular-nums text-slate-900">
+                            {plantRow.sn}
                           </td>
-                          <td className="py-2 px-3 border border-slate-300 text-slate-700">
-                            {item.zone}
+                          <td
+                            className="py-1.5 px-3 border border-slate-400 bg-[#ffff00] font-semibold text-slate-950"
+                            title={`${plantRow.plantName} (${plantRow.facilityCount} mapped facilities)`}
+                          >
+                            {plantRow.plant}
                           </td>
-                          <td className="py-2 px-3 border border-slate-300 text-slate-700 font-mono text-[11px]">
-                            {item.woreda}
-                          </td>
-                          <td className="py-2 px-3 border border-slate-300 font-semibold text-slate-900">
-                            <div className="flex items-center justify-between gap-1">
-                              <span>{item.healthFacility}</span>
-                              {item.masterCustomerCode && (
-                                <span className="font-mono text-[9px] text-slate-400">
-                                  #{item.masterCustomerCode}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* List of Packeges */}
-                          <td className="py-2 px-3 border border-slate-300 bg-[#eff6ff] text-slate-800 font-semibold text-center">
-                            {item.packages || 'MCH'}
-                          </td>
-
-                          {/* PLANT (HUB) COLUMN - Highlighted Yellow Cell */}
-                          <td className="py-1.5 px-2 border border-slate-300 bg-amber-50/60">
-                            <select
-                              value={item.hubCode}
-                              onChange={(e) => handleHubChange(item.id, e.target.value)}
-                              className="w-full bg-white border border-amber-400 text-xs font-bold text-slate-900 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
+                          {equipmentColumns.map(col => (
+                            <td
+                              key={`${plantRow.plant}-${col.id}`}
+                              className="py-1.5 px-3 border border-slate-400 text-right font-mono tabular-nums text-slate-900"
                             >
-                              {EPSS_HUBS_REGISTRY.map(hub => (
-                                <option key={hub.code} value={hub.code}>
-                                  {hub.code} ({hub.name})
-                                </option>
-                              ))}
-                            </select>
-                            <div className="flex items-center justify-between gap-1 mt-1 text-[10px]">
-                              {item.matchMethod === 'exact-master' ? (
-                                <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
-                                  <Check className="w-3 h-3 text-emerald-600" /> Exact Match
-                                </span>
-                              ) : item.matchMethod === 'fuzzy-master' ? (
-                                <span className="text-blue-700 font-semibold flex items-center gap-0.5">
-                                  <Check className="w-3 h-3 text-blue-600" /> Fuzzy ({item.matchConfidence}%)
-                                </span>
-                              ) : item.matchMethod === 'manual-override' ? (
-                                <span className="text-purple-700 font-semibold flex items-center gap-0.5">
-                                  <SlidersHorizontal className="w-2.5 h-2.5" /> Override
-                                </span>
-                              ) : (
-                                <span className="text-amber-700 font-medium flex items-center gap-0.5">
-                                  <MapPin className="w-2.5 h-2.5" /> Catchment
-                                </span>
-                              )}
-
-                              <button
-                                onClick={() => handleSaveToMaster(item)}
-                                className="text-slate-400 hover:text-emerald-700 p-0.5 rounded transition cursor-pointer"
-                                title="Save this Hub mapping into Health Facility Master Data"
-                              >
-                                <BookmarkCheck className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* Equipment Quantity Cells */}
-                          {equipmentColumns.map(col => {
-                            const qty = item.quantities[col.id] ?? 0;
-                            return (
-                              <td
-                                key={col.id}
-                                className="py-1 px-1 border border-slate-300 text-center font-mono font-bold text-slate-800 hover:bg-amber-100/40 transition"
-                              >
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={qty}
-                                  onChange={(e) => handleQuantityChange(item.id, col.id, parseInt(e.target.value) || 0)}
-                                  className="w-12 text-center font-mono font-bold text-xs bg-transparent focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 rounded py-0.5"
-                                />
-                              </td>
-                            );
-                          })}
-
-                          {/* Row Total */}
-                          <td className="py-2 px-2 border border-slate-300 text-center font-mono font-black text-amber-900 bg-amber-100/50">
-                            {item.totalQty}
-                          </td>
-
-                          {/* Row Action */}
-                          <td className="py-2 px-2 border border-slate-300 text-center">
-                            <button
-                              onClick={() => {
-                                const updatedAllocations = allocations.filter(a => a.id !== item.id);
-                                if (currentDossier) {
-                                  const updatedDossier: DspWorkflowRecord = {
-                                    ...currentDossier,
-                                    targetedFacilitiesCount: updatedAllocations.length,
-                                    totalQuantity: updatedAllocations.reduce((sum, a) => sum + a.totalQty, 0),
-                                    hubAggregationData: {
-                                      ...(currentDossier.hubAggregationData || {}),
-                                      columns: equipmentColumns,
-                                      allocations: updatedAllocations
-                                    }
-                                  };
-                                  setRecords(prev => prev.map(r => r.id === currentDossier.id ? updatedDossier : r));
-                                }
-                              }}
-                              className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
-                              title="Remove facility row"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
+                              {formatNumber(plantRow.quantities[col.id] || 0)}
+                            </td>
+                          ))}
                         </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={equipmentColumns.length + 8} className="py-12 text-center text-slate-400">
-                        <GitMerge className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p className="font-semibold text-slate-600 text-sm">No health facilities found matching filters.</p>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
+                      ))}
+                    </tbody>
 
-                {/* FOOTER ROW */}
-                <tfoot>
-                  <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-500 text-xs">
-                    <td className="py-3 px-3 uppercase tracking-wider font-mono text-[11px]" colSpan={4}>
-                      NATIONAL GRAND TOTAL ({stats.totalFacilities} Facilities · {uniqueRegions.length} Regions)
-                    </td>
-                    <td className="py-3 px-3 font-mono text-[11px] text-amber-300">
-                      {stats.activeHubsCount} EPSS Hubs
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-300 font-semibold bg-slate-800">
-                      All Packages
-                    </td>
-
-                    {equipmentColumns.map(col => {
-                      const colTotal = allocations.reduce((sum, a) => sum + (Number(a.quantities[col.id]) || 0), 0);
-                      return (
-                        <td key={`sum-${col.id}`} className="py-3 px-2 text-center font-mono font-black text-amber-300 border-r border-slate-700">
-                          {colTotal}
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-400">
+                        <td className="py-2 px-3 border border-slate-400 text-right font-mono">-</td>
+                        <td className="py-2 px-3 border border-slate-400 bg-[#fef08a] font-black text-slate-950">
+                          TOTAL ({filteredPlantRows.length} Plants)
                         </td>
-                      );
-                    })}
+                        {equipmentColumns.map(col => {
+                          const total = filteredPlantRows.reduce((sum, r) => sum + (r.quantities[col.id] || 0), 0);
+                          return (
+                            <td
+                              key={`tot-${col.id}`}
+                              className="py-2 px-3 border border-slate-400 text-right font-mono font-black text-slate-950"
+                            >
+                              {formatNumber(total)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
 
-                    <td className="py-3 px-2 text-center font-mono font-black text-emerald-400 bg-slate-950 text-sm">
-                      {stats.totalUnits}
-                    </td>
-                    <td className="py-3 px-2"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
+              {/* Optional Source Facilities Breakdown Drawer from 1.3.1 Map HF to Hub */}
+              {showContributingFacilities && (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                      Contributing Health Facilities from 1.3.1 Map HF to Hub ({allocations.length} Facilities)
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500">
+                      Aggregated into {plantAggregatedRows.length} Plant rows above
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredPlantRows.map((pr) => (
+                      <div key={`src-${pr.plant}`} className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded bg-[#ffff00] border border-amber-400 font-black text-xs text-slate-950">
+                            {pr.plant} — {pr.plantName}
+                          </span>
+                          <span className="text-[11px] font-mono font-bold text-slate-600">
+                            {pr.facilityCount} HFs • {formatNumber(pr.totalQty)} Units
+                          </span>
+                        </div>
+                        <div className="max-h-36 overflow-y-auto space-y-1">
+                          {pr.facilities.map((fac) => (
+                            <div key={fac.id} className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[11px]">
+                              <div className="truncate mr-2">
+                                <div className="font-semibold text-slate-900 truncate">{fac.healthFacility}</div>
+                                <div className="text-[10px] text-slate-500">{fac.region} · {fac.zone}</div>
+                              </div>
+                              <span className="font-mono font-bold text-emerald-700 shrink-0">{fac.totalQty} units</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
