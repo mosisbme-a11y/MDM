@@ -75,6 +75,24 @@ export interface SupabaseSyncResult {
 }
 
 /**
+ * Returns true if an error or response indicates a paused or unreachable Supabase project.
+ */
+export function isSupabasePausedError(err: any): boolean {
+  const msg = String(err?.message || err || '').toLowerCase();
+  const status = Number(err?.status || err?.code || 0);
+  return (
+    status === 540 ||
+    msg.includes('paused') ||
+    msg.includes('540') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('load failed') ||
+    msg.includes('enotfound') ||
+    msg.includes('econnrefused')
+  );
+}
+
+/**
  * Helper to test connection with Supabase.
  */
 export async function testSupabaseConnection(): Promise<{ success: boolean; message: string }> {
@@ -89,10 +107,22 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
     // Try pinging health_facilities or any table
     const { error } = await supabase.from('health_facilities').select('count', { count: 'exact', head: true });
     if (error && error.code !== 'PGRST116' && !error.message?.includes('relation') && error.code !== '42P01') {
+      if (isSupabasePausedError(error)) {
+        return {
+          success: false,
+          message: 'Your Supabase project appears to be PAUSED or still waking up. Open Supabase Dashboard, click "Resume project", and retry in 1–2 minutes.'
+        };
+      }
       return { success: false, message: error.message };
     }
     return { success: true, message: 'Successfully connected to Supabase PostgreSQL database!' };
   } catch (err: any) {
+    if (isSupabasePausedError(err)) {
+      return {
+        success: false,
+        message: 'Your Supabase project appears to be PAUSED or unreachable. Open Supabase Dashboard and click "Resume project", or verify VITE_SUPABASE_URL points to your active project.'
+      };
+    }
     return { success: false, message: err?.message || 'Connection test failed.' };
   }
 }
@@ -187,6 +217,9 @@ function notifySupabaseSyncCompleted(tableName: string, count: number, success: 
  */
 function formatSupabaseError(error: any, tableName: string): string {
   if (!error) return 'Unknown error occurred during sync.';
+  if (isSupabasePausedError(error)) {
+    return 'Supabase project is currently paused or unreachable. Click "Resume project" in your Supabase Dashboard (or verify VITE_SUPABASE_URL) and retry in 1–2 minutes.';
+  }
   
   const msg = error.message || String(error);
   // PostgREST 404 means the table is not found

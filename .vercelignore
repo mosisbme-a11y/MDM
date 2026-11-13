@@ -1,0 +1,8 @@
+node_modules
+server_data
+.aistudio
+*.md
+bun.lock
+.env
+.env.local
+dist

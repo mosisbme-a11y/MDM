@@ -651,9 +651,15 @@ export async function getUploadRegistry() {
     const store = readLocalStore();
     return Array.isArray(store.uploaded_files_registry) ? store.uploaded_files_registry : [];
   }
-  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', REGISTRY_KEY).maybeSingle();
-  if (error) throw new Error(`Supabase read (registry) failed: ${error.message}`);
-  return data && Array.isArray(data.payload) ? data.payload : [];
+  try {
+    const { data, error } = await client.from(TABLE).select('payload').eq('dataset', REGISTRY_KEY).maybeSingle();
+    if (error) throw new Error(`Supabase read (registry) failed: ${error.message}`);
+    return data && Array.isArray(data.payload) ? data.payload : [];
+  } catch (err) {
+    console.warn('[Supabase Store] getUploadRegistry fallback:', err?.message || err);
+    const store = readLocalStore();
+    return Array.isArray(store.uploaded_files_registry) ? store.uploaded_files_registry : [];
+  }
 }
 
 export async function addUploadRecord(record) {
@@ -686,9 +692,15 @@ export async function getMasterDataLogs() {
     const store = readLocalStore();
     return Array.isArray(store.master_data_logs) ? store.master_data_logs : [];
   }
-  const { data, error } = await client.from(TABLE).select('payload').eq('dataset', LOGS_KEY).maybeSingle();
-  if (error) throw new Error(`Supabase read (logs) failed: ${error.message}`);
-  return data && Array.isArray(data.payload) ? data.payload : [];
+  try {
+    const { data, error } = await client.from(TABLE).select('payload').eq('dataset', LOGS_KEY).maybeSingle();
+    if (error) throw new Error(`Supabase read (logs) failed: ${error.message}`);
+    return data && Array.isArray(data.payload) ? data.payload : [];
+  } catch (err) {
+    console.warn('[Supabase Store] getMasterDataLogs fallback:', err?.message || err);
+    const store = readLocalStore();
+    return Array.isArray(store.master_data_logs) ? store.master_data_logs : [];
+  }
 }
 
 export async function addMasterDataLog(log) {

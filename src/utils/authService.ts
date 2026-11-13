@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isSupabasePausedError } from '../lib/supabase';
 import { AuthUser } from '../types';
 
 const REMEMBER_KEY = 'epss_remember_login';
@@ -60,23 +60,37 @@ export async function signInWithPassword(
     return { error: 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env and rebuild.' };
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-  if (error || !data.user) {
-    return { error: 'Invalid email or password.' };
-  }
-
-  const profile = await loadProfile(data.user.id, data.user.email || email);
-  if (!profile) {
-    await supabase.auth.signOut();
-    return { error: 'This account has no active profile. Ask the Inventory Administrator to activate it.' };
-  }
-
   try {
-    sessionStorage.setItem(SESSION_ACTIVE_KEY, '1');
-  } catch {
-    // ignore
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error || !data.user) {
+      if (isSupabasePausedError(error)) {
+        return {
+          error: 'The connected Supabase database is currently paused or waking up. Click "Resume project" in Supabase Dashboard (or verify VITE_SUPABASE_URL) and try again in 1–2 minutes.'
+        };
+      }
+      return { error: 'Invalid email or password.' };
+    }
+
+    const profile = await loadProfile(data.user.id, data.user.email || email);
+    if (!profile) {
+      await supabase.auth.signOut();
+      return { error: 'This account has no active profile. Ask the Inventory Administrator to activate it.' };
+    }
+
+    try {
+      sessionStorage.setItem(SESSION_ACTIVE_KEY, '1');
+    } catch {
+      // ignore
+    }
+    return { user: profile };
+  } catch (err: any) {
+    if (isSupabasePausedError(err)) {
+      return {
+        error: 'The connected Supabase database is paused or unreachable. Click "Resume project" in your Supabase Dashboard and retry in 1–2 minutes.'
+      };
+    }
+    return { error: err?.message || 'Sign in failed.' };
   }
-  return { user: profile };
 }
 
 /**
