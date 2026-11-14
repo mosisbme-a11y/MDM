@@ -2631,32 +2631,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </div>
 
-                {/* Transmittal Target Destination Selection */}
-                <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setTransmittalDestination('EPSS')}
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      transmittalDestination === 'EPSS'
-                        ? 'bg-amber-500 text-slate-950 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send to EPSS Head Office</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTransmittalDestination('MOH')}
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      transmittalDestination === 'MOH'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Send className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Send to MOH PMD Directorate</span>
-                  </button>
+                {/* Transmittal Destination Notice */}
+                <div className="p-3 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-amber-400" />
+                    <span>Transmittal Destination: Ministry of Health (PMD Directorate)</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-mono font-black uppercase">
+                    RHB → MOH Submission
+                  </span>
                 </div>
 
                 <div className="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
@@ -2719,19 +2702,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
                   const year = new Date().getFullYear();
                   const randNum = Math.floor(100 + Math.random() * 900);
-                  const brkRef = `RHB/${transmittalDestination}-BRK/${year}/${randNum}`;
-                  const targetOrg = transmittalDestination === 'EPSS' ? 'EPSS Head Office' : 'MOH PMD Directorate';
+                  const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
+                  const targetOrg = 'Ministry of Health (PMD Directorate)';
 
                   const rhbRecord: DspWorkflowRecord = {
-                    id: `dsp-rhb-${transmittalDestination.toLowerCase()}-${Date.now()}`,
+                    id: `dsp-rhb-moh-${Date.now()}`,
                     dspRefNumber: brkRef,
-                    stage: transmittalDestination === 'EPSS' ? 'epss-ho-aggregation' : 'rhb-to-moh',
-                    subStage: transmittalDestination === 'EPSS' ? '4.1' : '3.2',
-                    stageTitle: transmittalDestination === 'EPSS' ? 'EPSS Aggregated Dispatch' : '3.2 Submit Breakdown to MOH',
+                    stage: 'rhb-to-moh',
+                    subStage: '3.2',
+                    stageTitle: '3.2 Submit Breakdown to MOH',
                     senderOrg: manualSignatoryOrg || `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
                     recipientOrg: targetOrg,
                     dspName: cleanDspName,
-                    subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Transmitted to ${targetOrg} (${filteredRows.length} Facilities)`,
+                    subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Transmitted to MOH (${filteredRows.length} Facilities)`,
                     status: 'Submitted & Pending',
                     dateSubmitted: internalDate || new Date().toISOString().split('T')[0],
                     approvedDate: internalDate || new Date().toISOString().split('T')[0],
@@ -2757,7 +2740,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       quantity: filteredRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
                       plant: filteredRows[0]?.hub || 'Addis Central'
                     })),
-                    notes: `Official Health Facility Breakdown Matrix submitted by ${manualSignatoryName} (${manualSignatoryRole}, ${manualSignatoryOrg || 'RHB'}) to ${targetOrg}.`
+                    notes: `Official Health Facility Breakdown Matrix submitted by ${manualSignatoryName} (${manualSignatoryRole}, ${manualSignatoryOrg || 'RHB'}) to Ministry of Health (PMD Directorate). Stored in 2.3 Breakdown Received from RHB & 2.4 Breakdown Aggregation by RHB.`
                   };
 
                   onTransmitRecord?.(rhbRecord);
@@ -2766,22 +2749,18 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     pushCentralMasterData({
                       dspReceivedMohRows: filteredRows,
                       updatedBy: `${manualSignatoryOrg || 'RHB'} - ${manualSignatoryName}`,
-                      updateKind: `Transmit Region Breakdown Matrix to ${targetOrg} (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
+                      updateKind: `Transmit Region Breakdown Matrix to MOH (${filteredRows.length} Facilities, ${grandTotalUnits} Units)`
                     });
                   } catch (e) {
                     console.warn(e);
                   }
                   setIsTransmitModalOpen(false);
-                  showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) successfully transmitted to ${targetOrg} by ${manualSignatoryName}!`);
+                  showToast(`✓ Regional Breakdown Matrix (${filteredRows.length} Facilities) successfully submitted to Ministry of Health! Stored inside 2.3 Breakdown Received from RHB & 2.4 Breakdown Aggregation by RHB.`);
                 }}
-                className={`px-5 py-2.5 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 text-xs ${
-                  transmittalDestination === 'EPSS'
-                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-                    : 'bg-slate-900 hover:bg-black text-amber-400'
-                }`}
+                className="px-5 py-2.5 rounded-xl font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 text-xs bg-slate-900 hover:bg-black text-amber-400"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>Confirm Transmit to {transmittalDestination}</span>
+                <Send className="w-3.5 h-3.5 text-amber-400" />
+                <span>Submit Breakdown to Ministry of Health (MOH)</span>
               </button>
             </div>
           </div>
