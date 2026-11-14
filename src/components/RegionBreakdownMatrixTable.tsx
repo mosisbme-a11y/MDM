@@ -185,32 +185,7 @@ export const MASTER_EQUIPMENT_CATALOG = [
   { name: 'Microscope Binocular Laboratory', code: '405-MIC-0116' }
 ];
 
-export interface RhbSubmissionSummaryRow {
-  sn: number;
-  region: string;
-  dspName: string;
-  date: string;
-  status?: string;
-  totalFacilities?: number;
-  totalUnits?: number;
-}
 
-export const ATTACHMENT_14_REGIONS_LIST: RhbSubmissionSummaryRow[] = [
-  { sn: 1, region: 'Afar', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 6, totalUnits: 142 },
-  { sn: 2, region: 'Amhara', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 18, totalUnits: 420 },
-  { sn: 3, region: 'Benishangul-Gumuz', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 5, totalUnits: 98 },
-  { sn: 4, region: 'Central Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 8, totalUnits: 186 },
-  { sn: 5, region: 'Gambela', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 4, totalUnits: 76 },
-  { sn: 6, region: 'Harari', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 4, totalUnits: 84 },
-  { sn: 7, region: 'Oromia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 24, totalUnits: 680 },
-  { sn: 8, region: 'Sidama', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 7, totalUnits: 160 },
-  { sn: 9, region: 'Somali', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 12, totalUnits: 290 },
-  { sn: 10, region: 'South Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 9, totalUnits: 210 },
-  { sn: 11, region: 'South West Ethiopia', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 6, totalUnits: 130 },
-  { sn: 12, region: 'Tigray', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 14, totalUnits: 340 },
-  { sn: 13, region: 'Addis Ababa', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 10, totalUnits: 250 },
-  { sn: 14, region: 'Dire Dawa', dspName: 'MOH/RHB/2026/DSP-01', date: '2026-11-09', status: 'Submitted to MOH', totalFacilities: 3, totalUnits: 65 }
-];
 
 interface RegionBreakdownMatrixTableProps {
   data?: RegionBreakdownMatrixData;
@@ -226,6 +201,7 @@ interface RegionBreakdownMatrixTableProps {
   disableBreakdownLink?: boolean;
   showHubColumn?: boolean;
   isHubMappedInitially?: boolean;
+  enableRhbMultiAutoPopulate?: boolean;
   onProceedToAggregation?: () => void;
   onTransmitRecord?: (record: DspWorkflowRecord) => void;
 }
@@ -244,6 +220,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   disableBreakdownLink = false,
   showHubColumn = false,
   isHubMappedInitially = false,
+  enableRhbMultiAutoPopulate = false,
   onProceedToAggregation,
   onTransmitRecord
 }) => {
@@ -254,10 +231,17 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>('all');
   const [selectedZone, setSelectedZone] = useState('all');
   const [selectedPackage, setSelectedPackage] = useState('all');
+  const [isAutoPopulateOpen, setIsAutoPopulateOpen] = useState(false);
+  const [selectedAutoRegions, setSelectedAutoRegions] = useState<string[]>([]);
+  const [selectedAutoFacilityIds, setSelectedAutoFacilityIds] = useState<string[]>([]);
+  const [autoPopulateFacilitySearch, setAutoPopulateFacilitySearch] = useState('');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isHubMapped, setIsHubMapped] = useState(showHubColumn);
-  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'rhb' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
+  useEffect(() => {
+    setIsHubMapped(showHubColumn);
+  }, [showHubColumn]);
+  const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
 
   const handleSelectAllCatalogItems = () => {
     const newCols: RegionBreakdownColumn[] = MASTER_EQUIPMENT_CATALOG.map((item, idx) => ({
@@ -428,11 +412,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     }
   };
 
-  // RHB Summary Table (Attachment 1 Format: S/N | Region | DSP Name | Date | View)
-  const [rhbSubViewMode, setRhbSubViewMode] = useState<'summary-table' | 'detailed-matrix'>('summary-table');
-  const [rhbSummaryRows, setRhbSummaryRows] = useState<RhbSubmissionSummaryRow[]>(ATTACHMENT_14_REGIONS_LIST);
-  const [selectedRhbDetailRegion, setSelectedRhbDetailRegion] = useState<RhbSubmissionSummaryRow | null>(null);
-
 
   const handleSelectItemOneByOne = (val: string) => {
     if (!val) return;
@@ -600,7 +579,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     if (data) {
       if (data.date) setInternalDate(data.date);
       if (data.columns && data.columns.length > 0) setColumns(data.columns);
-      if (data.rows && data.rows.length > 0) setRows(data.rows);
+      if (Array.isArray(data.rows)) setRows(data.rows);
     }
   }, [data]);
 
@@ -699,6 +678,43 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     if (selectedRegionFilter === 'all') return masterHfItems;
     return masterHfItems.filter(h => isRegionMatch(h.region, selectedRegionFilter));
   }, [masterHfItems, selectedRegionFilter]);
+
+  const getMasterFacilityKey = (hf: HealthFacilityRecord) => {
+    if (hf.id) return hf.id;
+    return `${(hf.region || '').trim()}::${(hf.zoneCode || hf.zoneDescription || '').trim()}::${(hf.woreda || hf.woredaDescription || '').trim()}::${(hf.customer || '').trim()}::${(hf.customerDescription || '').trim()}`;
+  };
+
+  const regionFacilityCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    uniqueRegions.forEach(reg => {
+      counts[reg] = masterHfItems.filter(h => isRegionMatch(h.region, reg)).length;
+    });
+    return counts;
+  }, [uniqueRegions, masterHfItems]);
+
+  const autoPopulateCandidateFacilities = useMemo(() => {
+    if (selectedAutoRegions.length > 0) {
+      return masterHfItems.filter(h =>
+        selectedAutoRegions.some(reg => isRegionMatch(h.region, reg))
+      );
+    }
+    if (selectedRegionFilter !== 'all') {
+      return masterHfItems.filter(h => isRegionMatch(h.region, selectedRegionFilter));
+    }
+    return masterHfItems;
+  }, [masterHfItems, selectedAutoRegions, selectedRegionFilter]);
+
+  const filteredAutoPopulateFacilities = useMemo(() => {
+    const q = autoPopulateFacilitySearch.trim().toLowerCase();
+    if (!q) return autoPopulateCandidateFacilities;
+    return autoPopulateCandidateFacilities.filter(h =>
+      (h.customerDescription || '').toLowerCase().includes(q) ||
+      (h.customer || '').toLowerCase().includes(q) ||
+      (h.region || '').toLowerCase().includes(q) ||
+      (h.zoneDescription || h.zoneCode || '').toLowerCase().includes(q) ||
+      (h.woredaDescription || h.woreda || '').toLowerCase().includes(q)
+    );
+  }, [autoPopulateCandidateFacilities, autoPopulateFacilitySearch]);
 
   // Column totals
   const columnTotals = useMemo(() => {
@@ -815,6 +831,133 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     setRows(newRows);
     notifyChange(internalDate, columns, newRows);
     showToast(`✓ Auto-filled ${newRows.length} facilities & customer descriptions for ${targetRegion} from HF Master List!`);
+  };
+
+  // Clear all populated facility rows from matrix table (RHB Clear All feature)
+  const handleClearAllFacilities = () => {
+    setRows([]);
+    setSelectedAutoRegions([]);
+    setSelectedAutoFacilityIds([]);
+    setAutoPopulateFacilitySearch('');
+    setSelectedRegionFilter('all');
+    setSelectedZone('all');
+    setSearchQuery('');
+    notifyChange(internalDate, columns, []);
+    showToast('✓ Cleared all facility rows from the matrix table.');
+  };
+
+  const handleToggleAutoRegion = (regionName: string) => {
+    setSelectedAutoRegions(prev => {
+      const exists = prev.some(r => r.toLowerCase() === regionName.toLowerCase());
+      if (exists) {
+        return prev.filter(r => r.toLowerCase() !== regionName.toLowerCase());
+      }
+      return [...prev, regionName];
+    });
+  };
+
+  const handleSelectAllAutoRegions = () => {
+    const withFacilities = uniqueRegions.filter(r => (regionFacilityCounts[r] || 0) > 0);
+    setSelectedAutoRegions(withFacilities.length > 0 ? withFacilities : [...uniqueRegions]);
+  };
+
+  const handleClearAutoSelectionOnly = () => {
+    setSelectedAutoRegions([]);
+    setSelectedAutoFacilityIds([]);
+    setAutoPopulateFacilitySearch('');
+  };
+
+  const handleToggleAutoFacility = (facKey: string) => {
+    setSelectedAutoFacilityIds(prev =>
+      prev.includes(facKey) ? prev.filter(id => id !== facKey) : [...prev, facKey]
+    );
+  };
+
+  const handleSelectAllMatchingAutoFacilities = () => {
+    const allKeys = filteredAutoPopulateFacilities.map(hf => getMasterFacilityKey(hf));
+    setSelectedAutoFacilityIds(prev => Array.from(new Set([...prev, ...allKeys])));
+  };
+
+  const handleDeselectAllMatchingAutoFacilities = () => {
+    const matchingKeySet = new Set(
+      filteredAutoPopulateFacilities.map(hf => getMasterFacilityKey(hf))
+    );
+    setSelectedAutoFacilityIds(prev => prev.filter(id => !matchingKeySet.has(id)));
+  };
+
+  // Multi-select Auto-Populate (supports 2+ regions or 2+ facilities in one go)
+  const handleAutoPopulateMultiFacilities = (mode: 'replace' | 'append' = 'replace') => {
+    let targetFacilities: HealthFacilityRecord[] = [];
+
+    if (selectedAutoFacilityIds.length > 0) {
+      const selectedKeySet = new Set(selectedAutoFacilityIds);
+      targetFacilities = masterHfItems.filter(hf =>
+        selectedKeySet.has(getMasterFacilityKey(hf))
+      );
+    } else if (selectedAutoRegions.length > 0) {
+      targetFacilities = masterHfItems.filter(h =>
+        selectedAutoRegions.some(reg => isRegionMatch(h.region, reg))
+      );
+    } else if (selectedRegionFilter !== 'all') {
+      targetFacilities = masterHfItems.filter(h => isRegionMatch(h.region, selectedRegionFilter));
+    }
+
+    if (targetFacilities.length === 0) {
+      showToast('⚠️ Please select at least 1 region or 2+ facilities from the HF Master List first.');
+      return;
+    }
+
+    setIsEditingMode(true);
+    const stamp = Date.now();
+    const mappedNewRows: RegionBreakdownRow[] = targetFacilities.map((hf, idx) => {
+      const existingMatch = rows.find(
+        r =>
+          (hf.customer && r.healthFacility === hf.customer) ||
+          (hf.customerDescription &&
+            (r.customerDescription || r.healthFacility || '').trim().toLowerCase() ===
+              hf.customerDescription.trim().toLowerCase())
+      );
+
+      const rowQuantities: Record<string, number> = {};
+      columns.forEach(col => {
+        rowQuantities[col.id] = existingMatch?.quantities?.[col.id] ?? 1;
+      });
+
+      const regionLabel = hf.region || selectedAutoRegions[0] || 'Oromia';
+      return {
+        id: `row-auto-multi-${regionLabel.toLowerCase().replace(/\s+/g, '-')}-${idx}-${stamp}`,
+        region: regionLabel,
+        zone: hf.zoneDescription || hf.zoneCode || 'Zone 1',
+        woreda: hf.woredaDescription || hf.woreda || '1',
+        hub: hf.deliveringPlant || 'General Regional Hub',
+        healthFacility: hf.customer || `HF-${idx + 1}`,
+        customerDescription: hf.customerDescription || hf.customer || 'Health Facility',
+        packages: existingMatch?.packages || (idx % 2 === 0 ? 'MCH' : 'OR'),
+        quantities: rowQuantities
+      };
+    });
+
+    let finalRows: RegionBreakdownRow[];
+    if (mode === 'append') {
+      const existingSignatures = new Set(
+        rows.map(r => `${(r.region || '').toLowerCase()}::${(r.customerDescription || r.healthFacility || '').trim().toLowerCase()}`)
+      );
+      const uniqueAdditions = mappedNewRows.filter(nr => {
+        const sig = `${(nr.region || '').toLowerCase()}::${(nr.customerDescription || nr.healthFacility || '').trim().toLowerCase()}`;
+        return !existingSignatures.has(sig);
+      });
+      finalRows = [...rows, ...uniqueAdditions];
+    } else {
+      finalRows = mappedNewRows;
+    }
+
+    const distinctRegionsCount = new Set(finalRows.map(r => r.region).filter(Boolean)).size;
+    setSelectedRegionFilter('all');
+    setRows(finalRows);
+    notifyChange(internalDate, columns, finalRows);
+    showToast(
+      `✓ ${mode === 'append' ? 'Appended' : 'Auto-populated'} ${mappedNewRows.length} facilities across ${distinctRegionsCount} region(s)!`
+    );
   };
 
   // Row field change
@@ -1264,59 +1407,63 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 All Regions & HF Master Linked
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {subtitle}
-            </p>
+            {subtitle && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                {subtitle}
+              </p>
+            )}
           </div>
         </div>
 
         {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
-        <div className="relative">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleMapHfToHub}
-                disabled={isAnalyzing}
-                className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
-                  isHubMapped 
-                    ? 'bg-emerald-600 border-emerald-400 text-white' 
-                    : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
-                }`}
-              >
-                {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
-                <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
-              </button>
-
-              {onProceedToAggregation && (
+        <div className="relative flex flex-wrap items-center gap-2">
+            {showHubColumn && (
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const mappedRows = rows.map(row => {
-                      if (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) return row;
-                      const mapping = mapFacilityToHub(
-                        row.healthFacility || row.customerDescription || '',
-                        row.region || '',
-                        row.zone || '',
-                        row.woreda || '',
-                        hfListItems
-                      );
-                      return {
-                        ...row,
-                        hub: (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01'
-                      };
-                    });
-                    setRows(mappedRows);
-                    setIsHubMapped(true);
-                    notifyChange(internalDate, columns, mappedRows);
-                    onProceedToAggregation();
-                  }}
-                  className="px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition-all active:scale-95 cursor-pointer tracking-wider uppercase flex items-center gap-2 border border-amber-300"
+                  onClick={handleMapHfToHub}
+                  disabled={isAnalyzing}
+                  className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
+                    isHubMapped 
+                      ? 'bg-emerald-600 border-emerald-400 text-white' 
+                      : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
+                  }`}
                 >
-                  <span>Save & Aggregate by Plant (1.3.3)</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
+                  <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
                 </button>
-              )}
-            </div>
+
+                {onProceedToAggregation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mappedRows = rows.map(row => {
+                        if (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) return row;
+                        const mapping = mapFacilityToHub(
+                          row.healthFacility || row.customerDescription || '',
+                          row.region || '',
+                          row.zone || '',
+                          row.woreda || '',
+                          hfListItems
+                        );
+                        return {
+                          ...row,
+                          hub: (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01'
+                        };
+                      });
+                      setRows(mappedRows);
+                      setIsHubMapped(true);
+                      notifyChange(internalDate, columns, mappedRows);
+                      onProceedToAggregation();
+                    }}
+                    className="px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition-all active:scale-95 cursor-pointer tracking-wider uppercase flex items-center gap-2 border border-amber-300"
+                  >
+                    <span>Save & Aggregate by Plant (1.3.3)</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
 
             <button
               type="button"
@@ -1326,7 +1473,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             >
               <span className={`w-3.5 h-3.5 rounded-full animate-pulse shrink-0 ${showHubColumn || isHubMapped ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)]' : 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)]'}`} />
               <span className={`tracking-widest font-black text-white transition-colors ${showHubColumn || isHubMapped ? 'group-hover:text-emerald-300' : 'group-hover:text-amber-300'}`}>
-                {showHubColumn || isHubMapped ? 'SUBMIT BREAKDOWN FOR HUB/BRANCHES' : 'SUBMIT BREAKDOWN TO MOH / EPSS'}
+                {showHubColumn || isHubMapped ? 'SUBMIT BREAKDOWN FOR HUB/BRANCHES' : 'SUBMIT BREAKDOWN TO MOH'}
               </span>
               <span className={`w-6 h-6 rounded-full text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1 ${showHubColumn || isHubMapped ? 'bg-emerald-400' : 'bg-amber-400'}`}>
                 3
@@ -1698,247 +1845,290 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       </div>
       
       {/* Region Selector & Filter Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[300px]">
-          {/* Region Quick Selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-700">Region:</span>
-            <select
-              value={selectedRegionFilter}
-              onChange={(e) => setSelectedRegionFilter(e.target.value)}
-              className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-1.5 text-xs text-amber-900 font-bold cursor-pointer focus:outline-none focus:border-amber-500 shadow-2xs"
-            >
-              <option value="all">🌍 All Regions (15 Ethiopian Regions)</option>
-              {uniqueRegions.map(reg => (
-                <option key={reg} value={reg}>{reg}</option>
-              ))}
-            </select>
-          </div>
-
-          {selectedRegionFilter !== 'all' && (
-            <button
-              type="button"
-              onClick={() => handleAutoPopulateRegionFacilities(selectedRegionFilter)}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-              title={`Automatically fill table rows with all facilities for ${selectedRegionFilter} from HF Master List`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>⚡ Auto-Fill {selectedRegionFilter} Facilities</span>
-            </button>
-          )}
-
-          <div className="relative w-full sm:w-56">
-            <Search size={14} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search facility, zone, woreda..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            title="Add a new health facility row to matrix table"
-          >
-            <Plus size={15} />
-            <span>+ Add Facility Row</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickAddColumn()}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            title="Add a new equipment / facility column to matrix table"
-          >
-            <Plus size={15} />
-            <span>+ Add Column</span>
-          </button>
-        </div>
-      </div>
-
-      {/* RHB BREAKDOWN AGGREGATION SUB-VIEW SWITCHER BAR */}
-      {matrixTemplateFormat === 'rhb' && (
-        <div className="bg-[#0A0F1D] border border-amber-400/40 p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-2.5">
-            <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.9)]" />
-            <div>
-              <span className="text-xs font-black text-white uppercase tracking-wider block">
-                BREAKDOWN AGGREGATION BY RHB — 14 Ethiopian Regional Health Bureaus
-              </span>
-              <span className="text-[11px] text-slate-400 font-mono">
-                Official Regional Submissions format sent to Ministry of Health (MOH)
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
-            <button
-              type="button"
-              onClick={() => setRhbSubViewMode('summary-table')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
-                rhbSubViewMode === 'summary-table'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <FileText size={14} />
-              <span>Summary Table (Attachment 1 Format)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRhbSubViewMode('detailed-matrix')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
-                rhbSubViewMode === 'detailed-matrix'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Layers size={14} />
-              <span>Detailed Facility Matrix</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
-                showToast('⚡ Switched to Linked DSP AGGR. SUBMITTED TO EPSS Health Facility Matrix');
-              }}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-              title="Open linked DSP Aggregated Submission to EPSS matrix"
-            >
-              <Link2 size={14} className="text-slate-950" />
-              <span>Linked EPSS Matrix</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* REGIONAL SUBMISSIONS SUMMARY TABLE: Exact Attachment 1 Format (S/N | Region | DSP Name | Date | View) */}
-      {matrixTemplateFormat === 'rhb' && rhbSubViewMode === 'summary-table' ? (
-        <div className="bg-white border-2 border-slate-900 rounded-xl overflow-hidden shadow-md">
-          <div className="bg-[#0B1527] text-white p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b-2 border-slate-900">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
-                <span className="font-black text-sm uppercase tracking-wider text-white">
-                  Regional Health Bureau (RHB) Submissions to Ministry of Health (MOH)
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Exact Attachment 1 Table Format: S/N | Region | DSP Name | Date | View — 14 Ethiopian Regions (Linked to EPSS Matrix)
-              </p>
+      <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[300px]">
+            {/* Region Quick Selector */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-700">Region:</span>
+              <select
+                value={selectedRegionFilter}
+                onChange={(e) => setSelectedRegionFilter(e.target.value)}
+                className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-1.5 text-xs text-amber-900 font-bold cursor-pointer focus:outline-none focus:border-amber-500 shadow-2xs"
+              >
+                <option value="all">🌍 All Regions (15 Ethiopian Regions)</option>
+                {uniqueRegions.map(reg => (
+                  <option key={reg} value={reg}>{reg}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            {selectedRegionFilter !== 'all' && (
               <button
                 type="button"
-                onClick={() => {
-                  const ws = XLSX.utils.json_to_sheet(
-                    rhbSummaryRows.map(r => ({
-                      'S/N': r.sn,
-                      'Region': r.region,
-                      'DSP Name': r.dspName,
-                      'Date': r.date,
-                      'View / Status': r.status || 'Submitted to MOH'
-                    }))
-                  );
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, 'RHB Submissions to MOH');
-                  XLSX.writeFile(wb, `RHB_Submissions_Summary_To_MOH_${internalDate}.xlsx`);
-                  showToast('✓ RHB Submissions Summary exported to Excel!');
-                }}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                onClick={() => handleAutoPopulateRegionFacilities(selectedRegionFilter)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                title={`Automatically fill table rows with all facilities for ${selectedRegionFilter} from HF Master List`}
               >
-                <FileSpreadsheet size={14} />
-                <span>Export Summary (.xlsx)</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>⚡ Auto-Fill {selectedRegionFilter} Facilities</span>
               </button>
+            )}
+
+            {enableRhbMultiAutoPopulate && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsAutoPopulateOpen(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
+                    isAutoPopulateOpen || selectedAutoRegions.length > 0 || selectedAutoFacilityIds.length > 0
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-600'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                  }`}
+                  title="Select 2 or more regions or multiple facilities in one go to auto-populate"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>
+                    Multi-Select Auto-Populate
+                    {(selectedAutoRegions.length > 0 || selectedAutoFacilityIds.length > 0) && (
+                      ` (${selectedAutoFacilityIds.length > 0 ? `${selectedAutoFacilityIds.length} HF` : `${selectedAutoRegions.length} Regions`})`
+                    )}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAutoPopulateOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllFacilities}
+                  disabled={rows.length === 0 && selectedAutoRegions.length === 0 && selectedAutoFacilityIds.length === 0}
+                  className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  title="Clear all auto-populated and listed health facility rows from the matrix"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear All</span>
+                </button>
+              </>
+            )}
+
+            <div className="relative w-full sm:w-56">
+              <Search size={14} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search facility, zone, woreda..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500"
+              />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse font-sans border-t border-slate-900">
-              <thead>
-                <tr className="bg-slate-100 text-slate-950 font-black text-xs border-b-2 border-slate-900">
-                  <th className="p-3 border-r border-slate-300 w-16 text-center bg-slate-200">S/N</th>
-                  <th className="p-3 border-r border-slate-300 min-w-[200px] bg-slate-100">Region</th>
-                  <th className="p-3 border-r border-slate-300 min-w-[260px] bg-slate-100">DSP Name</th>
-                  <th className="p-3 border-r border-slate-300 min-w-[140px] bg-slate-100">Date</th>
-                  <th className="p-3 text-center min-w-[120px] bg-slate-200">View</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rhbSummaryRows.map((row) => (
-                  <tr 
-                    key={row.sn} 
-                    className="border-b border-slate-300 hover:bg-amber-50/80 transition group"
-                  >
-                    <td className="p-3 border-r border-slate-300 text-center font-mono font-bold text-slate-900 bg-slate-50/60 group-hover:bg-amber-100/60">
-                      {row.sn}
-                    </td>
-                    <td className="p-3 border-r border-slate-300 font-bold text-slate-900 text-sm">
-                      {row.region}
-                    </td>
-                    <td className="p-3 border-r border-slate-300 font-mono">
-                      {isEditingMode ? (
-                        <input
-                          type="text"
-                          value={row.dspName}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setRhbSummaryRows(prev => prev.map(r => r.sn === row.sn ? { ...r, dspName: val } : r));
-                          }}
-                          className="w-full bg-white border border-amber-300 rounded px-2.5 py-1 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        />
-                      ) : (
-                        <span className="text-slate-800 font-semibold">{row.dspName}</span>
-                      )}
-                    </td>
-                    <td className="p-3 border-r border-slate-300 font-mono text-slate-700">
-                      {isEditingMode ? (
-                        <input
-                          type="date"
-                          value={row.date}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setRhbSummaryRows(prev => prev.map(r => r.sn === row.sn ? { ...r, date: val } : r));
-                          }}
-                          className="bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        />
-                      ) : (
-                        <span>{row.date}</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center bg-slate-50/60 group-hover:bg-amber-100/60">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedRhbDetailRegion(row);
-                          setSelectedRegionFilter(row.region);
-                          setMatrixTemplateFormat('dsp-aggr-submitted-to-epss');
-                          showToast(`🔗 Linked View: Opened ${row.region} Breakdown Matrix in DSP AGGR. SUBMITTED TO EPSS format`);
-                        }}
-                        className="px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-black text-amber-400 font-black text-xs transition cursor-pointer shadow-xs inline-flex items-center gap-1.5 border border-slate-700 active:scale-95"
-                        title={`View ${row.region} Health Facility Breakdown Matrix in DSP AGGR. SUBMITTED TO EPSS format`}
-                      >
-                        <Eye size={13} className="text-amber-400" />
-                        <span>View</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Add a new health facility row to matrix table"
+            >
+              <Plus size={15} />
+              <span>+ Add Facility Row</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleQuickAddColumn()}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Add a new equipment / facility column to matrix table"
+            >
+              <Plus size={15} />
+              <span>+ Add Column</span>
+            </button>
           </div>
         </div>
-      ) : (
-        /* SPREADSHEET TABLE: Matching Detailed Format */
+
+        {/* RHB Multi-Select Auto-Populate Facility Drawer (Select 2+ Regions or Facilities in One + Clear All) */}
+        {enableRhbMultiAutoPopulate && isAutoPopulateOpen && (
+          <div className="p-3.5 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3 animate-in fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-emerald-200">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-700" />
+                <span className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                  Auto-Populate Facilities — Select 2+ Regions or Multiple Facilities in One
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-200 text-emerald-900">
+                  {selectedAutoRegions.length} Region(s) • {selectedAutoFacilityIds.length > 0 ? `${selectedAutoFacilityIds.length} Specific HF` : `${autoPopulateCandidateFacilities.length} Matching HF`}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSelectAllAutoRegions}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase transition cursor-pointer"
+                >
+                  ✓ Select All Regions
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAutoSelectionOnly}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-[10px] uppercase transition cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAllFacilities}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] uppercase transition cursor-pointer flex items-center gap-1"
+                  title="Clear all populated facility rows in the table and reset selections"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Clear All Facilities</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Step 1: Multi-Select Regions (Pick 1, 2, or more in one) */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-bold text-slate-700">
+                1. Pick Regions (Check 2 or more regions to combine them in one):
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-white rounded-lg border border-emerald-200">
+                {uniqueRegions.map(reg => {
+                  const isChecked = selectedAutoRegions.some(r => r.toLowerCase() === reg.toLowerCase());
+                  const count = regionFacilityCounts[reg] || 0;
+                  return (
+                    <label
+                      key={`auto-reg-${reg}`}
+                      className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] cursor-pointer transition ${
+                        isChecked
+                          ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleAutoRegion(reg)}
+                          className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer shrink-0"
+                        />
+                        <span className="truncate">{reg}</span>
+                      </span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${count > 0 ? 'bg-white/80 text-emerald-800 font-bold' : 'text-slate-400'}`}>
+                        {count}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2: Multi-Select Specific Facilities */}
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-700">
+                  2. Pick Specific Facilities ({filteredAutoPopulateFacilities.length} available — optional, or populate all from selected regions):
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={autoPopulateFacilitySearch}
+                    onChange={(e) => setAutoPopulateFacilitySearch(e.target.value)}
+                    placeholder="Filter facilities by name, zone, ID..."
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-[11px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 w-52"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSelectAllMatchingAutoFacilities}
+                    disabled={filteredAutoPopulateFacilities.length === 0}
+                    className="px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 disabled:opacity-40 text-emerald-900 font-bold text-[10px] uppercase transition cursor-pointer"
+                  >
+                    Select All ({filteredAutoPopulateFacilities.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeselectAllMatchingAutoFacilities}
+                    disabled={selectedAutoFacilityIds.length === 0}
+                    className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-40 text-slate-700 font-bold text-[10px] uppercase transition cursor-pointer"
+                  >
+                    Uncheck Matching
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-1.5 bg-white rounded-lg border border-emerald-200">
+                {filteredAutoPopulateFacilities.length === 0 ? (
+                  <div className="col-span-full py-5 text-center text-xs text-slate-400 italic">
+                    No facilities found in HF Master List for the current filter.
+                  </div>
+                ) : (
+                  filteredAutoPopulateFacilities.map((hf, idx) => {
+                    const facKey = getMasterFacilityKey(hf);
+                    const isChecked = selectedAutoFacilityIds.includes(facKey);
+                    return (
+                      <label
+                        key={`${facKey}-${idx}`}
+                        className={`flex items-start gap-2 p-2 rounded-lg border text-[11px] cursor-pointer transition ${
+                          isChecked
+                            ? 'bg-emerald-100/90 border-emerald-400 text-emerald-950 font-bold'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleAutoFacility(facKey)}
+                          className="w-3.5 h-3.5 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold">{hf.customerDescription || hf.customer || 'Health Facility'}</div>
+                          <div className="text-[10px] font-mono text-slate-500 truncate">
+                            {hf.region} • {hf.zoneDescription || hf.zoneCode || '-'} • {hf.customer || '-'}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-emerald-200">
+              <span className="text-[11px] text-emerald-900 font-medium">
+                {selectedAutoFacilityIds.length > 0
+                  ? `Ready to populate ${selectedAutoFacilityIds.length} checked facilities.`
+                  : selectedAutoRegions.length > 0
+                    ? `Ready to populate all ${autoPopulateCandidateFacilities.length} facilities from ${selectedAutoRegions.length} selected region(s).`
+                    : 'Check 2+ regions or specific facilities above, then auto-populate.'}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleAutoPopulateMultiFacilities('append')}
+                  disabled={selectedAutoFacilityIds.length === 0 && selectedAutoRegions.length === 0 && selectedRegionFilter === 'all'}
+                  className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-emerald-50 disabled:opacity-40 text-emerald-800 border border-emerald-400 text-xs font-bold transition cursor-pointer"
+                >
+                  + Append Selected to Table
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAutoPopulateMultiFacilities('replace')}
+                  disabled={selectedAutoFacilityIds.length === 0 && selectedAutoRegions.length === 0 && selectedRegionFilter === 'all'}
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-black transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>
+                    ⚡ Auto-Populate Selected ({selectedAutoFacilityIds.length > 0 ? selectedAutoFacilityIds.length : autoPopulateCandidateFacilities.length})
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+
+      {/* SPREADSHEET TABLE: Matching Detailed Format */}
         <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse font-sans">
@@ -1967,7 +2157,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </th>
                 <th 
-                  colSpan={columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4)} 
+                  colSpan={columns.length + 4} 
                   className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
                 >
                   Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
@@ -1996,7 +2186,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </div>
                 </th>
                 <th 
-                  colSpan={matrixTemplateFormat === 'item' ? 4 : columns.length + (matrixTemplateFormat === 'rhb' ? 5 : 4)} 
+                  colSpan={matrixTemplateFormat === 'item' ? 4 : columns.length + 4} 
                   className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
                 >
                   Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
@@ -2014,22 +2204,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[70px] text-center">
                   Woreda
                 </th>
-                {matrixTemplateFormat === 'rhb' ? (
-                  <th className="p-2.5 bg-[#fed7aa] text-[#78350f] border-r border-slate-300 font-semibold min-w-[240px]">
-                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#fef08a] border border-[#fde047] text-[#854d0e] font-bold shadow-2xs not-italic">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                      <span>Customer Description</span>
-                    </div>
-                  </th>
-                ) : (
-                  <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[240px]">
-                    Name of health facility
-                  </th>
-                )}
+                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[240px]">
+                  Name of health facility
+                </th>
                  <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                    List of Packages
                  </th>
-                 {isHubMapped && (
+                 {showHubColumn && isHubMapped && (
                    <th className="p-2.5 bg-[#fef08a] text-amber-950 font-black border-r border-slate-300 min-w-[90px] text-center uppercase tracking-wider">
                      HUB
                    </th>
@@ -2096,7 +2277,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packages</th>
-                {isHubMapped && (
+                {showHubColumn && isHubMapped && (
                   <th className="p-2 bg-[#fef9c3] border-r border-slate-300 text-center font-bold text-amber-900 text-[10px]">HUB</th>
                 )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
@@ -2321,11 +2502,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                                 <Edit3 size={11} />
                               </button>
                             </div>
-                            {matrixTemplateFormat === 'rhb' && matchedHf && matchedHf.zoneDescription && (
-                              <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-                                <span className="text-slate-400">{matchedHf.zoneDescription}</span>
-                              </div>
-                            )}
                           </div>
                         )}
                       </td>
@@ -2351,7 +2527,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       </td>
 
                       {/* 6. HUB Column (Auto-inserted when Map HF to Hub is clicked) */}
-                      {showHubColumn && (
+                      {showHubColumn && isHubMapped && (
                         <td className="p-2.5 text-center font-mono font-black border-r border-slate-200 bg-amber-100/70 text-amber-950 min-w-[90px]">
                           {row.hub || 'AA01'}
                         </td>
@@ -2459,7 +2635,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
-                {isHubMapped && (
+                {showHubColumn && isHubMapped && (
                   <td className="p-2.5 border-r border-slate-300 text-center font-mono font-black text-amber-900 bg-amber-100/60 text-[11px]">
                     -
                   </td>
@@ -2483,7 +2659,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </table>
         </div>
       </div>
-      )}
+
 
               {/* MODAL 1: SEND TO MOH (DIRECT INSTITUTIONAL TRANSMITTAL & ITEM CONFIRMATION) */}
       {isTransmitModalOpen && (
@@ -2968,111 +3144,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         </div>
       )}
 
-      {/* REGIONAL HEALTH BUREAU SUBMISSION DOSSIER MODAL (Attachment 1 View) */}
-      {selectedRhbDetailRegion && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white border-2 border-slate-900 rounded-2xl max-w-4xl w-full p-5 space-y-4 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-black shadow-sm">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-black text-slate-900 text-base uppercase">
-                      {selectedRhbDetailRegion.region} Regional Health Bureau Breakdown
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      Submitted to MOH
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 font-mono">
-                    DSP Reference: {selectedRhbDetailRegion.dspName} • Date: {selectedRhbDetailRegion.date}
-                  </p>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedRhbDetailRegion(null)}
-                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Dossier Details Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">Allocated Facilities</span>
-                <span className="text-lg font-black font-mono text-amber-950">{selectedRhbDetailRegion.totalFacilities || 12} Health Centers / Hospitals</span>
-              </div>
-              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
-                <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">Equipment Items</span>
-                <span className="text-lg font-black font-mono text-indigo-950">{columns.length} Configured Columns</span>
-              </div>
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider block">Total Earmarked Quantity</span>
-                <span className="text-lg font-black font-mono text-emerald-950">{selectedRhbDetailRegion.totalUnits || 340} Units</span>
-              </div>
-            </div>
-
-            {/* Regional Breakdown Table Preview */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-900 text-white font-bold sticky top-0">
-                  <tr>
-                    <th className="p-2.5 border-r border-slate-700">Health Facility Name</th>
-                    <th className="p-2.5 border-r border-slate-700">Zone / Woreda</th>
-                    <th className="p-2.5 border-r border-slate-700">Delivering ⬡</th>
-                    <th className="p-2.5 text-center">Allocated Units</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {rows
-                    .filter(r => r.region.toLowerCase().includes(selectedRhbDetailRegion.region.toLowerCase()) || selectedRegionFilter === 'all')
-                    .slice(0, 8)
-                    .map((r, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-2 font-semibold text-slate-900 border-r border-slate-200">{r.healthFacility}</td>
-                        <td className="p-2 text-slate-600 border-r border-slate-200">{r.zone} / {r.woreda}</td>
-                        <td className="p-2 font-mono font-bold text-indigo-700 border-r border-slate-200">{r.hub || 'AD01'}</td>
-                        <td className="p-2 text-center font-mono font-bold text-emerald-700">
-                          {Object.values(r.quantities || {}).reduce((a, b) => a + (Number(b) || 0), 0) || 12}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRegionFilter(selectedRhbDetailRegion.region);
-                  setRhbSubViewMode('detailed-matrix');
-                  setSelectedRhbDetailRegion(null);
-                  showToast(`✓ Main Table filtered for ${selectedRhbDetailRegion.region}`);
-                }}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
-              >
-                <Layers size={14} />
-                <span>Switch Main Table to {selectedRhbDetailRegion.region} Matrix</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRhbDetailRegion(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs transition cursor-pointer"
-              >
-                Close Dossier
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* 8-Column Institutional Request Selection Modal */}
       {isRequestModalOpen && (
         <div className={`fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 transition-all duration-300 ${
@@ -3231,6 +3303,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
         </div>
       )}
+
     </div>
   );
 };

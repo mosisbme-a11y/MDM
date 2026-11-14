@@ -1754,8 +1754,9 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         />
       ) : ((currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'matrix') ? (
         <RegionBreakdownMatrixTable
+          key="rhb-breakdown-matrix"
           data={
-            selectedRecord?.facilityMatrixData ||
+            (selectedRecord ? records.find(r => r.id === selectedRecord.id)?.facilityMatrixData || selectedRecord.facilityMatrixData : undefined) ||
             records.find(r => (r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management') && r.facilityMatrixData)?.facilityMatrixData || {
               date: '2026-10-27',
               region: 'Oromia',
@@ -1765,7 +1766,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           }
           hfListItems={hfListItems}
           isEditable={true}
-          showHubColumn={true}
+          showHubColumn={false}
+          enableRhbMultiAutoPopulate={true}
           breakdownRequests={records}
           selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id || ''}
           onSelectBreakdownRequest={(reqId) => {
@@ -1811,7 +1813,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             });
           }}
           title="3. DSP Submitted Region to MOH - Health Facility Breakdown Matrix"
-          subtitle="Official two-tier template showing medical device allocations per health facility across zones and woredas"
+          subtitle=""
         />
       ) : (currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'ledger' ? (
         <RegionalSubmittedDataView records={records} />
@@ -1925,6 +1927,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
           {stage131ViewMode === 'matrix' ? (
             <RegionBreakdownMatrixTable
+              key="ho-131-hub-map-matrix"
               data={activeStage131MatrixData}
               hfListItems={hfListItems}
               isEditable={true}
