@@ -365,64 +365,8 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       if (list.length > 0) return list;
     }
 
-    // 3. Fallback: exact reference transmitted items matching user screenshots
-    return [
-      {
-        id: 'rec-def-1',
-        materialCode: '404-VENM-TUIF',
-        description: 'MV S.P - Turbine inlet filter, VG70',
-        qty: 1,
-        source: 'Ref: MOH/PMD-DSP/2026/797',
-        valuationTypeDesc: '50258_ZMD',
-        wbsElement: 'SDG-ME-23-001-011',
-        budgetSource: 'WB',
-        totalAmount: 5951.95
-      },
-      {
-        id: 'rec-def-2',
-        materialCode: '404-VENM-SPSB',
-        description: 'MV S.P - Switch power supply board, VG70',
-        qty: 1,
-        source: 'Ref: MOH/PMD-DSP/2026/797',
-        valuationTypeDesc: '50258_ZMD',
-        wbsElement: 'SDG-ME-23-001-011',
-        budgetSource: 'WB',
-        totalAmount: 59528.98
-      },
-      {
-        id: 'rec-def-3',
-        materialCode: '404-VENM-SAVA-01',
-        description: 'MV S.P - Safety valve, VG70',
-        qty: 2,
-        source: 'Ref: MOH/PMD-DSP/2026/797',
-        valuationTypeDesc: '50258_ZMD',
-        wbsElement: 'SDG-ME-23-001-011',
-        budgetSource: 'WB',
-        totalAmount: 112000.00
-      },
-      {
-        id: 'rec-def-4',
-        materialCode: '404-VENM-PCAP',
-        description: 'MV S.P - Patient Circuit, VG70',
-        qty: 10,
-        source: 'Ref: MOH/PMD-DSP/2026/797',
-        valuationTypeDesc: '50258_ZMD',
-        wbsElement: 'SDG-ME-23-001-011',
-        budgetSource: 'WB',
-        totalAmount: 320000.00
-      },
-      {
-        id: 'rec-def-5',
-        materialCode: '404-VENM-OXSE-01',
-        description: 'MV S.P - Oxygen sensor, VG70',
-        qty: 26,
-        source: 'Ref: MOH/PMD-DSP/2026/797',
-        valuationTypeDesc: '50258_ZMD',
-        wbsElement: 'SDG-ME-23-001-011',
-        budgetSource: 'WB',
-        totalAmount: 485000.00
-      }
-    ];
+    // Return empty array if no 2.1 EPSS-to-MOH dossier has been received yet (no hardcoded mock data)
+    return [];
   }, [records, dspReceivedEpssRows]);
 
   // Set of material codes already imported into matrix columns
@@ -843,10 +787,16 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
   // Submit to RHBs with Regional Security Authorization
   const handleTransmit = () => {
-    const targetedActiveRegions = rows.map(r => r.region).filter(r => approvedRegions[r] !== false);
+    const approvedRows = rows.filter(r => approvedRegions[r.region] !== false);
+    const targetedActiveRegions = approvedRows.map(r => r.region);
 
     if (targetedActiveRegions.length === 0) {
       alert('Security Verification Error: At least one region must be authorized and approved for submission.');
+      return;
+    }
+
+    if (columns.length === 0) {
+      alert('No equipment columns are loaded in the matrix. Please import or select equipment items first.');
       return;
     }
 
@@ -860,12 +810,68 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
     const refNum = `MOH/PMD-BRK/${year}/${randNum}`;
     const officialLetterRef = `MOH/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const totalQty = Object.values(totals).reduce((sum, v) => sum + v, 0);
+    const approvedColTotals: Record<string, number> = {};
+    columns.forEach(c => {
+      approvedColTotals[c.id] = approvedRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0);
+    });
+    const totalQty = Object.values(approvedColTotals).reduce((sum, v) => sum + v, 0);
+
+    // Derive valuation proportionally from matched EPSS-to-MOH items if present
+    const totalValuationETB = columns.reduce((sum, c) => {
+      const colQty = approvedColTotals[c.id] || 0;
+      const srcItem = exactTransmittedItems.find(
+        it => it.materialCode.trim().toLowerCase() === c.materialCode.trim().toLowerCase()
+      );
+      if (srcItem && srcItem.totalAmount && srcItem.qty > 0) {
+        return sum + (srcItem.totalAmount / srcItem.qty) * colQty;
+      }
+      return sum;
+    }, 0);
 
     const finalSignatory = manualSignatoryName.trim() || 'Yechalew Sheferew';
     const finalRole = manualSignatoryRole.trim() || 'Team Leader';
     const finalOrg = manualOrganization.trim() || 'MOH';
-    const finalDspName = manualDspName.trim() || (selectedBreakdownRequestId ? (records.find(r => r.id === selectedBreakdownRequestId)?.dspName || 'Global Breakdown') : 'Global Breakdown');
+    const sourceRecord = selectedBreakdownRequestId ? records.find(r => r.id === selectedBreakdownRequestId) : undefined;
+    const finalDspName = manualDspName.trim() || sourceRecord?.dspName || 'Regional Allocation Breakdown';
+
+    const exactMatrixData = {
+      date: approvedRows[0]?.date || TODAY_ISO_DATE,
+      region: targetedActiveRegions.length === 1 ? targetedActiveRegions[0] : 'Multi-Region',
+      columns: columns.map(c => ({
+        id: c.id,
+        name: c.description,
+        code: c.materialCode
+      })),
+      rows: approvedRows.map(r => ({
+        id: r.id,
+        date: r.date || TODAY_ISO_DATE,
+        region: r.region,
+        zone: '',
+        woreda: '',
+        hub: '',
+        healthFacility: `${r.region} Regional Health Bureau`,
+        packages: r.budgetSource || 'WB',
+        quantities: { ...r.quantities }
+      }))
+    };
+
+    const itemsPayload = columns.map(c => {
+      const srcItem = exactTransmittedItems.find(
+        it => it.materialCode.trim().toLowerCase() === c.materialCode.trim().toLowerCase()
+      );
+      const colQty = approvedColTotals[c.id] || 0;
+      const unitAmt = srcItem && srcItem.totalAmount && srcItem.qty > 0 ? srcItem.totalAmount / srcItem.qty : 0;
+      return {
+        material: c.materialCode,
+        description: c.description,
+        quantity: colQty,
+        plant: 'AA01 Central',
+        budgetSource: srcItem?.budgetSource || approvedRows[0]?.budgetSource || 'WB',
+        wbsElement: srcItem?.wbsElement,
+        valuationTypeDesc: srcItem?.valuationTypeDesc,
+        totalAmount: unitAmt > 0 ? Math.round(unitAmt * colQty) : undefined
+      };
+    });
 
     const newRecord: DspWorkflowRecord = {
       id: `dsp-brk-tx-${Date.now()}`,
@@ -876,71 +882,49 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       senderOrg: finalOrg === 'MOH' ? 'Ministry of Health (PMD Directorate)' : finalOrg === 'EPSS' ? 'EPSS Head Office' : finalOrg,
       recipientOrg: targetedActiveRegions.join(', ') + ' Regional Health Bureaus',
       dspName: finalDspName,
-      subject: `DSP [${finalDspName}]: Authorized DSP Request to RHB (${columns.length} Materials)`,
+      subject: `DSP [${finalDspName}]: Authorized DSP Request to RHB (${columns.length} Materials, ${approvedRows.length} Regions)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
       totalDevices: columns.length,
       totalQuantity: totalQty,
-      totalValuationETB: totalQty * 250000,
+      totalValuationETB,
       targetedRegions: targetedActiveRegions,
-      targetedFacilitiesCount: rows.length,
+      targetedFacilitiesCount: approvedRows.length,
       officialLetterRef: officialLetterRef,
       signatory: finalSignatory,
       authorizedPerson: finalSignatory,
       signatoryRole: finalRole,
       role: finalRole,
       organization: finalOrg,
-      itemsIncluded: columns.map(c => ({
-        material: c.materialCode,
-        description: c.description,
-        quantity: totals[c.id] || 0,
-        plant: 'AA01 Central'
-      })),
-      facilityMatrixData: {
-        date: TODAY_ISO_DATE,
-        region: targetedActiveRegions[0] || 'Oromia',
-        columns: columns.map(c => ({
-          id: c.id,
-          name: c.description,
-          code: c.materialCode
-        })),
-        rows: rows.map(r => ({
-          id: r.id,
-          region: r.region,
-          zone: 'Zone 1',
-          woreda: '1',
-          hub: 'AD01',
-          healthFacility: `${r.region} Health Facility`,
-          packages: r.budgetSource || 'MCH',
-          quantities: r.quantities
-        }))
-      },
-      notes: `Secured & Authorized Transmission via Horizontal Matrix. Authorized by ${finalSignatory} (${finalRole}, ${finalOrg}). Verified for ${targetedActiveRegions.length} Ethiopian Regions.${uploadedLetter ? ` Official Letter: ${uploadedLetter.name}` : ''}`
+      pdfFile: uploadedLetter ? { name: uploadedLetter.name, blob: uploadedLetter } : undefined,
+      itemsIncluded: itemsPayload,
+      facilityMatrixData: exactMatrixData,
+      notes: `MOH-to-RHB Regional Quota Matrix transmitted by ${finalSignatory} (${finalRole}, ${finalOrg}) for ${targetedActiveRegions.length} region(s): ${targetedActiveRegions.join(', ')}.${uploadedLetter ? ` Official Letter: ${uploadedLetter.name}` : ''}`
     };
 
-    // Also create matching incoming dossier for RHB (Sub-step 3.1)
+    // Exact 1-to-1 incoming dossier for RHB (Sub-step 3.1: Breakdown Received from MOH)
     const rhbIncomingRecord: DspWorkflowRecord = {
       ...newRecord,
-      id: `dsp-rhb-rcv-${Date.now()}`,
+      id: `dsp-rhb-rcv-${Date.now() + 1}`,
       stage: 'rhb-breakdown-management',
       subStage: '3.1',
       stageTitle: '3.1 Breakdown Received from MOH',
-      subject: `MOH Breakdown Dossier: Received from MOH PMD (${columns.length} Materials)`,
+      subject: `DSP [${finalDspName}]: Breakdown Received from MOH (${approvedRows.length} Regions, ${columns.length} Materials)`,
       status: 'Submitted & Pending'
     };
 
     setRecords(prev => [rhbIncomingRecord, newRecord, ...prev]);
-    
+
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`✓ Secured Breakdown Request ${refNum} transmitted to ${targetedActiveRegions.length} Ethiopian Regions & archived in RHB Inbox!`, {
+      onTriggerCloudSync(`✓ Breakdown Request ${refNum} transmitted to ${targetedActiveRegions.length} Ethiopian Region(s) & archived in RHB 3.1!`, {
         type: 'CREATE',
         title: `Breakdown Request ${refNum}`,
-        payload: newRecord
+        payload: rhbIncomingRecord
       });
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Breakdown Request ${refNum} submitted for security approved regions (${targetedActiveRegions.length})!`);
+    showToast(`✓ Breakdown Request ${refNum} submitted for ${targetedActiveRegions.length} approved region(s)! Exact regional quota matrix stored in Sub-step 3.1.`);
     if (onSelectSubTab) onSelectSubTab('moh-osp-management');
   };
 

@@ -72,6 +72,7 @@ import {
 } from './Stage4MohSubmittedMatrixTable';
 import { Stage5EpssHoAggregationView } from './Stage5EpssHoAggregationView';
 import { Stage6EpssBranchDispatchView } from './Stage6EpssBranchDispatchView';
+import { BranchReceivedDspView } from './BranchReceivedDspView';
 import { DspRequestMohTemplateView } from './DspRequestMohTemplateView';
 import { DspReceivedFromMohView } from './DspReceivedFromMohView';
 import { DspBreakdownReceivedFromMohView } from './DspBreakdownReceivedFromMohView';
@@ -749,17 +750,27 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
   });
 
   const activeStage131Record = useMemo(() => {
+    const is131OrMohToEpss = (r: DspWorkflowRecord) => {
+      const sub = canonicalizeSubStage(r.subStage, r.stage);
+      return (
+        r.stage === 'epss-ho-aggregation' ||
+        sub === '1.3.1' ||
+        sub === '1.2' ||
+        sub === '2.5' ||
+        r.stage === 'moh-to-epss-ho'
+      );
+    };
     if (
       selectedRecord &&
-      (selectedRecord.facilityMatrixData ||
-        (selectedRecord.stage === 'epss-ho-aggregation' && selectedRecord.stage4MatrixData))
+      is131OrMohToEpss(selectedRecord) &&
+      (selectedRecord.facilityMatrixData || selectedRecord.stage4MatrixData)
     ) {
       return selectedRecord;
     }
     return (
-      records.find(r => r.stage === 'epss-ho-aggregation' && (r.facilityMatrixData || r.stage4MatrixData)) ||
-      records.find(r => r.facilityMatrixData) ||
-      records.find(r => r.stage4MatrixData) ||
+      records.find(r => (r.stage === 'epss-ho-aggregation' || canonicalizeSubStage(r.subStage, r.stage) === '1.3.1') && (r.facilityMatrixData || r.stage4MatrixData)) ||
+      records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2' && (r.stage4MatrixData || r.facilityMatrixData)) ||
+      records.find(r => (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') && r.stage4MatrixData) ||
       null
     );
   }, [selectedRecord, records]);
@@ -1651,8 +1662,16 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         <RegionBreakdownMatrixTable
           key="rhb-breakdown-matrix"
           data={
-            (selectedRecord ? records.find(r => r.id === selectedRecord.id)?.facilityMatrixData || selectedRecord.facilityMatrixData : undefined) ||
-            records.find(r => (r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management') && r.facilityMatrixData)?.facilityMatrixData || {
+            (selectedRecord &&
+            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '3.2' ||
+              selectedRecord.stage === 'rhb-to-moh') &&
+            selectedRecord.facilityMatrixData
+              ? selectedRecord.facilityMatrixData
+              : records.find(
+                  r =>
+                    (canonicalizeSubStage(r.subStage, r.stage) === '3.2' || r.stage === 'rhb-to-moh') &&
+                    r.facilityMatrixData
+                )?.facilityMatrixData) || {
               date: '2026-10-27',
               region: 'Oromia',
               columns: DEFAULT_STAGE_3_COLUMNS,
@@ -1664,7 +1683,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           showHubColumn={false}
           enableRhbMultiAutoPopulate={true}
           breakdownRequests={records}
-          selectedBreakdownRequestId={selectedRecord?.id || records.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id || ''}
+          selectedBreakdownRequestId={
+            (selectedRecord &&
+            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '3.2' ||
+              selectedRecord.stage === 'rhb-to-moh')
+              ? selectedRecord.id
+              : records.find(
+                  r =>
+                    canonicalizeSubStage(r.subStage, r.stage) === '3.2' ||
+                    r.stage === 'rhb-to-moh'
+                )?.id) || ''
+          }
           onSelectBreakdownRequest={(reqId) => {
             const req = records.find(r => r.id === reqId);
             if (req) {
@@ -1711,7 +1740,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           subtitle=""
         />
       ) : (currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'ledger' ? (
-        <RegionalSubmittedDataView records={records} />
+        <RegionalSubmittedDataView records={records} onSelectSubTab={onSelectSubTab} />
       )
  : currentStage === 'moh-to-epss-ho' && stage4ViewMode === 'matrix' ? (
         <Stage4MohSubmittedMatrixTable
@@ -1774,6 +1803,35 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           multipleStockItems={multipleStockItems}
           subStageTarget="1.2"
           onSelectSubTab={onSelectSubTab}
+          onProceedToMapHf={(dossier12) => {
+            // Find or create linked 1.3.1 Map HF to Hub record carrying exact 1.2 matrix
+            const existing131 = records.find(
+              r =>
+                (r.stage === 'epss-ho-aggregation' ||
+                  canonicalizeSubStage(r.subStage, r.stage) === '1.3.1') &&
+                (r.dspRefNumber === dossier12.dspRefNumber ||
+                  r.id === `${dossier12.id}-map-131`)
+            );
+            if (existing131) {
+              setSelectedRecord(existing131);
+            } else if (dossier12.stage4MatrixData || dossier12.facilityMatrixData) {
+              const s4 = dossier12.stage4MatrixData;
+              const fm =
+                dossier12.facilityMatrixData ||
+                (s4 ? convertStage4ToFacilityMatrix(s4) : undefined);
+              const new131: DspWorkflowRecord = {
+                ...dossier12,
+                id: `${dossier12.id}-map-131`,
+                stage: 'epss-ho-aggregation',
+                subStage: '1.3.1',
+                stageTitle: '5. EPSS HO Aggregation (from MOH)',
+                facilityMatrixData: fm
+              };
+              setRecords(prev => [new131, ...prev]);
+              setSelectedRecord(new131);
+            }
+            onSelectSubTab?.('dsp-ho-1-3-1');
+          }}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '1.3.1' || (currentSubTab as string) === 'dsp-ho-1-3-1' || (currentSubTab as string) === 'map-hf-hub') ? (
@@ -1863,6 +1921,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           records={records}
           setRecords={setRecords}
           hfListItems={hfListItems}
+          onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '1.3.3' || (currentSubTab as string) === 'dsp-ho-1-3-3' || (currentSubTab as string) === 'item-aggregation' || (currentStage === 'epss-ho-aggregation' && stage5ViewMode === 'hub-aggregation')) ? (
@@ -1897,12 +1956,19 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onProceedToOrderProcess={() => onSelectSubTab?.('dsp-ho-1-3-4')}
           onTriggerCloudSync={onTriggerCloudSync}
         />
-      ) : (currentStage === 'epss-to-branch') ? (
-        <Stage6EpssBranchDispatchView
+      ) : (currentStage === 'epss-to-branch' || currentSubStep === '4.1' || currentSubTab === 'dsp-branches-4-1') ? (
+        <BranchReceivedDspView
           records={records}
-          setRecords={setRecords}
-          hfListItems={hfListItems}
-          onTriggerCloudSync={onTriggerCloudSync}
+          multipleStockItems={multipleStockItems}
+          mode="4.1"
+          onSelectSubTab={onSelectSubTab}
+        />
+      ) : (currentSubStep === '4.2' || currentSubTab === 'dsp-branches-4-2') ? (
+        <BranchReceivedDspView
+          records={records}
+          multipleStockItems={multipleStockItems}
+          mode="4.2"
+          onSelectSubTab={onSelectSubTab}
         />
       ) : (currentSubStep === '2.1' || currentSubTab === 'dsp-moh-2-1') ? (
         <DspReceivedFromMohView
@@ -1930,7 +1996,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '2.3' || currentSubTab === 'dsp-moh-2-3') ? (
-        <RegionalSubmittedDataView records={records} />
+        <RegionalSubmittedDataView records={records} onSelectSubTab={onSelectSubTab} />
       ) : (currentSubStep === '2.4' || currentSubTab === 'dsp-moh-2-4' || currentSubTab === 'regional-aggregator') ? (
         <RhbBreakdownAggregationView
           records={records}
@@ -2101,42 +2167,78 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             });
           }}
           onTransmitEPSS={(metadata) => {
-            const newRecord: DspWorkflowRecord = {
-              id: `dsp-moh-epss-${Date.now()}`,
-              dspRefNumber: `MOH/EPSS-HO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-              stage: 'epss-ho-aggregation',
-              subStage: '1.3.1',
-              stageTitle: '5. EPSS HO Aggregation (from MOH)',
+            const ts = Date.now();
+            const refNum = `MOH/EPSS-HO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
+            const letterRef = `MOH/LET/${ts.toString().slice(-4)}`;
+            const totalUnits = metadata.matrixData.rows.reduce(
+              (sum, r) => sum + metadata.matrixData.columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0),
+              0
+            );
+            const regionsList = [...new Set(metadata.matrixData.rows.map(r => r.region))].filter(Boolean);
+            const itemsSummary = metadata.matrixData.columns.map(c => ({
+              material: c.code,
+              description: c.name,
+              quantity: metadata.matrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+              plant: 'HO01 Central'
+            }));
+            const convertedFacilityMatrix = convertStage4ToFacilityMatrix(metadata.matrixData);
+            const dossierTitle = metadata.dspName || `MOH to EPSS Health Facility Matrix (${regionsList.join(', ') || 'National'})`;
+
+            // 1. Incoming record in EPSS 1.2 (DSP Received from MOH) — exact HF matrix sent by MOH
+            const received12Record: DspWorkflowRecord = {
+              id: `dsp-moh-to-epss-12-${ts}`,
+              dspRefNumber: refNum,
+              dspName: dossierTitle,
+              stage: 'head-office-dsp',
+              subStage: '1.2',
+              stageTitle: 'Head Office DSP Management',
               senderOrg: metadata.organization,
-              recipientOrg: 'EPSS Head Office',
-              subject: `DSP [Aggregated]: National Breakdown Matrix from MOH PMD (${metadata.matrixData.rows.length} Facilities)`,
-              status: 'Submitted & Pending',
+              recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+              subject: `DSP [${dossierTitle}]: Received from MOH (${metadata.matrixData.rows.length} Facilities, ${totalUnits} Units)`,
+              status: 'Endorsed & Approved',
               dateSubmitted: metadata.date,
               totalDevices: metadata.matrixData.columns.length,
-              totalQuantity: metadata.matrixData.rows.reduce((sum, r) => sum + metadata.matrixData.columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0), 0),
-              totalValuationETB: metadata.matrixData.rows.length * 500000,
-              targetedRegions: [...new Set(metadata.matrixData.rows.map(r => r.region))].filter(Boolean),
+              totalQuantity: totalUnits,
+              totalValuationETB: 0,
+              targetedRegions: regionsList,
               targetedFacilitiesCount: metadata.matrixData.rows.length,
-              officialLetterRef: `MOH/LET/${Date.now().toString().slice(-4)}`,
+              officialLetterRef: letterRef,
               signatory: metadata.signatory,
               signatoryRole: metadata.role,
               authorizedPerson: metadata.signatory,
               organization: metadata.organization,
               role: metadata.role,
-              itemsIncluded: metadata.matrixData.columns.map(c => ({
-                material: c.code,
-                description: c.name,
-                quantity: metadata.matrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-                plant: 'HO01 Central'
-              })),
+              itemsIncluded: itemsSummary,
               stage4MatrixData: metadata.matrixData,
-              facilityMatrixData: convertStage4ToFacilityMatrix(metadata.matrixData),
-              notes: `Aggregated breakdown transmitted from MOH PMD to EPSS Head Office. Signatory: ${metadata.signatory} (${metadata.role})`
+              facilityMatrixData: convertedFacilityMatrix,
+              notes: `Exact Health Facility Breakdown Matrix transmitted from ${metadata.organization} to EPSS Head Office. Signatory: ${metadata.signatory} (${metadata.role}).`
             };
 
-            setRecords(prev => [newRecord, ...prev]);
-            setSelectedRecord(newRecord);
-            onSelectSubTab?.('dsp-ho-1-3-1'); // Transition to EPSS HO Aggregation step
+            // 2. Linked record for 1.3.1 Map HF to Hub
+            const map131Record: DspWorkflowRecord = {
+              ...received12Record,
+              id: `dsp-moh-to-epss-12-${ts}-map-131`,
+              stage: 'epss-ho-aggregation',
+              subStage: '1.3.1',
+              stageTitle: '5. EPSS HO Aggregation (from MOH)',
+              status: 'Submitted & Pending'
+            };
+
+            setRecords(prev => [map131Record, received12Record, ...prev]);
+            setSelectedRecord(map131Record);
+            onTriggerCloudSync?.(
+              `MOH Health Facility Breakdown (${metadata.matrixData.rows.length} facilities, ${totalUnits} units) transmitted to EPSS (1.2 & 1.3.1)`,
+              {
+                type: 'CREATE',
+                title: `MOH to EPSS Dossier: ${refNum}`,
+                payload: received12Record
+              }
+            );
+            setActionFeedbackToast(
+              `✓ Sent exact ${metadata.matrixData.rows.length}-facility Health Facility Matrix to EPSS (1.2 DSP Received from MOH & 1.3.1 Map HF to Hub)!`
+            );
+            setTimeout(() => setActionFeedbackToast(null), 5000);
+            onSelectSubTab?.('dsp-ho-1-2');
           }}
           title="DSP Aggr. Submitted to EPSS - Health Facility Matrix"
           subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"
@@ -2539,125 +2641,216 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               );
             })()}
 
-            {/* Device Allocation Breakdown: Professional Smart Table */}
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center justify-between px-1">
-                <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-black">
-                  <FileText className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Exact Source Data — Medical Device Breakdown List</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-bold">
-                    {selectedRecord.itemsIncluded.length} Material Groups
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const csv = selectedRecord.itemsIncluded.map((item, idx) => {
-                        const qty = item.quantity || (item as any).qty || 0;
-                        const unitVal = (item as any).unitPrice || (selectedRecord.totalQuantity ? selectedRecord.totalValuationETB / selectedRecord.totalQuantity : 0);
-                        const totalVal = (item as any).totalAmount || (qty * unitVal);
-                        return {
-                          'S/N': idx + 1,
-                          'Material Code': item.material,
-                          'Item Description': item.description || (item as any).materialDescription || 'N/A',
-                          'Qty Requested': qty,
-                          'Unit Val (ETB)': unitVal,
-                          'Total Val (ETB)': totalVal
-                        };
-                      });
-                      downloadCSV(`dossier-${selectedRecord.dspRefNumber}-items.csv`, csv);
-                    }}
-                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Export CSV</span>
-                  </button>
-                </div>
-              </div>
+            {/* Direction-Aware Dossier Payload View (1-to-1 Exact Sent Data) */}
+            {(() => {
+              const recSub = canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage);
+              const isEpssToMoh = recSub === '1.1' || recSub === '2.1' || selectedRecord.stage === 'moh-to-epss';
+              const isMohToRhb = recSub === '2.2' || recSub === '3.1' || selectedRecord.stage === 'moh-to-rhb';
 
-              <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-72 overflow-y-auto overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                  <thead>
-                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
-                      <th className="p-2.5 border-r border-slate-300 w-10 text-center">S/N</th>
-                      <th className="p-2.5 border-r border-slate-300 min-w-[110px]">Material Code</th>
-                      <th className="p-2.5 border-r border-slate-300 min-w-[200px]">Item Description</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[100px]">Qty Requested</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[110px]">Unit Val (ETB)</th>
-                      <th className="p-2.5 border-r border-slate-300 text-right min-w-[120px]">Total Val (ETB)</th>
-                      <th className="p-2.5 text-center w-14">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {selectedRecord.itemsIncluded.map((item, idx) => {
-                      const qty = item.quantity || (item as any).qty || 0;
-                      const unitVal = (item as any).unitPrice || (selectedRecord.totalQuantity ? selectedRecord.totalValuationETB / selectedRecord.totalQuantity : 0);
-                      const totalVal = (item as any).totalAmount || (qty * unitVal);
-                      return (
-                        <tr 
-                          key={idx} 
-                          className="hover:bg-slate-50 transition-colors"
+              if (isEpssToMoh) {
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-slate-700 flex items-center justify-between px-1">
+                      <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-black">
+                        <FileText className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Exact EPSS ➔ MOH Request Dossier (10-Column Format)</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+                          {selectedRecord.itemsIncluded.length} Materials
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const csv = selectedRecord.itemsIncluded.map((item, idx) => ({
+                              'S/N': idx + 1,
+                              'Material': item.material,
+                              'Material Description': item.description || (item as any).materialDescription || '',
+                              'Qty': item.quantity || (item as any).qty || 0,
+                              'Total Amount': item.totalAmount || 0,
+                              'Valuation Type Desc': item.valuationTypeDesc || 'Standard Price (S)',
+                              'WBS Element': item.wbsElement || '-',
+                              'Budget Source': item.budgetSource || 'WB',
+                              'Request Date': item.requestDate || selectedRecord.dateSubmitted,
+                              'DSP Request to': item.dspRequestTo || selectedRecord.recipientOrg || 'Ministry of Health (PMD)'
+                            }));
+                            downloadCSV(`dossier-${selectedRecord.dspRefNumber}-10col.csv`, csv);
+                          }}
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
                         >
-                          <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">
-                            {idx + 1}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
-                            {item.material}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-slate-800 font-medium">
-                            {item.description || (item as any).materialDescription || 'Medical Equipment'}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-700">
-                            {formatNumber(qty)}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-600">
-                            {formatCurrency(unitVal)}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-emerald-700">
-                            {formatCurrency(totalVal)}
-                          </td>
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItemFromRecord(selectedRecord.id, idx)}
-                              className="p-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
-                              title="Delete / Remove item from this dossier"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
+                          <Download className="w-3 h-3" />
+                          <span>Export 10-Col CSV</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-80 overflow-y-auto overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                        <thead>
+                          <tr className="bg-[#FFA500] border-b-2 border-black text-black italic font-bold text-[11px]">
+                            <th className="p-2 border-r border-black w-10 text-center">S/N</th>
+                            <th className="p-2 border-r border-black font-mono">Material</th>
+                            <th className="p-2 border-r border-black">Material Description</th>
+                            <th className="p-2 border-r border-black text-right">Qty</th>
+                            <th className="p-2 border-r border-black text-right">Total Amount</th>
+                            <th className="p-2 border-r border-black">Valuation Type Desc</th>
+                            <th className="p-2 border-r border-black font-mono">WBS Element</th>
+                            <th className="p-2 border-r border-black text-center">Budget Source</th>
+                            <th className="p-2 border-r border-black text-center">Request Date</th>
+                            <th className="p-2 border-r border-black text-center">DSP Request to</th>
+                            <th className="p-2 text-center w-12">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {selectedRecord.itemsIncluded.map((item, idx) => {
+                            const qty = item.quantity || (item as any).qty || 0;
+                            const totalAmt = item.totalAmount || 0;
+                            return (
+                              <tr key={idx} className="hover:bg-amber-50/40">
+                                <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
+                                <td className="p-2 border-r border-slate-200 font-mono font-bold text-indigo-950">{item.material}</td>
+                                <td className="p-2 border-r border-slate-200 text-slate-900 font-medium">
+                                  {item.description || (item as any).materialDescription || 'Medical Equipment'}
+                                </td>
+                                <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-800">{formatNumber(qty)}</td>
+                                <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(totalAmt)}</td>
+                                <td className="p-2 border-r border-slate-200 text-slate-700">{item.valuationTypeDesc || 'Standard Price (S)'}</td>
+                                <td className="p-2 border-r border-slate-200 font-mono text-slate-800">{item.wbsElement || '-'}</td>
+                                <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-indigo-800">{item.budgetSource || 'WB'}</td>
+                                <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">{item.requestDate || selectedRecord.dateSubmitted}</td>
+                                <td className="p-2 border-r border-slate-200 text-center font-semibold text-amber-900">{item.dspRequestTo || selectedRecord.recipientOrg}</td>
+                                <td className="p-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItemFromRecord(selectedRecord.id, idx)}
+                                    className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                                    title="Remove item from this dossier"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isMohToRhb && selectedRecord.facilityMatrixData) {
+                const fm = selectedRecord.facilityMatrixData;
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-slate-700 flex items-center justify-between px-1">
+                      <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-black">
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Exact MOH ➔ RHB Regional Quota Breakdown Matrix</span>
+                      </span>
+                      <span className="text-[10px] font-mono bg-teal-100 text-teal-900 px-2 py-0.5 rounded-md font-bold">
+                        {fm.rows.length} Regions • {fm.columns.length} Items
+                      </span>
+                    </div>
+                    <div className="bg-white border border-slate-300 rounded-xl overflow-x-auto max-h-80 overflow-y-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#0B1527] text-white text-[11px] font-bold">
+                            <th className="p-2 border-r border-white/10 text-center w-10">S/N</th>
+                            <th className="p-2 border-r border-white/10">Date</th>
+                            <th className="p-2 border-r border-white/10">Region</th>
+                            <th className="p-2 border-r border-white/10">Budget Source</th>
+                            {fm.columns.map(c => (
+                              <th key={c.id} className="p-2 border-r border-white/10 text-center min-w-[110px]">
+                                <div>{c.name}</div>
+                                <div className="text-[9px] font-mono text-amber-300">{c.code}</div>
+                              </th>
+                            ))}
+                            <th className="p-2 text-center bg-slate-800">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {fm.rows.map((r, idx) => {
+                            const rowSum = fm.columns.reduce((s, c) => s + (Number(r.quantities[c.id]) || 0), 0);
+                            return (
+                              <tr key={r.id || idx} className="hover:bg-teal-50/40">
+                                <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
+                                <td className="p-2 border-r border-slate-200 font-mono text-slate-600">{r.date || fm.date}</td>
+                                <td className="p-2 border-r border-slate-200 font-bold text-slate-900">{r.region}</td>
+                                <td className="p-2 border-r border-slate-200 font-mono text-indigo-800">{r.packages || 'WB'}</td>
+                                {fm.columns.map(c => (
+                                  <td key={c.id} className="p-2 border-r border-slate-200 text-center font-mono font-bold text-slate-800">
+                                    {Number(r.quantities[c.id]) || 0}
+                                  </td>
+                                ))}
+                                <td className="p-2 text-center font-mono font-black text-teal-800 bg-teal-50">{formatNumber(rowSum)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (selectedRecord.stage4MatrixData) {
+                return (
+                  <div className="space-y-2 border-t border-slate-200 pt-3">
+                    <Stage4MohSubmittedMatrixTable
+                      data={selectedRecord.stage4MatrixData}
+                      isEditable={false}
+                      title="Exact Sent Health Facility Breakdown Matrix"
+                      subtitle="Exact two-tier equipment allocation matrix as transmitted"
+                    />
+                  </div>
+                );
+              }
+
+              if (selectedRecord.facilityMatrixData) {
+                return (
+                  <div className="space-y-2 border-t border-slate-200 pt-3">
+                    <RegionBreakdownMatrixTable
+                      data={selectedRecord.facilityMatrixData}
+                      isEditable={false}
+                      showHubColumn={Boolean(selectedRecord.facilityMatrixData.rows.some(r => r.hub))}
+                      title="Exact Sent Health Facility Breakdown Matrix"
+                      subtitle="Exact two-tier equipment allocation matrix as transmitted"
+                    />
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-slate-700 px-1 uppercase tracking-wider">
+                    Sent Equipment Quantities Summary
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold">
+                          <th className="p-2.5 border-r border-slate-200 w-10 text-center">S/N</th>
+                          <th className="p-2.5 border-r border-slate-200 font-mono">Material Code</th>
+                          <th className="p-2.5 border-r border-slate-200">Description</th>
+                          <th className="p-2.5 text-right">Quantity</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Regional Health Facility Breakdown Matrix (if present) */}
-            {selectedRecord.facilityMatrixData && (
-              <div className="space-y-2 border-t border-slate-200 pt-3">
-                <RegionBreakdownMatrixTable
-                  data={selectedRecord.facilityMatrixData}
-                  isEditable={false}
-                  title="Official Regional Health Facility Breakdown"
-                  subtitle="Two-tier equipment allocation matrix submitted by Regional Health Bureau to MOH"
-                />
-              </div>
-            )}
-
-            {/* Stage 4 MOH to EPSS Breakdown Matrix (if present) */}
-            {selectedRecord.stage4MatrixData && (
-              <div className="space-y-2 border-t border-slate-200 pt-3">
-                <Stage4MohSubmittedMatrixTable
-                  data={selectedRecord.stage4MatrixData}
-                  isEditable={false}
-                  title="DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
-                  subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS"
-                />
-              </div>
-            )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {selectedRecord.itemsIncluded.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
+                            <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">{item.material}</td>
+                            <td className="p-2 border-r border-slate-200 text-slate-800">{item.description}</td>
+                            <td className="p-2 text-right font-mono font-black text-cyan-700">{formatNumber(item.quantity || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Signatory Footnote */}
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">

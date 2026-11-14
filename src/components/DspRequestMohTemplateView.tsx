@@ -942,48 +942,7 @@ Authorized Directorate Desk`;
       notes: `DSP Name: ${dspName}. Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
-    // 2. Sent Placeholder for Sub-step 1.2 (DSP Received from MOH - tracking the outgoing request response)
-    const sentRecord12: DspWorkflowRecord = {
-      id: `dsp-ho-received-placeholder-${Date.now()}`,
-      dspRefNumber: mohReceivedRef,
-      stage: 'head-office-dsp',
-      subStage: '1.2',
-      stageTitle: 'Head Office DSP Management',
-      senderOrg: 'Ministry of Health (PMD Directorate)',
-      recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-      subject: `DSP Received from MOH: Official Endorsement Pending for ${dspName} (${refNum})`,
-      status: 'Submitted & Pending',
-      dateSubmitted: TODAY_ISO_DATE,
-      totalDevices: itemsToSend.length,
-      totalQuantity: sentTotals.totalQty,
-      totalValuationETB: sentTotals.totalValuation,
-      targetedRegions: ['Oromia', 'Amhara', 'Sidama', 'Somali'],
-      targetedFacilitiesCount: 14,
-      officialLetterRef: officialLetterRef,
-      signatory: 'Dr. Bethlehem (MOH PMD Directorate)',
-      signatoryRole: 'Director, PMD Directorate',
-      dspName: dspName,
-      authorizedPerson: 'Dr. Bethlehem (MOH PMD Directorate)',
-      role: 'Director, PMD Directorate',
-      organization: 'MOH',
-      pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
-      itemsIncluded: itemsToSend.map(r => ({
-        material: r.material,
-        description: r.materialDescription,
-        quantity: r.qty,
-        plant: 'AA01 Central',
-        allocatedFacility: 'MOH Approved Allocation',
-        valuationTypeDesc: r.valuationTypeDesc,
-        wbsElement: r.wbsElement,
-        budgetSource: r.budgetSource,
-        requestDate: r.requestDate,
-        dspRequestTo: r.dspRequestTo,
-        totalAmount: r.totalAmount
-      })),
-      notes: `DSP Name: ${dspName}. Outgoing DSP Request (Ref: ${refNum}) transmitted. This placeholder is stored in Sub-step 1.2 to track the incoming MOH endorsement.`
-    };
-
-    // 3. Incoming Received DSP record for MOH Side (Sub-step 2.1: DSP Received from EPSS)
+    // 2. Incoming Received DSP record for MOH Side (Sub-step 2.1: DSP Received from EPSS)
     const receivedRecord21: DspWorkflowRecord = {
       id: `dsp-moh-received-epss-${Date.now()}`,
       dspRefNumber: mohReceivedRef,
@@ -1024,19 +983,13 @@ Authorized Directorate Desk`;
       notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
-    // 4. Clear previous defaults and store exact transmitted records across all 3 steps (1.1, 1.2, 2.1)
+    // 3. Store exact transmitted 10-column records strictly in 1.1 (EPSS outgoing) and 2.1 (MOH incoming from EPSS)
+    // Do NOT overwrite 1.2 (which belongs exclusively to MOH -> EPSS breakdown transmittals)
     setRecords(prev => {
-      const filtered = prev.filter(r => {
-        const sub = canonicalizeSubStage(r.subStage, r.stage);
-        // Clear old mock data for 1.2 and 2.1 to make room for exact transmittal
-        if (sub === '1.2' || sub === '2.1') return false;
-        return true;
-      });
       const updated = [
         { ...newRecord11, dspName },
-        { ...sentRecord12, dspName },
         receivedRecord21,
-        ...filtered
+        ...prev
       ];
       return updated;
     });
@@ -1075,8 +1028,6 @@ Authorized Directorate Desk`;
     try {
       // Push to Supabase Cloud so all users and devices immediately receive exact transmittal data
       pushCentralMasterData({
-        dspReceivedMohRows: itemsToSend,
-        dspReceivedMohRecord: sentRecord12,
         dspReceivedEpssRows: itemsToSend,
         dspReceivedEpssRecord: receivedRecord21,
         dsp22Columns: generated22Columns,
@@ -1088,7 +1039,7 @@ Authorized Directorate Desk`;
       console.warn('Failed to push to cloud:', e);
     }
 
-    // 6. Remove transmitted items from active table (templateRows) in Sub-step 1.1
+    // 5. Remove transmitted items from active table (templateRows) in Sub-step 1.1
     setTemplateRows(prev => {
       const remaining = prev.filter(r => !itemsToSend.some(sent => sent.id === r.id));
       return remaining.map((r, i) => ({ ...r, srNo: i + 1 }));
@@ -1096,15 +1047,15 @@ Authorized Directorate Desk`;
     setSelectedRowIds([]);
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from MOH (1.2) and Received from EPSS (2.1)`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from EPSS (2.1)`, {
         type: 'CREATE',
         title: `DSP Transmittal ${refNum}`,
-        payload: { request: newRecord11, received12: sentRecord12, received21: receivedRecord21 }
+        payload: { request: newRecord11, received21: receivedRecord21 }
       });
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Exact copy stored in Sub-step 1.2 (EPSS) and Sub-step 2.1 (MOH).`);
+    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Exact 10-column copy stored in Sub-step 1.1 and Sub-step 2.1 (MOH Received from EPSS).`);
   };
 
   return (

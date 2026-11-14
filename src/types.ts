@@ -639,6 +639,7 @@ export interface RegionBreakdownColumn {
 
 export interface RegionBreakdownRow {
   id: string;
+  date?: string;
   region: string;
   zone: string;
   woreda: string;
@@ -699,6 +700,12 @@ export interface DspWorkflowRecord {
     quantity: number;
     allocatedFacility?: string;
     plant: string;
+    totalAmount?: number;
+    valuationTypeDesc?: string;
+    wbsElement?: string;
+    budgetSource?: string;
+    requestDate?: string;
+    dspRequestTo?: string;
   }[];
   notes?: string;
   excelFile?: { name: string; blob: Blob };

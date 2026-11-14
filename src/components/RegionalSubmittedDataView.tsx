@@ -1,167 +1,599 @@
-import React, { useMemo } from 'react';
-import { DspWorkflowRecord } from '../types';
-import { formatCurrency, formatNumber } from '../utils/formatters';
-import { Building2, Layers, AlertCircle, FileSpreadsheet, Hospital } from 'lucide-react';
-import { isRhbSubmittedToMohRecord } from '../utils/rhbAggregation';
+import React, { useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import { DspWorkflowRecord, EpssSubTab, RegionBreakdownColumn, RegionBreakdownRow } from '../types';
+import { formatNumber } from '../utils/formatters';
+import {
+  Building2,
+  Layers,
+  AlertCircle,
+  FileSpreadsheet,
+  Hospital,
+  Eye,
+  Check,
+  Download,
+  Search,
+  Calendar,
+  FileText,
+  ArrowRight,
+  UserCheck
+} from 'lucide-react';
+import { isRhbSubmittedToMohRecord, aggregateRhbSubmissionsToMoh } from '../utils/rhbAggregation';
 
 interface Props {
   records: DspWorkflowRecord[];
+  onSelectSubTab?: (tab: EpssSubTab) => void;
 }
 
-export const RegionalSubmittedDataView: React.FC<Props> = ({ records }) => {
-  const regionalRecords = useMemo(() => 
-    records.filter(isRhbSubmittedToMohRecord),
+export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSubTab }) => {
+  const regionalRecords = useMemo(
+    () =>
+      records
+        .filter(isRhbSubmittedToMohRecord)
+        .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime()),
     [records]
   );
 
-  const aggregatedFacilities = useMemo(() => {
-    const facilities: any[] = [];
-    regionalRecords.forEach(record => {
-      if (record.facilityMatrixData?.rows) {
-        record.facilityMatrixData.rows.forEach(row => {
-          facilities.push({
-            ...row,
-            dspRef: record.dspRefNumber,
-            columns: record.facilityMatrixData?.columns || []
-          });
-        });
-      }
-    });
-    return facilities;
-  }, [regionalRecords]);
+  const [selectedDossierId, setSelectedDossierId] = useState<string>(() => regionalRecords[0]?.id || '');
+  const [viewMode, setViewMode] = useState<'single' | 'consolidated'>('single');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const allColumns = useMemo(() => {
-    const cols = new Map<string, { id: string, name: string, code: string }>();
-    regionalRecords.forEach(record => {
-      record.facilityMatrixData?.columns.forEach(c => {
-        cols.set(c.id, c);
+  useEffect(() => {
+    if (regionalRecords.length > 0 && !regionalRecords.some(r => r.id === selectedDossierId)) {
+      setSelectedDossierId(regionalRecords[0].id);
+    } else if (regionalRecords.length === 0 && selectedDossierId !== '') {
+      setSelectedDossierId('');
+    }
+  }, [regionalRecords, selectedDossierId]);
+
+  const selectedDossier = useMemo(() => {
+    return regionalRecords.find(r => r.id === selectedDossierId) || regionalRecords[0] || null;
+  }, [regionalRecords, selectedDossierId]);
+
+  // Exact columns & rows for the selected 1-to-1 RHB dossier
+  const { selectedColumns, selectedRows } = useMemo(() => {
+    if (!selectedDossier) {
+      return { selectedColumns: [] as RegionBreakdownColumn[], selectedRows: [] as RegionBreakdownRow[] };
+    }
+    const cols: RegionBreakdownColumn[] =
+      selectedDossier.facilityMatrixData?.columns && selectedDossier.facilityMatrixData.columns.length > 0
+        ? selectedDossier.facilityMatrixData.columns
+        : (selectedDossier.itemsIncluded || []).map((it, idx) => ({
+            id: `rhb-col-${idx}-${it.material}`,
+            name: it.description,
+            code: it.material
+          }));
+
+    let rows: RegionBreakdownRow[] = [];
+    if (selectedDossier.facilityMatrixData?.rows && selectedDossier.facilityMatrixData.rows.length > 0) {
+      rows = selectedDossier.facilityMatrixData.rows;
+    } else if (selectedDossier.itemsIncluded && selectedDossier.itemsIncluded.length > 0) {
+      const qObj: Record<string, number> = {};
+      cols.forEach((c, idx) => {
+        qObj[c.id] = Number(selectedDossier.itemsIncluded[idx]?.quantity) || 0;
       });
+      rows = [
+        {
+          id: `${selectedDossier.id}-summary`,
+          date: selectedDossier.dateSubmitted,
+          region: selectedDossier.targetedRegions?.[0] || 'Regional',
+          zone: '-',
+          woreda: '-',
+          hub: selectedDossier.itemsIncluded[0]?.plant || '',
+          healthFacility: `${selectedDossier.targetedRegions?.[0] || 'Regional'} Consolidated Allocation`,
+          packages: 'MCH',
+          quantities: qObj
+        }
+      ];
+    }
+    return { selectedColumns: cols, selectedRows: rows };
+  }, [selectedDossier]);
+
+  const filteredSelectedRows = useMemo(() => {
+    if (!searchQuery.trim()) return selectedRows;
+    const q = searchQuery.toLowerCase();
+    return selectedRows.filter(
+      row =>
+        row.region?.toLowerCase().includes(q) ||
+        row.zone?.toLowerCase().includes(q) ||
+        row.woreda?.toLowerCase().includes(q) ||
+        row.healthFacility?.toLowerCase().includes(q) ||
+        row.packages?.toLowerCase().includes(q)
+    );
+  }, [selectedRows, searchQuery]);
+
+  const selectedColumnTotals = useMemo(() => {
+    const sums: Record<string, number> = {};
+    selectedColumns.forEach(c => {
+      sums[c.id] = filteredSelectedRows.reduce((acc, r) => acc + (Number(r.quantities?.[c.id]) || 0), 0);
     });
-    return Array.from(cols.values());
-  }, [regionalRecords]);
+    return sums;
+  }, [selectedColumns, filteredSelectedRows]);
+
+  const selectedGrandTotal = useMemo(
+    () => Object.values(selectedColumnTotals).reduce((a, b) => a + b, 0),
+    [selectedColumnTotals]
+  );
+
+  // Consolidated across all RHBs (optional tab)
+  const consolidated = useMemo(() => aggregateRhbSubmissionsToMoh(records), [records]);
+
+  const handleExportSelectedExcel = () => {
+    if (!selectedDossier) return;
+    const header1 = [
+      'S/N',
+      'Date',
+      'Region',
+      'Zone',
+      'Woreda',
+      'Name of health facility',
+      'List of Packages',
+      ...selectedColumns.map(c => c.name),
+      'Total'
+    ];
+    const header2 = ['', '', '', '', '', '', 'Packages', ...selectedColumns.map(c => c.code), 'Units'];
+    const dataRows = filteredSelectedRows.map((row, idx) => {
+      const rTotal = selectedColumns.reduce((s, c) => s + (Number(row.quantities?.[c.id]) || 0), 0);
+      return [
+        idx + 1,
+        row.date || selectedDossier.facilityMatrixData?.date || selectedDossier.dateSubmitted,
+        row.region,
+        row.zone,
+        row.woreda,
+        row.healthFacility,
+        row.packages || 'MCH',
+        ...selectedColumns.map(c => Number(row.quantities?.[c.id]) || 0),
+        rTotal
+      ];
+    });
+    const footerRow = [
+      'TOTAL',
+      '',
+      '',
+      '',
+      '',
+      `${filteredSelectedRows.length} Facilities`,
+      '',
+      ...selectedColumns.map(c => selectedColumnTotals[c.id] || 0),
+      selectedGrandTotal
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([header1, header2, ...dataRows, footerRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'RHB_Submitted_Matrix');
+    XLSX.writeFile(wb, `RHB_to_MOH_Dossier_${selectedDossier.dspRefNumber.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header Banner */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
           <div>
             <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
               <Layers className="w-5 h-5 text-amber-600" />
-              Regional Submission Aggregation (RHB to MOH)
+              2.3 Breakdown Received from RHB (RHB ➔ MOH Exact Dossiers)
             </h3>
-            <p className="text-xs text-slate-500 mt-1 font-medium">Consolidated incoming breakdown data from all Regional Health Bureaus.</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Select any Regional Health Bureau submission below to inspect its exact Health Facility Breakdown Matrix as transmitted in Sub-step 3.2.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-             <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-amber-600" />
-                <span className="text-[11px] font-black text-amber-700 font-mono">{regionalRecords.length} Dossiers</span>
-             </div>
-             <div className="bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100 flex items-center gap-2">
-                <Hospital className="w-4 h-4 text-purple-600" />
-                <span className="text-[11px] font-black text-purple-700 font-mono">{aggregatedFacilities.length} Facilities</span>
-             </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-amber-600" />
+              <span className="text-[11px] font-black text-amber-700 font-mono">
+                {regionalRecords.length} RHB Dossier{regionalRecords.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100 flex items-center gap-2">
+              <Hospital className="w-4 h-4 text-purple-600" />
+              <span className="text-[11px] font-black text-purple-700 font-mono">
+                {consolidated.facilityRows.length} Total Facilities
+              </span>
+            </div>
+
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setViewMode('single')}
+                className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  viewMode === 'single' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Selected Dossier (1-to-1)
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('consolidated')}
+                className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  viewMode === 'consolidated' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All RHBs Combined
+              </button>
+            </div>
+
+            {onSelectSubTab && (
+              <button
+                type="button"
+                onClick={() => onSelectSubTab('dsp-moh-2-4')}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+              >
+                <span>Proceed to 2.4 Aggregation</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
-        
+
         {regionalRecords.length === 0 ? (
-          <div className="text-center py-16 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-            <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-400">No regional submissions found in system memory.</p>
-            <p className="text-xs text-slate-400 mt-1">Incoming data from RHBs will appear here once submitted.</p>
+          <div className="text-center py-16 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 space-y-2">
+            <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-500">No RHB breakdown dossiers submitted to MOH yet.</p>
+            <p className="text-xs text-slate-400">
+              When a Regional Health Bureau submits its Health Facility Breakdown Matrix in Sub-step 3.2, the exact dossier will appear here.
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-inner bg-slate-50/20">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+          /* Selectable RHB Dossier Inbox Cards */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {regionalRecords.map(record => {
+              const isSelected = selectedDossier?.id === record.id && viewMode === 'single';
+              const facCount = record.facilityMatrixData?.rows?.length || record.targetedFacilitiesCount || 0;
+              const colCount = record.facilityMatrixData?.columns?.length || record.itemsIncluded?.length || 0;
+              return (
+                <div
+                  key={record.id}
+                  onClick={() => {
+                    setSelectedDossierId(record.id);
+                    setViewMode('single');
+                  }}
+                  className={`rounded-2xl p-4 border transition-all cursor-pointer group ${
+                    isSelected
+                      ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-400/30 shadow-md'
+                      : 'bg-white border-slate-200 hover:border-amber-400 shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-black text-amber-700 uppercase tracking-widest font-mono">
+                      {record.dspRefNumber}
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${
+                        record.status === 'Submitted & Pending'
+                          ? 'bg-amber-100 text-amber-700'
+                          : record.status === 'Under Review'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {record.status}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-slate-900 line-clamp-1 mb-1">
+                    {record.dspName || record.subject}
+                  </h4>
+                  <div className="text-[11px] text-slate-600 font-semibold line-clamp-1 mb-2">
+                    From: {record.senderOrg}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 font-medium">
+                    <div className="flex items-center gap-1">
+                      <Building2 className="w-3 h-3 text-amber-600" />
+                      <span>{record.targetedRegions?.join(', ') || 'Regional'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Hospital className="w-3 h-3 text-purple-600" />
+                      <span>{facCount} Facilities</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                      <span>
+                        {colCount} Items • {formatNumber(record.totalQuantity)} Units
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                    <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span className="font-mono font-bold text-slate-700">{record.dateSubmitted}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setSelectedDossierId(record.id);
+                        setViewMode('single');
+                      }}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'bg-slate-900 hover:bg-black text-amber-300'
+                      }`}
+                    >
+                      {isSelected ? <Check className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{isSelected ? 'Selected' : 'View Full Dossier'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Selected RHB Dossier 1-to-1 Matrix Inspector */}
+      {regionalRecords.length > 0 && viewMode === 'single' && selectedDossier && (
+        <div className="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-[#0B1527] text-white p-5 border-b-2 border-amber-400 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 bg-amber-400 text-slate-950 rounded-xl shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                    Exact RHB ➔ MOH Dossier Sent Data
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-white/10 font-mono text-[10px] text-white">
+                    {selectedDossier.dspRefNumber}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-white/10 font-mono text-[10px] text-amber-200">
+                    Letter: {selectedDossier.officialLetterRef}
+                  </span>
+                </div>
+                <h4 className="text-base font-black text-white mt-1">
+                  {selectedDossier.dspName || selectedDossier.subject}
+                </h4>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-300 mt-1">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                    Sender: <strong className="text-white">{selectedDossier.senderOrg}</strong>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    Signatory:{' '}
+                    <strong className="text-white">
+                      {selectedDossier.signatory} ({selectedDossier.signatoryRole})
+                    </strong>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                    Date: <strong className="font-mono text-white">{selectedDossier.dateSubmitted}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportSelectedExcel}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Exact Matrix (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search health facility, zone, woreda, package..."
+                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="text-xs font-mono font-bold text-slate-600">
+              Showing <strong>{filteredSelectedRows.length}</strong> of {selectedRows.length} Facilities •{' '}
+              <strong className="text-amber-700">{formatNumber(selectedGrandTotal)}</strong> Units
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="font-semibold">
+                  <th className="bg-[#fed7aa] text-slate-900 border border-slate-300 py-2 px-2.5 text-center w-12">
+                    S/N
+                  </th>
+                  <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[95px]">
+                    Date
+                  </th>
+                  <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[110px]">
+                    Region
+                  </th>
+                  <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[120px]">
+                    Zone
+                  </th>
+                  <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[110px]">
+                    Woreda
+                  </th>
+                  <th className="bg-[#fed7aa] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[210px]">
+                    Name of health facility
+                  </th>
+                  <th className="bg-[#dbeafe] text-slate-900 italic border border-slate-300 py-2 px-3 min-w-[110px] text-center">
+                    List of Packages
+                  </th>
+                  {selectedColumns.map(col => (
+                    <th
+                      key={col.id}
+                      className="bg-[#fed7aa] text-slate-900 font-semibold border border-slate-300 py-2 px-2 text-center min-w-[135px] leading-tight"
+                    >
+                      {col.name}
+                    </th>
+                  ))}
+                  <th className="bg-[#fde047]/70 text-slate-900 font-black border border-slate-300 py-2 px-2.5 text-center min-w-[75px]">
+                    Total
+                  </th>
+                </tr>
+                <tr className="text-[11px] font-mono">
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-2"></th>
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-3"></th>
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-3"></th>
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-3"></th>
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-3"></th>
+                  <th className="bg-[#fed7aa] border border-slate-300 py-1 px-3"></th>
+                  <th className="bg-[#dbeafe] text-slate-800 border border-slate-300 py-1 px-3 text-center font-sans text-[10px]">
+                    Packages
+                  </th>
+                  {selectedColumns.map(col => (
+                    <th
+                      key={`code-${col.id}`}
+                      className="bg-white text-slate-800 border border-slate-300 py-1 px-2 text-center font-bold"
+                    >
+                      {col.code}
+                    </th>
+                  ))}
+                  <th className="bg-[#fef9c3] border border-slate-300 py-1 px-2 text-center font-sans text-[10px]">
+                    Units
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSelectedRows.map((fac, idx) => {
+                  const rowTotal = selectedColumns.reduce(
+                    (s, c) => s + (Number(fac.quantities?.[c.id]) || 0),
+                    0
+                  );
+                  return (
+                    <tr
+                      key={`${selectedDossier.id}-${fac.id}-${idx}`}
+                      className={`hover:bg-amber-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}
+                    >
+                      <td className="p-2.5 border border-slate-200 text-center font-mono font-bold text-slate-500">
+                        {idx + 1}
+                      </td>
+                      <td className="p-2.5 border border-slate-200 font-mono text-slate-600 whitespace-nowrap">
+                        {fac.date || selectedDossier.facilityMatrixData?.date || selectedDossier.dateSubmitted}
+                      </td>
+                      <td className="p-2.5 border border-slate-200 font-bold text-slate-800">{fac.region}</td>
+                      <td className="p-2.5 border border-slate-200 text-slate-600">{fac.zone || '-'}</td>
+                      <td className="p-2.5 border border-slate-200 text-slate-600">{fac.woreda || '-'}</td>
+                      <td className="p-2.5 border border-slate-200 font-black text-slate-900">{fac.healthFacility}</td>
+                      <td className="p-2.5 border border-slate-200 text-center bg-[#eff6ff]/60">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-bold text-[10px]">
+                          {fac.packages || 'MCH'}
+                        </span>
+                      </td>
+                      {selectedColumns.map(col => (
+                        <td
+                          key={col.id}
+                          className="p-2.5 border border-slate-200 text-center font-mono font-black text-amber-800 bg-amber-50/10"
+                        >
+                          {formatNumber(Number(fac.quantities?.[col.id]) || 0)}
+                        </td>
+                      ))}
+                      <td className="p-2.5 border border-slate-200 text-center font-mono font-black text-slate-900 bg-amber-100/50">
+                        {formatNumber(rowTotal)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-500 text-xs">
+                  <td colSpan={7} className="p-3 text-right uppercase tracking-wider font-mono text-amber-300">
+                    Total Sent by {selectedDossier.senderOrg} ({filteredSelectedRows.length} Facilities):
+                  </td>
+                  {selectedColumns.map(col => (
+                    <td
+                      key={`sum-${col.id}`}
+                      className="p-3 text-center border-r border-slate-700 font-mono text-amber-300"
+                    >
+                      {formatNumber(selectedColumnTotals[col.id] || 0)}
+                    </td>
+                  ))}
+                  <td className="p-3 text-center font-mono text-emerald-400 bg-slate-950">
+                    {formatNumber(selectedGrandTotal)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Optional Consolidated View Across All Submitted RHBs */}
+      {regionalRecords.length > 0 && viewMode === 'consolidated' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Consolidated RHB Facility Submissions ({consolidated.facilityRows.length} Facilities across{' '}
+              {consolidated.regionSummaries.length} Regions)
+            </h4>
+            <span className="text-xs font-mono font-black text-amber-700">
+              Grand Total: {formatNumber(consolidated.grandTotalUnits)} Units
+            </span>
+          </div>
+          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-slate-50/20">
+            <table className="w-full text-left border-collapse min-w-[1100px] text-[11px]">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-tighter">
-                  <th className="p-3 border-r border-slate-200 sticky left-0 z-10 bg-slate-100">DSP Ref</th>
+                  <th className="p-3 border-r border-slate-200">DSP Ref</th>
+                  <th className="p-3 border-r border-slate-200">Date</th>
                   <th className="p-3 border-r border-slate-200">Region</th>
                   <th className="p-3 border-r border-slate-200">Zone</th>
                   <th className="p-3 border-r border-slate-200">Woreda</th>
                   <th className="p-3 border-r border-slate-200 min-w-[200px]">Health Facility</th>
                   <th className="p-3 border-r border-slate-200">Package</th>
-                  {allColumns.map(col => (
+                  {consolidated.unifiedColumns.map(col => (
                     <th key={col.id} className="p-3 border-r border-slate-200 text-center min-w-[140px] bg-white">
                       <div className="text-slate-900 leading-tight">{col.name}</div>
                       <div className="text-[9px] font-mono font-normal text-slate-400 mt-1">{col.code}</div>
                     </th>
                   ))}
+                  <th className="p-3 text-center bg-amber-100 text-amber-900">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-[11px]">
-                {aggregatedFacilities.map((fac, idx) => (
-                  <tr key={`${fac.dspRef}-${fac.id}-${idx}`} className="hover:bg-amber-50/30 transition-colors bg-white">
-                    <td className="p-3 border-r border-slate-100 font-mono text-[10px] font-bold text-slate-500 sticky left-0 z-10 bg-white group-hover:bg-amber-50/30">{fac.dspRef}</td>
+              <tbody className="divide-y divide-slate-100">
+                {consolidated.facilityRows.map((fac, idx) => (
+                  <tr key={`${fac.dspRefNumber}-${fac.id}-${idx}`} className="hover:bg-amber-50/30 transition-colors bg-white">
+                    <td className="p-3 border-r border-slate-100 font-mono text-[10px] font-bold text-slate-500">
+                      {fac.dspRefNumber}
+                    </td>
+                    <td className="p-3 border-r border-slate-100 font-mono text-slate-600">{fac.submissionDate}</td>
                     <td className="p-3 border-r border-slate-100 font-bold text-slate-800">{fac.region}</td>
                     <td className="p-3 border-r border-slate-100 text-slate-600">{fac.zone}</td>
                     <td className="p-3 border-r border-slate-100 text-slate-600">{fac.woreda}</td>
                     <td className="p-3 border-r border-slate-100 font-black text-slate-900">{fac.healthFacility}</td>
                     <td className="p-3 border-r border-slate-100">
-                       <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold text-[9px]">{fac.packages}</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold text-[9px]">
+                        {fac.packages}
+                      </span>
                     </td>
-                    {allColumns.map(col => (
+                    {consolidated.unifiedColumns.map(col => (
                       <td key={col.id} className="p-3 border-r border-slate-100 text-center font-black text-amber-700 font-mono bg-amber-50/10">
-                        {fac.quantities[col.id] || '-'}
+                        {fac.quantities[col.id] || 0}
                       </td>
                     ))}
+                    <td className="p-3 text-center font-mono font-black text-slate-900 bg-amber-50/50">
+                      {formatNumber(fac.rowTotal)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-slate-50 font-black text-slate-900 border-t-2 border-slate-200">
-                  <td colSpan={6} className="p-3 text-right uppercase tracking-wider text-xs">Total Aggregated Quantity:</td>
-                  {allColumns.map(col => {
-                    const total = aggregatedFacilities.reduce((sum, f) => sum + (Number(f.quantities[col.id]) || 0), 0);
-                    return (
-                      <td key={col.id} className="p-3 text-center border-r border-slate-200 bg-amber-100/50 text-amber-900 font-mono">
-                        {total > 0 ? formatNumber(total) : '-'}
-                      </td>
-                    );
-                  })}
+                <tr className="bg-slate-900 font-black text-white border-t-2 border-slate-300">
+                  <td colSpan={7} className="p-3 text-right uppercase tracking-wider text-xs text-amber-300">
+                    Total Consolidated Quantity:
+                  </td>
+                  {consolidated.unifiedColumns.map(col => (
+                    <td key={col.id} className="p-3 text-center border-r border-slate-700 text-amber-300 font-mono">
+                      {formatNumber(consolidated.columnTotals[col.id] || 0)}
+                    </td>
+                  ))}
+                  <td className="p-3 text-center font-mono text-emerald-400 bg-slate-950">
+                    {formatNumber(consolidated.grandTotalUnits)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
           </div>
-        )}
-      </div>
-
-      {/* Dossier Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {regionalRecords.map(record => (
-          <div key={record.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-amber-400 transition-colors group">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest font-mono">{record.dspRefNumber}</div>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                record.status === 'Submitted & Pending' ? 'bg-amber-100 text-amber-700' : 
-                record.status === 'Under Review' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>
-                {record.status}
-              </span>
-            </div>
-            <h4 className="text-xs font-bold text-slate-900 line-clamp-1 mb-2">{record.subject}</h4>
-            <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
-               <div className="flex items-center gap-1">
-                 <Building2 className="w-3 h-3" />
-                 {(record.senderOrg || 'Regional').split(' ')[0]} Region
-               </div>
-               <div className="flex items-center gap-1">
-                 <Hospital className="w-3 h-3" />
-                 {record.targetedFacilitiesCount} Facilities
-               </div>
-               <div className="flex items-center gap-1">
-                 <FileSpreadsheet className="w-3 h-3" />
-                 {record.totalQuantity} Units
-               </div>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-               <div className="text-[10px] text-slate-400">Submitted: <span className="font-bold text-slate-600">{record.dateSubmitted}</span></div>
-               <button className="text-[10px] font-black text-amber-600 hover:text-amber-700 uppercase tracking-wider group-hover:translate-x-1 transition-transform">
-                 View Full Dossier ➔
-               </button>
-            </div>
-          </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

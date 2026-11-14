@@ -105,10 +105,11 @@ interface Stage4MohSubmittedMatrixTableProps {
   onSelectDossier?: (dossierId: string) => void;
   title?: string;
   subtitle?: string;
-  onTransmitEPSS?: (metadata: { 
-    signatory: string; 
-    role: string; 
-    organization: string; 
+  onTransmitEPSS?: (metadata: {
+    signatory: string;
+    role: string;
+    organization: string;
+    dspName?: string;
     date: string;
     matrixData: Stage4MatrixData;
   }) => void;
@@ -148,7 +149,8 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
   const [signatoryName, setSignatoryName] = useState('');
   const [signatoryRole, setSignatoryRole] = useState('PMD Director');
-  const [signatoryOrg, setSignatoryOrg] = useState('Ministry of Health (MOH)');
+  const [signatoryOrg, setSignatoryOrg] = useState('Ministry of Health (PMD Directorate)');
+  const [dspProjectTitle, setDspProjectTitle] = useState('National Health Facility Allocation Matrix');
 
   const handleBatchApplyQtyToAllRows = (colId: string, customQty?: number) => {
     const valToApply = customQty !== undefined ? customQty : (Number(batchQtyInputs[colId]) || 0);
@@ -1724,17 +1726,17 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             </div>
 
             <div className="space-y-5">
-              {/* DSP PROJECT / MATRIX REFERENCE TITLE - Matching Image 5 */}
+              {/* DSP PROJECT / MATRIX REFERENCE TITLE */}
               <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3 shadow-2xs">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-amber-700" />
                   <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">DSP Project / Matrix Reference Title</span>
                 </div>
-                <input 
+                <input
                   type="text"
-                  placeholder="e.g. Regional Health Facility Allocation Matrix"
-                  value={signatoryOrg.includes('Regional') ? signatoryOrg : 'Regional Health Facility Allocation Matrix'}
-                  onChange={(e) => setSignatoryOrg(e.target.value)}
+                  placeholder="e.g. National Health Facility Allocation Matrix"
+                  value={dspProjectTitle}
+                  onChange={(e) => setDspProjectTitle(e.target.value)}
                   className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:border-amber-500 outline-none transition shadow-sm"
                 />
               </div>
@@ -1859,10 +1861,12 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                   }
                   
                   if (onTransmitEPSS) {
+                    const activeDossier = dossiers.find(d => d.id === selectedDossierId);
                     onTransmitEPSS({
                       signatory: signatoryName,
                       role: signatoryRole,
                       organization: signatoryOrg,
+                      dspName: dspProjectTitle.trim() || activeDossier?.dspName || 'MOH to EPSS Health Facility Matrix',
                       date: internalDate,
                       matrixData: {
                         date: internalDate,
