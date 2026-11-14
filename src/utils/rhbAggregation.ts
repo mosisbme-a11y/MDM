@@ -1,15 +1,22 @@
 import { DspWorkflowRecord, RegionBreakdownColumn, RegionBreakdownRow } from '../types';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, getDossierTier } from '../data/defaultDspWorkflows';
 
 /**
  * Strictly identifies records that were individually submitted by a Regional Health Bureau (RHB)
- * to the Ministry of Health (MOH). Excludes MOH->RHB drafts or EPSS-targeted records.
+ * to the Ministry of Health (MOH). Excludes EPSS Head Office (1.x), Branch (4.x),
+ * and MOH outgoing (2.1/2.2/2.5) records.
  */
 export function isRhbSubmittedToMohRecord(r: DspWorkflowRecord): boolean {
   if (!r) return false;
   const sub = canonicalizeSubStage(r.subStage, r.stage);
+  const tier = getDossierTier(r);
   const recipientUpper = (r.recipientOrg || '').toUpperCase();
   const senderUpper = (r.senderOrg || '').toUpperCase();
+
+  // Strictly exclude EPSS Head Office (1.x) and Branches (4.x)
+  if (tier === 'head-office-dsp' || tier === 'branches-dsp-management') {
+    return false;
+  }
 
   const hasPayload =
     (r.facilityMatrixData?.rows && r.facilityMatrixData.rows.length > 0) ||
@@ -17,9 +24,9 @@ export function isRhbSubmittedToMohRecord(r: DspWorkflowRecord): boolean {
   if (!hasPayload) return false;
 
   if (r.stage === 'rhb-to-moh') return true;
-  if (r.stage === 'moh-osp-management' && sub === '2.3') return true;
+  if (tier === 'moh-osp-management' && sub === '2.3') return true;
 
-  if (r.stage === 'rhb-breakdown-management' && sub === '3.2') {
+  if (tier === 'rhb-breakdown-management' && sub === '3.2') {
     const sentToMoh =
       recipientUpper.includes('MOH') ||
       recipientUpper.includes('MINISTRY OF HEALTH') ||

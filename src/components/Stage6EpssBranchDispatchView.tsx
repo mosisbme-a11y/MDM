@@ -13,7 +13,7 @@ import {
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, HealthFacilityRecord } from '../types';
 import { EPSS_HUBS_REGISTRY, getHubByCode } from '../data/epssHubs';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 
 interface Stage6EpssBranchDispatchViewProps {
   records: DspWorkflowRecord[];
@@ -36,22 +36,16 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
   onSelectSubTab,
   onTriggerCloudSync
 }) => {
-  // Stage 5 / 1.3.1-1.3.4 mapped dossiers
+  // Strictly isolated to Head Office DSP Management (1.3.1-1.3.4 mapped dossiers)
   const stage5Records = useMemo(() => {
     return records.filter(r => {
+      if (!isDossierInTier(r, 'head-office-dsp')) return false;
       const sub = canonicalizeSubStage(r.subStage, r.stage);
       const hasHubData =
         Boolean(r.hubAggregationData?.allocations?.length) ||
         Boolean(r.stage4MatrixData?.rows?.length) ||
         Boolean(r.facilityMatrixData?.rows?.length);
-      return (
-        hasHubData &&
-        (r.stage === 'epss-ho-aggregation' ||
-          r.stage === 'moh-to-epss-ho' ||
-          sub === '1.3.1' ||
-          sub === '1.3.3' ||
-          sub === '1.3.4')
-      );
+      return hasHubData && (sub === '1.3.1' || sub === '1.3.3' || sub === '1.3.4');
     });
   }, [records]);
 

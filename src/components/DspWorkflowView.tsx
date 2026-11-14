@@ -93,7 +93,13 @@ import {
     AuthUser
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import {
+  canonicalizeSubStage,
+  DspHierarchyTierId,
+  getDspHierarchyInfo,
+  isDossierInTier,
+  isDossierInSubStep
+} from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 import { mapFacilityToHub, getHubByCode } from '../data/epssHubs';
 import { RhbBreakdownAggregationView } from './RhbBreakdownAggregationView';
@@ -707,6 +713,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     }
     if (currentStage !== 'all') {
       setSelectedStageKey(currentStage);
+      setStageFilter('all');
     }
   }, [currentStage, currentSubStep]);
 
@@ -749,28 +756,37 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     }))
   });
 
+  const rhbScopedRecords = useMemo(
+    () => records.filter((r) => isDossierInTier(r, 'rhb-breakdown-management')),
+    [records]
+  );
+
+  const hoMapScopedRecords = useMemo(
+    () =>
+      records.filter((r) => {
+        if (!isDossierInTier(r, 'head-office-dsp')) return false;
+        const sub = canonicalizeSubStage(r.subStage, r.stage);
+        return sub === '1.2' || sub === '1.3.1';
+      }),
+    [records]
+  );
+
   const activeStage131Record = useMemo(() => {
-    const is131OrMohToEpss = (r: DspWorkflowRecord) => {
+    const is131Or12InHeadOffice = (r: DspWorkflowRecord) => {
+      if (!isDossierInTier(r, 'head-office-dsp')) return false;
       const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return (
-        r.stage === 'epss-ho-aggregation' ||
-        sub === '1.3.1' ||
-        sub === '1.2' ||
-        sub === '2.5' ||
-        r.stage === 'moh-to-epss-ho'
-      );
+      return sub === '1.3.1' || sub === '1.2';
     };
     if (
       selectedRecord &&
-      is131OrMohToEpss(selectedRecord) &&
+      is131Or12InHeadOffice(selectedRecord) &&
       (selectedRecord.facilityMatrixData || selectedRecord.stage4MatrixData)
     ) {
       return selectedRecord;
     }
     return (
-      records.find(r => (r.stage === 'epss-ho-aggregation' || canonicalizeSubStage(r.subStage, r.stage) === '1.3.1') && (r.facilityMatrixData || r.stage4MatrixData)) ||
-      records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2' && (r.stage4MatrixData || r.facilityMatrixData)) ||
-      records.find(r => (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') && r.stage4MatrixData) ||
+      records.find(r => isDossierInTier(r, 'head-office-dsp') && canonicalizeSubStage(r.subStage, r.stage) === '1.3.1' && (r.facilityMatrixData || r.stage4MatrixData)) ||
+      records.find(r => isDossierInTier(r, 'head-office-dsp') && canonicalizeSubStage(r.subStage, r.stage) === '1.2' && (r.stage4MatrixData || r.facilityMatrixData)) ||
       null
     );
   }, [selectedRecord, records]);
@@ -925,7 +941,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'head-office-dsp', 
       label: 'Head Office DSP Management', 
       color: 'from-blue-600 to-cyan-600', 
-      count: records.filter(r => r.stage === 'head-office-dsp').length,
+      count: records.filter(r => isDossierInTier(r, 'head-office-dsp')).length,
       subSteps: [
         { id: '1.1', label: 'DSP Request to MOH', subTab: 'dsp-ho-1-1' as EpssSubTab },
         { id: '1.2', label: 'DSP Received from MOH', subTab: 'dsp-ho-1-2' as EpssSubTab },
@@ -940,7 +956,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'moh-osp-management', 
       label: 'MOH DSP Management', 
       color: 'from-cyan-600 to-teal-600', 
-      count: records.filter(r => r.stage === 'moh-osp-management').length,
+      count: records.filter(r => isDossierInTier(r, 'moh-osp-management')).length,
       subSteps: [
         { id: '2.1', label: 'DSP Received from EPSS', subTab: 'dsp-moh-2-1' as EpssSubTab },
         { id: '2.2', label: 'DSP Request to RHB', subTab: 'dsp-moh-2-2' as EpssSubTab },
@@ -954,7 +970,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'rhb-breakdown-management', 
       label: 'RHB Breakdown Management', 
       color: 'from-amber-600 to-orange-600', 
-      count: records.filter(r => r.stage === 'rhb-breakdown-management').length,
+      count: records.filter(r => isDossierInTier(r, 'rhb-breakdown-management')).length,
       subSteps: [
         { id: '3.1', label: 'Breakdown Received from MOH', subTab: 'dsp-rhb-3-1' as EpssSubTab },
         { id: '3.2', label: 'Submit Breakdown to MOH', subTab: 'dsp-rhb-3-2' as EpssSubTab },
@@ -965,7 +981,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       stageKey: 'branches-dsp-management', 
       label: 'Branches DSP Management', 
       color: 'from-purple-600 to-indigo-600', 
-      count: records.filter(r => r.stage === 'branches-dsp-management').length,
+      count: records.filter(r => isDossierInTier(r, 'branches-dsp-management')).length,
       subSteps: [
         { id: '4.1', label: 'Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
         { id: '4.2', label: 'Analysis & compare with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
@@ -978,13 +994,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     return records.filter((r) => {
       let matchStage = true;
       if (currentStage !== 'all') {
-        matchStage = r.stage === currentStage;
+        matchStage = isDossierInTier(r, currentStage as DspHierarchyTierId);
       }
 
       let matchSubStep = true;
       if (currentSubStep && currentSubStep !== 'all') {
-        const recordSubStage = canonicalizeSubStage(r.subStage, r.stage);
-        matchSubStep = recordSubStage === currentSubStep || recordSubStage.startsWith(currentSubStep) || currentSubStep.startsWith(recordSubStage);
+        matchSubStep = isDossierInSubStep(r, currentSubStep);
       }
 
       const matchSearch =
@@ -1012,7 +1027,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           selectedRegionsFilter.some(sel => sel.toLowerCase() === reg.toLowerCase() || reg.toLowerCase().includes(sel.toLowerCase()))
         );
 
-      const matchStageFilter = stageFilter === 'all' || r.stage === stageFilter;
+      const matchStageFilter =
+        currentStage !== 'all' ||
+        stageFilter === 'all' ||
+        isDossierInTier(r, stageFilter as DspHierarchyTierId);
 
       return matchStage && matchSubStep && matchSearch && matchStatus && matchAging && matchRegion && matchStageFilter;
     });
@@ -1068,9 +1086,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
   const handleExportCSV = () => {
     const data = filteredRecords.map((r, idx) => {
       const dateInfo = computeDateCount(r.dateSubmitted, r.actionTakenDate || r.approvedDate, r.status, r.actionTakenBy, r.actionType, r.turnaroundDays);
+      const hInfo = getDspHierarchyInfo(r);
       return {
         '#': idx + 1,
         'DSP Reference': r.dspRefNumber,
+        'DSP Management Hierarchy': hInfo.badgeText,
         'Workflow Stage': r.stageTitle,
         'From (Sender)': r.senderOrg,
         'To (Recipient)': r.recipientOrg,
@@ -1163,11 +1183,19 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           >
             <Archive className="w-3.5 h-3.5 text-amber-600" />
             <span>Saved Drafts</span>
-            {records.filter(r => (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft').length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
-                {records.filter(r => (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft').length}
-              </span>
-            )}
+            {(() => {
+              const scopedDraftCount = records.filter(r => {
+                const isDraft = (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft';
+                if (!isDraft) return false;
+                if (currentStage !== 'all') return isDossierInTier(r, currentStage as DspHierarchyTierId);
+                return true;
+              }).length;
+              return scopedDraftCount > 0 ? (
+                <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {scopedDraftCount}
+                </span>
+              ) : null;
+            })()}
           </button>
         </div>
       </div>
@@ -1270,7 +1298,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         isOpen={isBreakdownModalOpen}
         onClose={() => setIsBreakdownModalOpen(false)}
         items={multipleStockItems || []}
-        epssToMohRecords={records.filter(r => r.stage === 'moh-to-epss')}
+        epssToMohRecords={records.filter(r => isDossierInTier(r, 'moh-osp-management') && canonicalizeSubStage(r.subStage, r.stage) === '2.1')}
         currentUser={currentUser}
         onSaveDraft={(data) => {
           const refNum = `DRAFT-BRK-${Date.now().toString().slice(-6)}`;
@@ -1663,13 +1691,13 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           key="rhb-breakdown-matrix"
           data={
             (selectedRecord &&
-            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '3.2' ||
-              selectedRecord.stage === 'rhb-to-moh') &&
+            isDossierInTier(selectedRecord, 'rhb-breakdown-management') &&
             selectedRecord.facilityMatrixData
               ? selectedRecord.facilityMatrixData
-              : records.find(
+              : rhbScopedRecords.find(
                   r =>
-                    (canonicalizeSubStage(r.subStage, r.stage) === '3.2' || r.stage === 'rhb-to-moh') &&
+                    (canonicalizeSubStage(r.subStage, r.stage) === '3.2' ||
+                      canonicalizeSubStage(r.subStage, r.stage) === '3.1') &&
                     r.facilityMatrixData
                 )?.facilityMatrixData) || {
               date: '2026-10-27',
@@ -1682,20 +1710,21 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           isEditable={true}
           showHubColumn={false}
           enableRhbMultiAutoPopulate={true}
-          breakdownRequests={records}
+          breakdownRequests={rhbScopedRecords}
+          allowedTier="rhb-breakdown-management"
+          allowedSubStages={['3.1', '3.2']}
+          hierarchyScopeTitle="3. RHB Breakdown Management (3.1 & 3.2 Only)"
           selectedBreakdownRequestId={
-            (selectedRecord &&
-            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '3.2' ||
-              selectedRecord.stage === 'rhb-to-moh')
+            (selectedRecord && isDossierInTier(selectedRecord, 'rhb-breakdown-management')
               ? selectedRecord.id
-              : records.find(
+              : rhbScopedRecords.find(
                   r =>
                     canonicalizeSubStage(r.subStage, r.stage) === '3.2' ||
-                    r.stage === 'rhb-to-moh'
+                    canonicalizeSubStage(r.subStage, r.stage) === '3.1'
                 )?.id) || ''
           }
           onSelectBreakdownRequest={(reqId) => {
-            const req = records.find(r => r.id === reqId);
+            const req = rhbScopedRecords.find(r => r.id === reqId);
             if (req) {
               setSelectedRecord(req);
             }
@@ -1718,8 +1747,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           }}
           onUpdateData={(updated) => {
             setRecords(prev => {
-              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management')?.id;
-              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'rhb-to-moh' || r.stage === 'rhb-breakdown-management');
+              const targetId =
+                (selectedRecord && isDossierInTier(selectedRecord, 'rhb-breakdown-management')
+                  ? selectedRecord.id
+                  : undefined) ||
+                prev.find(r => isDossierInTier(r, 'rhb-breakdown-management'))?.id;
+              const existingIdx = targetId
+                ? prev.findIndex(r => r.id === targetId)
+                : prev.findIndex(r => isDossierInTier(r, 'rhb-breakdown-management'));
               if (existingIdx >= 0) {
                 const updatedRec = {
                   ...prev[existingIdx],
@@ -1745,8 +1780,17 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
  : currentStage === 'moh-to-epss-ho' && stage4ViewMode === 'matrix' ? (
         <Stage4MohSubmittedMatrixTable
           data={
-            selectedRecord?.stage4MatrixData ||
-            records.find(r => r.stage === 'moh-to-epss-ho' && r.stage4MatrixData)?.stage4MatrixData || {
+            (selectedRecord &&
+            isDossierInTier(selectedRecord, 'moh-osp-management') &&
+            canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' &&
+            selectedRecord.stage4MatrixData
+              ? selectedRecord.stage4MatrixData
+              : records.find(
+                  r =>
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5' &&
+                    r.stage4MatrixData
+                )?.stage4MatrixData) || {
               date: '2026-10-28',
               region: 'Oromia',
               columns: DEFAULT_STAGE_4_COLUMNS,
@@ -1755,18 +1799,47 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           }
           hfListItems={hfListItems}
           isEditable={true}
-          dossiers={records.filter(r => r.stage === 'moh-to-epss-ho')}
-          selectedDossierId={selectedRecord?.id || records.find(r => r.stage === 'moh-to-epss-ho')?.id || ''}
+          dossiers={records.filter(
+            r =>
+              isDossierInTier(r, 'moh-osp-management') &&
+              canonicalizeSubStage(r.subStage, r.stage) === '2.5'
+          )}
+          selectedDossierId={
+            (selectedRecord &&
+            isDossierInTier(selectedRecord, 'moh-osp-management') &&
+            canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5'
+              ? selectedRecord.id
+              : records.find(
+                  r =>
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5'
+                )?.id) || ''
+          }
           onSelectDossier={(dId) => {
-            const req = records.find(r => r.id === dId);
+            const req = records.find(
+              r =>
+                r.id === dId &&
+                isDossierInTier(r, 'moh-osp-management') &&
+                canonicalizeSubStage(r.subStage, r.stage) === '2.5'
+            );
             if (req) {
               setSelectedRecord(req);
             }
           }}
           onUpdateData={(updated) => {
             setRecords(prev => {
-              const targetId = selectedRecord?.id || prev.find(r => r.stage === 'moh-to-epss-ho')?.id;
-              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : prev.findIndex(r => r.stage === 'moh-to-epss-ho');
+              const targetId =
+                (selectedRecord &&
+                isDossierInTier(selectedRecord, 'moh-osp-management') &&
+                canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5'
+                  ? selectedRecord.id
+                  : undefined) ||
+                prev.find(
+                  r =>
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5'
+                )?.id;
+              const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : -1;
               if (existingIdx >= 0) {
                 const updatedRec = {
                   ...prev[existingIdx],
@@ -1886,10 +1959,13 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               isEditable={true}
               showHubColumn={true}
               isHubMappedInitially={true}
-              breakdownRequests={records}
+              breakdownRequests={hoMapScopedRecords}
+              allowedTier="head-office-dsp"
+              allowedSubStages={['1.2', '1.3.1']}
+              hierarchyScopeTitle="1. Head Office DSP Management (1.2 & 1.3.1 Only)"
               selectedBreakdownRequestId={activeStage131Record?.id || ''}
               onSelectBreakdownRequest={(reqId) => {
-                const req = records.find(r => r.id === reqId);
+                const req = hoMapScopedRecords.find(r => r.id === reqId);
                 if (req) {
                   setSelectedRecord(req);
                 }
@@ -1987,10 +2063,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           initialColumns={dsp22Columns}
           initialRows={dsp22Rows}
           dspReceivedEpssRows={
-            records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')?.itemsIncluded || []
+            records.find(r => isDossierInTier(r, 'moh-osp-management') && canonicalizeSubStage(r.subStage, r.stage) === '2.1')?.itemsIncluded || []
           }
           dspReceivedMohRows={
-            records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.2')?.itemsIncluded || []
+            records.find(r => isDossierInTier(r, 'head-office-dsp') && canonicalizeSubStage(r.subStage, r.stage) === '1.2')?.itemsIncluded || []
           }
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
@@ -2074,35 +2150,44 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         <Stage4MohSubmittedMatrixTable
           data={
             (selectedRecord &&
-            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
-              selectedRecord.stage === 'moh-to-epss-ho') &&
+            isDossierInTier(selectedRecord, 'moh-osp-management') &&
+            canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' &&
             selectedRecord.stage4MatrixData
               ? selectedRecord.stage4MatrixData
               : records.find(
                   (r) =>
-                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5' &&
                     r.stage4MatrixData
                 )?.stage4MatrixData) || liveAggregatedStage4Data
           }
           hfListItems={hfListItems}
           isEditable={true}
           dossiers={records.filter(
-            (r) => canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho'
+            (r) =>
+              isDossierInTier(r, 'moh-osp-management') &&
+              canonicalizeSubStage(r.subStage, r.stage) === '2.5'
           )}
           selectedDossierId={
             (selectedRecord &&
-            (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
-              selectedRecord.stage === 'moh-to-epss-ho') &&
+            isDossierInTier(selectedRecord, 'moh-osp-management') &&
+            canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' &&
             selectedRecord.stage4MatrixData
               ? selectedRecord.id
               : records.find(
                   (r) =>
-                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5' &&
                     r.stage4MatrixData
                 )?.id) || ''
           }
           onSelectDossier={(dId) => {
-            const req = records.find(r => r.id === dId);
+            const req = records.find(
+              r =>
+                r.id === dId &&
+                isDossierInTier(r, 'moh-osp-management') &&
+                canonicalizeSubStage(r.subStage, r.stage) === '2.5'
+            );
             if (req) {
               setSelectedRecord(req);
             }
@@ -2111,13 +2196,14 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             setRecords(prev => {
               const targetId =
                 (selectedRecord &&
-                (canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5' ||
-                  selectedRecord.stage === 'moh-to-epss-ho')
+                isDossierInTier(selectedRecord, 'moh-osp-management') &&
+                canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '2.5'
                   ? selectedRecord.id
                   : undefined) ||
                 prev.find(
                   (r) =>
-                    (canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho') &&
+                    isDossierInTier(r, 'moh-osp-management') &&
+                    canonicalizeSubStage(r.subStage, r.stage) === '2.5' &&
                     r.stage4MatrixData
                 )?.id;
               const existingIdx = targetId ? prev.findIndex(r => r.id === targetId) : -1;
@@ -2218,9 +2304,9 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             const map131Record: DspWorkflowRecord = {
               ...received12Record,
               id: `dsp-moh-to-epss-12-${ts}-map-131`,
-              stage: 'epss-ho-aggregation',
+              stage: 'head-office-dsp',
               subStage: '1.3.1',
-              stageTitle: '5. EPSS HO Aggregation (from MOH)',
+              stageTitle: '1.3.1 Map HF to Hub',
               status: 'Submitted & Pending'
             };
 
@@ -2284,16 +2370,22 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <option value="Dispatched to Plants">Dispatched to Plants</option>
               </select>
 
-              <select
-                value={stageFilter}
-                onChange={(e) => setStageFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
-              >
-                <option value="all">All Workflow Stages</option>
-                {stagesList.map(s => (
-                  <option key={s.id} value={s.stageKey}>{s.label}</option>
-                ))}
-              </select>
+              {currentStage === 'all' ? (
+                <select
+                  value={stageFilter}
+                  onChange={(e) => setStageFilter(e.target.value)}
+                  className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 cursor-pointer shadow-sm hover:border-slate-300 transition-colors"
+                >
+                  <option value="all">All DSP Management Tiers</option>
+                  {stagesList.map(s => (
+                    <option key={s.id} value={s.stageKey}>{s.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
+                  Isolated: {activeStageObj.label} Only
+                </span>
+              )}
             </div>
           </div>
 
@@ -2334,6 +2426,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                             'S/N': idx + 1,
                             'Date': r.dateSubmitted,
                             'DSP Name': dspInfo.dspName,
+                            'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
                             'Authorized person': dspInfo.authorizedPerson,
                             'Organazation': dspInfo.organization,
                             'Role': dspInfo.role,
@@ -2358,6 +2451,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[210px] italic">DSP Management Hierarchy</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
@@ -2368,7 +2462,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
                         {filteredRecords.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="py-12 text-center bg-slate-50/30">
+                            <td colSpan={9} className="py-12 text-center bg-slate-50/30">
                               <div className="flex flex-col items-center gap-2">
                                 <FileText className="w-8 h-8 text-slate-200" />
                                 <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2388,6 +2482,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                                 </td>
                                 <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
                                   {dspInfo.dspName}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${dspInfo.hierarchyBadgeClasses}`}>
+                                    {dspInfo.hierarchyBadgeText}
+                                  </span>
                                 </td>
                                 <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
                                   {dspInfo.authorizedPerson}
@@ -2450,6 +2549,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                           'S/N': idx + 1,
                           'Date': r.dateSubmitted,
                           'DSP Name': dspInfo.dspName,
+                          'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
                           'Authorized person': dspInfo.authorizedPerson,
                           'Organazation': dspInfo.organization,
                           'Role': dspInfo.role,
@@ -2475,6 +2575,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
                       <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
                       <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 min-w-[210px] italic">DSP Management Hierarchy</th>
                       <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
                       <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
                       <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
@@ -2485,7 +2586,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center bg-slate-50/30">
+                        <td colSpan={9} className="py-12 text-center bg-slate-50/30">
                           <div className="flex flex-col items-center gap-2">
                             <FileText className="w-8 h-8 text-slate-200" />
                             <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2505,6 +2606,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                             </td>
                             <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
                               {dspInfo.dspName}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${dspInfo.hierarchyBadgeClasses}`}>
+                                {dspInfo.hierarchyBadgeText}
+                              </span>
                             </td>
                             <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
                               {dspInfo.authorizedPerson}
@@ -2555,8 +2661,16 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-900">Dossier Details</span>
+                  {(() => {
+                    const hInfo = getDspHierarchyInfo(selectedRecord);
+                    return (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${hInfo.badgeClasses}`}>
+                        {hInfo.badgeText}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 mt-1">
                   {selectedRecord.dspName || selectedRecord.subject.match(/DSP \[(.*?)\]/)?.[1] || selectedRecord.subject}
@@ -3474,6 +3588,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         isOpen={isSavedDraftsManagerOpen}
         onClose={() => setIsSavedDraftsManagerOpen(false)}
         records={records}
+        activeTier={currentStage !== 'all' ? (currentStage as DspHierarchyTierId) : 'all'}
         onUpdateRecord={(updatedRecord) => {
           setRecords(prev => {
             const updated = prev.map(r => r.id === updatedRecord.id ? updatedRecord : r);

@@ -31,7 +31,7 @@ import {
   TODAY_ISO_DATE,
   buildDspTemplateRowsFromStock
 } from '../data/defaultDspRequestTemplateData';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 
 interface DspReceivedFromMohViewProps {
   records: DspWorkflowRecord[];
@@ -79,12 +79,14 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   const is21 = subStageTarget === '2.1';
   const targetSubStage = is21 ? '2.1' : '1.2';
 
-  // Strictly filter dossiers for ONLY the target directional sub-step (no cross-stage bleed or mock defaults)
+  const targetTier = is21 ? 'moh-osp-management' : 'head-office-dsp';
+
+  // Strictly filter dossiers for ONLY the target institutional hierarchy tier + sub-step (no cross-tier bleed)
   const receivedRecords = useMemo(() => {
     return records
-      .filter(r => canonicalizeSubStage(r.subStage, r.stage) === targetSubStage)
+      .filter(r => isDossierInTier(r, targetTier) && canonicalizeSubStage(r.subStage, r.stage) === targetSubStage)
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
-  }, [records, targetSubStage]);
+  }, [records, targetTier, targetSubStage]);
 
   const [selectedDossierId, setSelectedDossierId] = useState<string>('');
   const [showArchiveMatrix, setShowArchiveMatrix] = useState(!is21);
@@ -424,9 +426,13 @@ Attachment: ${folder.letterFileName}`;
     showToast(`✓ Stored exact ${sourceRows.length} EPSS->MOH items as "${dspNameValue}"!`);
   };
 
-  // Clear current subStage records
+  // Clear current subStage records strictly within target tier
   const handleClearReceivedData = () => {
-    setRecords(prev => prev.filter(r => canonicalizeSubStage(r.subStage, r.stage) !== targetSubStage));
+    setRecords(prev =>
+      prev.filter(
+        r => !(isDossierInTier(r, targetTier) && canonicalizeSubStage(r.subStage, r.stage) === targetSubStage)
+      )
+    );
     setSelectedDossierId('');
     showToast(`✓ Cleared ${is21 ? '2.1 Received from EPSS' : '1.2 Received from MOH'} dossiers`);
   };
@@ -644,9 +650,14 @@ Attachment: ${folder.letterFileName}`;
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                  is21 ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-blue-50 text-blue-800 border-blue-200'
+                }`}>
+                  {is21 ? '2. MOH DSP Management • 2.1' : '1. Head Office DSP Management • 1.2'}
+                </span>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  {is21 ? '2.1 EPSS → MOH Official Request Dossiers' : '1.2 MOH → EPSS Health Facility Breakdown Dossiers'}
+                  {is21 ? 'EPSS → MOH Official Request Dossiers' : 'MOH → EPSS Health Facility Breakdown Dossiers'}
                 </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <ShieldCheck className="w-3 h-3 text-emerald-600" />

@@ -1,4 +1,5 @@
 import { DspWorkflowRecord } from '../types';
+import { DspHierarchyTierId, getDspHierarchyInfo } from '../data/defaultDspWorkflows';
 
 export interface DossierDisplayInfo {
   dspName: string;
@@ -6,12 +7,19 @@ export interface DossierDisplayInfo {
   organization: string;
   role: string;
   status: 'Pending' | 'Approved' | 'Under Review' | 'Draft';
+  hierarchyTier: DspHierarchyTierId;
+  hierarchyNumber: 1 | 2 | 3 | 4;
+  hierarchyLabel: string;
+  hierarchyShortLabel: string;
+  subStep: string;
+  subStepLabel: string;
+  hierarchyBadgeText: string;
+  hierarchyBadgeClasses: string;
 }
 
 /**
- * Standardizes DSP Workflow Records for the 8-Column Institutional Table Format:
- * S/N | Date | DSP Name | Authorized person | Organazation | Role | Status | View
- * As specified in user template reference {C8DB306C-47B8-4474-93C2-1A74295BCB3F}.png
+ * Standardizes DSP Workflow Records for the Institutional Table Format
+ * with explicit DSP Management Hierarchy Tier & Sub-Step identification.
  */
 export const getDossierDisplayInfo = (rec: DspWorkflowRecord, idx: number = 0): DossierDisplayInfo => {
   // 1. Clean DSP Name (Clean project name - Priority: what user wrote manually in rec.dspName)
@@ -156,5 +164,21 @@ export const getDossierDisplayInfo = (rec: DspWorkflowRecord, idx: number = 0): 
     status = 'Pending';
   }
 
-  return { dspName, authorizedPerson, organization, role, status };
+  const hierarchy = getDspHierarchyInfo(rec);
+
+  return {
+    dspName,
+    authorizedPerson,
+    organization,
+    role,
+    status,
+    hierarchyTier: hierarchy.tierId,
+    hierarchyNumber: hierarchy.tierNumber,
+    hierarchyLabel: hierarchy.tierLabel,
+    hierarchyShortLabel: hierarchy.shortTierLabel,
+    subStep: hierarchy.subStep,
+    subStepLabel: hierarchy.subStepLabel,
+    hierarchyBadgeText: hierarchy.badgeText,
+    hierarchyBadgeClasses: hierarchy.badgeClasses,
+  };
 };

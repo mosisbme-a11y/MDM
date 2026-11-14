@@ -38,6 +38,7 @@ import {
   mapFacilityToHub
 } from '../data/epssHubs';
 import { formatNumber } from '../utils/formatters';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 
 export interface Stage5AllocationItem {
   id: string;
@@ -112,19 +113,22 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   onProceedToOrderProcess,
   onTriggerCloudSync
 }) => {
-  // Strictly source ONLY dossiers that already received mapped HF->Hub data from 1.3.1 Map HF to Hub
+  // Strictly isolated to Head Office DSP Management (1.3.1 Map HF to Hub / 1.3.3 / 1.3.4) — excludes MOH 2.x, RHB 3.x, Branch 4.x
   const stage5Dossiers = useMemo(() => {
-    return records.filter(r =>
-      r.hubAggregationData?.mappedFromMapHfToHub === true ||
-      (r.hubAggregationData?.status === 'Mapped & Ready' &&
-        Array.isArray(r.hubAggregationData?.allocations) &&
-        r.hubAggregationData.allocations.length > 0 &&
-        Array.isArray(r.hubAggregationData?.columns) &&
-        r.hubAggregationData.columns.length > 0) ||
-      (r.stage === 'epss-ho-aggregation' &&
-        (r.subStage === '1.3.1' || r.subStage === '1.3') &&
-        Boolean(r.facilityMatrixData?.rows?.some(row => Boolean(row.hub && row.hub.trim() && row.hub !== 'HO01'))))
-    );
+    return records.filter(r => {
+      if (!isDossierInTier(r, 'head-office-dsp')) return false;
+      const sub = canonicalizeSubStage(r.subStage, r.stage);
+      return (
+        r.hubAggregationData?.mappedFromMapHfToHub === true ||
+        (r.hubAggregationData?.status === 'Mapped & Ready' &&
+          Array.isArray(r.hubAggregationData?.allocations) &&
+          r.hubAggregationData.allocations.length > 0 &&
+          Array.isArray(r.hubAggregationData?.columns) &&
+          r.hubAggregationData.columns.length > 0) ||
+        ((sub === '1.3.1' || sub === '1.3' || sub === '1.3.3' || sub === '1.3.4') &&
+          Boolean(r.facilityMatrixData?.rows?.some(row => Boolean(row.hub && row.hub.trim() && row.hub !== 'HO01'))))
+      );
+    });
   }, [records]);
 
   // Selected Dossier State

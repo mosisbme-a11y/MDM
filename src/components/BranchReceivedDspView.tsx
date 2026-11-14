@@ -16,7 +16,7 @@ import {
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
 import { formatNumber } from '../utils/formatters';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { getHubByCode } from '../data/epssHubs';
 
 interface BranchReceivedDspViewProps {
@@ -56,7 +56,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
     return records
       .filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        return r.stage === 'branches-dsp-management' || sub === '4.1' || sub === '4.2';
+        return isDossierInTier(r, 'branches-dsp-management') && (sub === '4.1' || sub === '4.2');
       })
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records]);
@@ -326,7 +326,10 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
             {mode === '4.1' ? <Warehouse className="w-5 h-5" /> : <BarChart3 className="w-5 h-5" />}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-purple-50 text-purple-800 border border-purple-200">
+                4. Branches DSP Management • {mode}
+              </span>
               <h3 className="text-sm md:text-base font-black text-slate-900 uppercase">
                 {mode === '4.1' ? '4.1 Branch Received DSP (From EPSS Head Office)' : '4.2 Branch SOH Analysis & Compare with DSP'}
               </h3>

@@ -42,6 +42,12 @@ import { formatNumber, formatCurrency } from '../utils/formatters';
 import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
+import {
+  DspHierarchyTierId,
+  canonicalizeSubStage,
+  getDspHierarchyInfo,
+  isDossierInTier
+} from '../data/defaultDspWorkflows';
 import { EPSS_HUBS_REGISTRY, mapFacilityToHub } from '../data/epssHubs';
 
 export interface RegionBreakdownColumn {
@@ -204,6 +210,9 @@ interface RegionBreakdownMatrixTableProps {
   enableRhbMultiAutoPopulate?: boolean;
   onProceedToAggregation?: () => void;
   onTransmitRecord?: (record: DspWorkflowRecord) => void;
+  allowedTier?: DspHierarchyTierId;
+  allowedSubStages?: string[];
+  hierarchyScopeTitle?: string;
 }
 
 export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProps> = ({
@@ -222,8 +231,21 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   isHubMappedInitially = false,
   enableRhbMultiAutoPopulate = false,
   onProceedToAggregation,
-  onTransmitRecord
+  onTransmitRecord,
+  allowedTier,
+  allowedSubStages,
+  hierarchyScopeTitle
 }) => {
+  const scopedBreakdownRequests = useMemo(() => {
+    return (breakdownRequests || []).filter((r: DspWorkflowRecord) => {
+      if (allowedTier && !isDossierInTier(r, allowedTier)) return false;
+      if (allowedSubStages && allowedSubStages.length > 0) {
+        const sub = canonicalizeSubStage(r.subStage, r.stage);
+        if (!allowedSubStages.includes(sub)) return false;
+      }
+      return true;
+    });
+  }, [breakdownRequests, allowedTier, allowedSubStages]);
   const [internalDate, setInternalDate] = useState<string>(data?.date || new Date().toISOString().split('T')[0]);
   const [columns, setColumns] = useState<RegionBreakdownColumn[]>(data?.columns || DEFAULT_STAGE_3_COLUMNS);
   const [rows, setRows] = useState<RegionBreakdownRow[]>(data?.rows || DEFAULT_STAGE_3_ROWS);
@@ -463,8 +485,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
   const handleSelectBreakdownRequest = (reqId: string) => {
     setSelectedRequestId(reqId);
-    if (!breakdownRequests) return;
-    const matched = breakdownRequests.find(r => r.id === reqId);
+    if (!scopedBreakdownRequests) return;
+    const matched = scopedBreakdownRequests.find(r => r.id === reqId);
     if (!matched) return;
 
     if (onSelectBreakdownRequest) {
@@ -1615,25 +1637,28 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               </span>
             </button>
 
-            {/* Breakdown Request Selector - Clean button opening 8-column Table Modal */}
-            {!disableBreakdownLink && breakdownRequests && breakdownRequests.length > 0 && (
+            {/* Breakdown Request Selector - Clean button opening isolated Hierarchy Table Modal */}
+            {!disableBreakdownLink && (scopedBreakdownRequests.length > 0 || hierarchyScopeTitle) && (
               <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-amber-300 shadow-2xs">
                 <span className="text-xs font-bold text-slate-700 pl-1">Request:</span>
                 <button
                   type="button"
                   onClick={() => setIsRequestModalOpen(true)}
-                  className="bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg px-2.5 py-1 text-xs text-amber-950 font-bold cursor-pointer transition flex items-center gap-1.5 max-w-xs truncate shadow-2xs"
-                  title="Open Institutional Request Selection Table"
+                  className="bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-lg px-2.5 py-1 text-xs text-amber-950 font-bold cursor-pointer transition flex items-center gap-1.5 max-w-sm truncate shadow-2xs"
+                  title="Open Isolated DSP Management Request Selection Table"
                 >
                   <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span className="truncate">
                     {selectedRequestId
                       ? (() => {
-                          const sel = breakdownRequests.find(r => r.id === selectedRequestId);
-                          if (!sel) return 'Selected Request';
-                          return getDossierDisplayInfo(sel).dspName || sel.dspName || sel.dspRefNumber;
+                          const sel = scopedBreakdownRequests.find(r => r.id === selectedRequestId);
+                          if (!sel) return hierarchyScopeTitle ? `Select (${hierarchyScopeTitle})` : '-- Select Request --';
+                          const info = getDossierDisplayInfo(sel);
+                          return `[${info.subStep}] ${info.dspName || sel.dspName || sel.dspRefNumber}`;
                         })()
-                      : '-- Select Breakdown Request --'}
+                      : hierarchyScopeTitle
+                        ? `-- Select (${hierarchyScopeTitle}) --`
+                        : '-- Select Breakdown Request --'}
                   </span>
                   <ChevronDown className="w-3 h-3 text-amber-700 shrink-0" />
                 </button>
@@ -3170,8 +3195,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Select Breakdown Request Source Data</h3>
-                  <p className="text-xs text-slate-500">Choose an official request dossier from the institutional table below</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">Select Breakdown Request Source Data</h3>
+                    {hierarchyScopeTitle && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-50 text-orange-800 border border-orange-200">
+                        Isolated: {hierarchyScopeTitle}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {hierarchyScopeTitle
+                      ? `Strictly isolated to ${hierarchyScopeTitle} — dossiers from other DSP Management tiers (e.g. EPSS HO / MOH / Branches) are excluded.`
+                      : 'Choose an official request dossier from the institutional table below'}
+                  </p>
                 </div>
               </div>
 
@@ -3210,24 +3246,27 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
                     <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-48 italic">DSP Management Hierarchy</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-40 italic">Authorized person</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Role</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
                     <th className="py-2.5 px-3 text-center w-28 italic">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
-                  {breakdownRequests.length === 0 ? (
+                  {scopedBreakdownRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 font-medium italic">
-                        No breakdown requests available.
+                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium italic">
+                        {hierarchyScopeTitle
+                          ? `No dossiers available in ${hierarchyScopeTitle}.`
+                          : 'No breakdown requests available.'}
                       </td>
                     </tr>
                   ) : (
-                    breakdownRequests.map((rec, idx) => {
+                    scopedBreakdownRequests.map((rec, idx) => {
                       const dspInfo = getDossierDisplayInfo(rec, idx);
                       const isSelected = selectedRequestId === rec.id;
                       return (
@@ -3239,6 +3278,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                         >
                           <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
                             {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${dspInfo.hierarchyBadgeClasses}`}>
+                              {dspInfo.hierarchyShortLabel} • {dspInfo.subStep} {dspInfo.subStepLabel}
+                            </span>
                           </td>
                           <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
                             {rec.dateSubmitted}
@@ -3288,7 +3332,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
               <span className="text-xs text-slate-500">
-                Total Requests Available: <strong className="text-slate-800">{breakdownRequests.length}</strong>
+                Isolated Dossiers Available: <strong className="text-slate-800">{scopedBreakdownRequests.length}</strong>
               </span>
               <div className="flex items-center gap-2">
                 <button

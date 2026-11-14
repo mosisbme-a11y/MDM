@@ -17,11 +17,13 @@ import {
 } from 'lucide-react';
 import { DspWorkflowRecord } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
+import { DspHierarchyTierId, getDspHierarchyInfo, isDossierInTier } from '../data/defaultDspWorkflows';
 
 interface SavedDraftsManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: DspWorkflowRecord[];
+  activeTier?: DspHierarchyTierId | 'all';
   onUpdateRecord: (updatedRecord: DspWorkflowRecord) => void;
   onDeleteRecord: (id: string) => void;
   onSubmitDraft: (record: DspWorkflowRecord) => void;
@@ -31,6 +33,7 @@ export const SavedDraftsManagerModal: React.FC<SavedDraftsManagerModalProps> = (
   isOpen,
   onClose,
   records,
+  activeTier = 'all',
   onUpdateRecord,
   onDeleteRecord,
   onSubmitDraft
@@ -41,7 +44,14 @@ export const SavedDraftsManagerModal: React.FC<SavedDraftsManagerModalProps> = (
 
   if (!isOpen) return null;
 
-  const draftRecords = records.filter(r => (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft');
+  const draftRecords = records.filter(r => {
+    const isDraft = (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft';
+    if (!isDraft) return false;
+    if (activeTier && activeTier !== 'all') {
+      return isDossierInTier(r, activeTier);
+    }
+    return true;
+  });
   
   const filteredDrafts = draftRecords.filter(d => 
     d.dspRefNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,11 +151,16 @@ export const SavedDraftsManagerModal: React.FC<SavedDraftsManagerModalProps> = (
                 >
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {(() => {
+                        const hInfo = getDspHierarchyInfo(draft);
+                        return (
+                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${hInfo.badgeClasses}`}>
+                            {hInfo.badgeText}
+                          </span>
+                        );
+                      })()}
                       <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono text-[10px] font-bold">
                         {draft.dspRefNumber}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
-                        {draft.stageTitle || draft.stage}
                       </span>
                       <span className="text-[10px] text-slate-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />

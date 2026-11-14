@@ -54,7 +54,7 @@ import {
   downloadDspRequestCSV,
   generateDspRequestExcelBlob
 } from '../data/defaultDspRequestTemplateData';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { EpssSubTab } from '../types';
 import { getAccessToken, googleSignIn } from '../utils/googleWorkspace';
 import { loadGmailTemplates, formatGmailSubject, formatGmailBody } from '../utils/gmailTemplates';
@@ -173,7 +173,14 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     } catch {}
 
     for (const r of (records || [])) {
-      if (Array.isArray(r.itemsIncluded) && r.itemsIncluded.length > 0 && r.itemsIncluded.length <= 50) {
+      const sub = canonicalizeSubStage(r.subStage, r.stage);
+      if (
+        isDossierInTier(r, 'head-office-dsp') &&
+        sub === '1.1' &&
+        Array.isArray(r.itemsIncluded) &&
+        r.itemsIncluded.length > 0 &&
+        r.itemsIncluded.length <= 50
+      ) {
         return r.itemsIncluded.map((it: any, idx: number) => ({
           id: `trans-item-${idx}-${r.id}`,
           srNo: idx + 1,
@@ -1095,7 +1102,10 @@ Authorized Directorate Desk`;
             </button>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                  1. Head Office DSP Management • 1.1
+                </span>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Linked with Multiple Stock (Program HP Only)
                 </span>
@@ -1104,7 +1114,7 @@ Authorized Directorate Desk`;
                   Auto-fill Active
                 </span>
               </div>
-              <div className="text-xs font-semibold text-slate-700">
+              <div className="text-xs font-semibold text-slate-700 mt-0.5">
                 DSP Management: {dspName || "National Medical Equipment Allocation"}
               </div>
             </div>

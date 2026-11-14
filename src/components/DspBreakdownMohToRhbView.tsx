@@ -42,7 +42,7 @@ import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatCurrency, formatNumber } from '../utils/formatters';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { getAccessToken } from '../utils/googleWorkspace';
 import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
 
@@ -223,7 +223,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const handleSelectBreakdownRequestSource = (reqId: string) => {
     setSelectedBreakdownRequestId(reqId);
     if (!reqId) return;
-    const req = records.find(r => r.id === reqId);
+    const req = mohReceivedEpssDossiers.find(r => r.id === reqId);
     if (req) {
       const dspInfo = getDossierDisplayInfo(req);
       if (dspInfo.dspName) setManualDspName(dspInfo.dspName);
@@ -277,7 +277,22 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     return () => clearTimeout(timer);
   }, [columns, rows]);
 
-  // Extract EXACT items transmitted from EPSS to MOH (Stage 2.1)
+  // Strictly isolated to MOH DSP Management (Sub-step 2.1: DSP Received from EPSS) — never mix EPSS 1.x, RHB 3.x, or Branch 4.x dossiers
+  const mohReceivedEpssDossiers = useMemo(() => {
+    return (records || [])
+      .filter(r => {
+        const sub = canonicalizeSubStage(r.subStage, r.stage);
+        return (
+          isDossierInTier(r, 'moh-osp-management') &&
+          sub === '2.1' &&
+          Array.isArray(r.itemsIncluded) &&
+          r.itemsIncluded.length > 0
+        );
+      })
+      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
+  }, [records]);
+
+  // Extract EXACT items transmitted from EPSS to MOH (strictly MOH Stage 2.1)
   const exactTransmittedItems = useMemo(() => {
     const list: Array<{ 
       id: string; 
@@ -291,15 +306,10 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       totalAmount?: number;
     }> = [];
     
-    // Find the official record received from EPSS (Stage 2.1 or 1.1)
-    const epss21Records = records.filter(r => {
-      const sub = canonicalizeSubStage(r.subStage, r.stage);
-      return sub === '2.1' && r.stage === 'moh-osp-management';
-    }).sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
-
-    const targetRecord = epss21Records[0] 
-      || records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '2.1')
-      || records.find(r => canonicalizeSubStage(r.subStage, r.stage) === '1.1');
+    const targetRecord =
+      (selectedBreakdownRequestId
+        ? mohReceivedEpssDossiers.find(r => r.id === selectedBreakdownRequestId)
+        : undefined) || mohReceivedEpssDossiers[0];
 
     const sourceRef = targetRecord?.dspRefNumber || 'MOH/PMD-DSP/2026/797';
 
@@ -952,12 +962,15 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </span>
             </div>
             <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-400/30 font-black">
+                  2. MOH DSP Management • 2.2 DSP Request to RHB
+                </span>
                 <span>MOH PMD Directorate | Regional Health Bureaus</span>
                 <span className="text-emerald-400 font-mono font-bold">• All 15 Ethiopian Regions Active</span>
               </div>
-              <div className="text-xs font-semibold text-slate-200">
-                Official Quota Breakdown Matrix Template (Sub-step 2.2)
+              <div className="text-xs font-semibold text-slate-200 mt-0.5">
+                Official Quota Breakdown Matrix Template (Sub-step 2.2 — Isolated MOH Tier)
               </div>
             </div>
           </div>
@@ -1115,11 +1128,12 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               <span>
                 {selectedBreakdownRequestId
                   ? (() => {
-                      const sel = records.find(r => r.id === selectedBreakdownRequestId);
-                      if (!sel) return 'Selected Request';
-                      return getDossierDisplayInfo(sel).dspName || sel.dspName || sel.dspRefNumber;
+                      const sel = mohReceivedEpssDossiers.find(r => r.id === selectedBreakdownRequestId);
+                      if (!sel) return '-- Select MOH 2.1 Dossier --';
+                      const info = getDossierDisplayInfo(sel);
+                      return `[2.1] ${info.dspName || sel.dspName || sel.dspRefNumber}`;
                     })()
-                  : '-- Select Breakdown Request --'}
+                  : '-- Select MOH 2.1 Received EPSS Dossier --'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
@@ -2406,8 +2420,15 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Select Breakdown Request Source Data</h3>
-                  <p className="text-xs text-slate-500">Choose an official request dossier from the institutional table below</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">Select MOH 2.1 Received Dossier</h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-50 text-teal-800 border border-teal-200">
+                      Isolated: 2. MOH DSP Management (2.1 Only)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Strictly isolated to MOH DSP Management (Sub-step 2.1 DSP Received from EPSS). EPSS HO (1.x), RHB (3.x), and Branch (4.x) dossiers are excluded.
+                  </p>
                 </div>
               </div>
 
@@ -2446,24 +2467,25 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
                     <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-48 italic">DSP Management Hierarchy</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-40 italic">Authorized person</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                    <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Role</th>
                     <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
                     <th className="py-2.5 px-3 text-center w-28 italic">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
-                  {records.filter(r => r.itemsIncluded && r.itemsIncluded.length > 0).length === 0 ? (
+                  {mohReceivedEpssDossiers.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 font-medium italic">
-                        No breakdown requests available. Transmit a request from EPSS or MOH first.
+                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium italic">
+                        No MOH 2.1 dossiers available yet. Receive a DSP Request from EPSS HO into Sub-step 2.1 first.
                       </td>
                     </tr>
                   ) : (
-                    records.filter(r => r.itemsIncluded && r.itemsIncluded.length > 0).map((rec, idx) => {
+                    mohReceivedEpssDossiers.map((rec, idx) => {
                       const dspInfo = getDossierDisplayInfo(rec, idx);
                       const isSelected = selectedBreakdownRequestId === rec.id;
                       return (
@@ -2475,6 +2497,11 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                         >
                           <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
                             {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 border-r border-slate-100">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${dspInfo.hierarchyBadgeClasses}`}>
+                              {dspInfo.hierarchyShortLabel} • {dspInfo.subStep} {dspInfo.subStepLabel}
+                            </span>
                           </td>
                           <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
                             {rec.dateSubmitted}
@@ -2508,7 +2535,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                                 setIsSelectRequestModalOpen(false);
                               }}
                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs active:scale-95"
-                              title="Select this breakdown request"
+                              title="Select this MOH 2.1 dossier"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span>{isSelected ? 'Selected' : 'View'}</span>
@@ -2524,7 +2551,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
               <span className="text-xs text-slate-500">
-                Total Requests Available: <strong className="text-slate-800">{records.filter(r => r.itemsIncluded && r.itemsIncluded.length > 0).length}</strong>
+                MOH 2.1 Dossiers Available: <strong className="text-slate-800">{mohReceivedEpssDossiers.length}</strong>
               </span>
               <div className="flex items-center gap-2">
                 <button

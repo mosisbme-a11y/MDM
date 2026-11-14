@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { DspWorkflowRecord } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
+import { getDspHierarchyInfo, isDossierInTier, DspHierarchyTierId } from '../data/defaultDspWorkflows';
 
 export interface StageSourceDataModalProps {
   isOpen: boolean;
@@ -33,18 +34,27 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
   const [selectedRecordDetail, setSelectedRecordDetail] = useState<DspWorkflowRecord | null>(null);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
 
-  // Filter records matching this stage
+  // Filter records strictly matching this stage / hierarchy tier
   const stageRecords = useMemo(() => {
-    return records.filter(r => {
-      const s = r.stage as string;
-      if (stageKey === 'moh-to-epss' && (s === 'moh-to-epss' || s === 'dsp-mgmt')) return true;
-      if (stageKey === 'rhb-to-moh' && s === 'rhb-to-moh') return true;
-      if (stageKey === 'moh-to-rhb' && s === 'moh-to-rhb') return true;
-      if (stageKey === 'moh-to-epss-ho' && s === 'moh-to-epss-ho') return true;
-      if (stageKey === 'epss-ho-aggregation' && s === 'epss-ho-aggregation') return true;
-      if (stageKey === 'epss-branch-dispatch' && (s === 'epss-branch-dispatch' || s === 'epss-to-branch')) return true;
-      return s === stageKey;
-    });
+    const tierAliases: Record<string, DspHierarchyTierId> = {
+      'head-office-dsp': 'head-office-dsp',
+      'epss-ho-aggregation': 'head-office-dsp',
+      'moh-to-epss': 'head-office-dsp',
+      'dsp-mgmt': 'head-office-dsp',
+      'moh-osp-management': 'moh-osp-management',
+      'moh-to-rhb': 'moh-osp-management',
+      'moh-to-epss-ho': 'moh-osp-management',
+      'rhb-breakdown-management': 'rhb-breakdown-management',
+      'rhb-to-moh': 'rhb-breakdown-management',
+      'branches-dsp-management': 'branches-dsp-management',
+      'epss-to-branch': 'branches-dsp-management',
+      'epss-branch-dispatch': 'branches-dsp-management',
+    };
+    const matchedTier = tierAliases[stageKey];
+    if (matchedTier) {
+      return records.filter(r => isDossierInTier(r, matchedTier));
+    }
+    return records.filter(r => (r.stage as string) === stageKey);
   }, [records, stageKey]);
 
   const filteredRecords = useMemo(() => {
@@ -156,7 +166,15 @@ export const StageSourceDataModal: React.FC<StageSourceDataModalProps> = ({
                   className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
                   <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const hInfo = getDspHierarchyInfo(rec);
+                        return (
+                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black ${hInfo.badgeClasses}`}>
+                            {hInfo.badgeText}
+                          </span>
+                        );
+                      })()}
                       <span className="px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 font-mono text-xs font-black border border-amber-200">
                         {rec.dspRefNumber}
                       </span>

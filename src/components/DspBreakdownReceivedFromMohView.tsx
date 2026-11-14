@@ -21,7 +21,7 @@ import {
   RegionBreakdownMatrixData
 } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatters';
-import { canonicalizeSubStage } from '../data/defaultDspWorkflows';
+import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 
 interface Props {
   records: DspWorkflowRecord[];
@@ -52,12 +52,12 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
   onSelectRecordForBreakdown,
   onTriggerCloudSync
 }) => {
-  // Strictly collect ONLY dossiers sent from MOH to RHBs (Sub-step 3.1 / moh-to-rhb)
+  // Strictly isolated to RHB Breakdown Management (Sub-step 3.1: Breakdown Received from MOH) — excludes EPSS 1.x, MOH 2.x, Branch 4.x
   const receivedMohDossiers = useMemo(() => {
     return records
       .filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        return sub === '3.1' || r.stage === 'moh-to-rhb';
+        return isDossierInTier(r, 'rhb-breakdown-management') && sub === '3.1';
       })
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records]);
@@ -427,8 +427,11 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
             </div>
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Sub-step 3.1 • Breakdown Received from MOH
+                <span className="px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase bg-orange-500/20 text-orange-300 border border-orange-400/40">
+                  3. RHB Breakdown Management • Sub-step 3.1
+                </span>
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  RHB Isolated (EPSS &amp; MOH Excluded)
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
                   • MOH ➔ RHB Regional Quota Dossiers
@@ -438,7 +441,7 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
                 Breakdown Received from MOH (RHB Incoming Dossiers)
               </h1>
               <p className="text-xs text-slate-300 mt-0.5">
-                Displays the exact Regional Quota Matrix sent by MOH PMD Directorate in Sub-step 2.2, preserving per-region quantities, dates, and budget sources.
+                Displays ONLY RHB Sub-step 3.1 Regional Quota Dossiers received from MOH PMD Directorate (strictly separated from EPSS Head Office &amp; Branch dossiers).
               </p>
             </div>
           </div>
