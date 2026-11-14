@@ -87,6 +87,7 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [inspectingRecord, setInspectingRecord] = useState<ReceivingDataRecord | null>(null);
+  const [showLedgerTable, setShowLedgerTable] = useState(false);
 
   // Automated Stock Holding Alert System State (default 90 days threshold)
   const [alertThresholdDays, setAlertThresholdDays] = useState<number>(90);
@@ -596,7 +597,11 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setSelectedHoldingFilter(selectedHoldingFilter === 'alertExceeded' ? 'all' : 'alertExceeded')}
+              onClick={() => {
+                const next = selectedHoldingFilter === 'alertExceeded' ? 'all' : 'alertExceeded';
+                setSelectedHoldingFilter(next);
+                if (next === 'alertExceeded') setShowLedgerTable(true);
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
                 selectedHoldingFilter === 'alertExceeded'
                   ? 'bg-rose-800 text-white ring-2 ring-rose-400'
@@ -759,7 +764,9 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
         <div
           onClick={() => {
             if (alertCount > 0) {
-              setSelectedHoldingFilter(selectedHoldingFilter === 'alertExceeded' ? 'all' : 'alertExceeded');
+              const next = selectedHoldingFilter === 'alertExceeded' ? 'all' : 'alertExceeded';
+              setSelectedHoldingFilter(next);
+              if (next === 'alertExceeded') setShowLedgerTable(true);
             } else {
               setIsAlertModalOpen(true);
             }
@@ -836,9 +843,32 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
       <ReceivingDataAnalyticsSection
         receivingRecords={activeRecords}
         items={items}
+        collapsible={true}
         onOpenUploadModal={isAdmin ? () => setIsUploadModalOpen(true) : undefined}
       />
 
+      {/* Collapsible Detailed Receiving Ledger (Collected matching Plant-by-Plant Receiving Matrix appearance) */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setShowLedgerTable(!showLedgerTable)}
+          className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <FileSpreadsheet className="w-4 h-4 text-teal-600" />
+            <span>Detailed Receiving Data Ledger (GRN &amp; Stock Holding Days)</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-teal-100 text-teal-800">
+              {filteredRecords.length.toLocaleString()} Consignments
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-500 shrink-0">
+            <span>{showLedgerTable ? 'Hide Matrix' : 'View Matrix'}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showLedgerTable ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {showLedgerTable && (
+          <div className="p-3 border-t border-slate-200 space-y-3">
       {/* Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
         <div className="relative flex-1 min-w-[240px]">
@@ -1253,6 +1283,9 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
           </table>
         </div>
       </div>
+          </div>
+        )}
+      </div>
 
       {/* Automated Stock Holding Floating Alert Toast */}
       {alertCount > 0 && !isAlertBannerDismissed && (
@@ -1285,6 +1318,7 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
                   type="button"
                   onClick={() => {
                     setSelectedHoldingFilter('alertExceeded');
+                    setShowLedgerTable(true);
                     window.scrollTo({ top: 380, behavior: 'smooth' });
                   }}
                   className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"

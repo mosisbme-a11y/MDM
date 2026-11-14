@@ -51,6 +51,7 @@ interface ReceivingDataAnalyticsSectionProps {
   onOpenUploadModal?: () => void;
   className?: string;
   isDashboardEmbedded?: boolean;
+  collapsible?: boolean;
 }
 
 // Plant code to friendly name lookup in EPSS network
@@ -179,7 +180,8 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
   onNavigateTab,
   onOpenUploadModal,
   className = '',
-  isDashboardEmbedded = false
+  isDashboardEmbedded = false,
+  collapsible = false
 }) => {
   // Filter States
   const [timePreset, setTimePreset] = useState<'all' | 'last-30' | 'last-90' | 'ytd' | 'custom'>('all');
@@ -193,6 +195,7 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
   const [barChartGrouping, setBarChartGrouping] = useState<'plant' | 'time'>('plant');
   const [pieChartTarget, setPieChartTarget] = useState<'program' | 'plant'>('program');
   const [showDataTable, setShowDataTable] = useState(false);
+  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState(!collapsible);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isQuickExporting, setIsQuickExporting] = useState(false);
 
@@ -725,6 +728,30 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
 
   return (
     <div className={`space-y-4 ${className}`}>
+      {collapsible && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setIsAnalyticsExpanded(!isAnalyticsExpanded)}
+            className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer"
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <Building2 className="w-4 h-4 text-teal-600" />
+              <span>Receiving Data Analytics &amp; Plant-by-Plant Matrix (RDF vs Health Program)</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-teal-100 text-teal-800">
+                {plantBarData.length} EPSS Plants
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 shrink-0">
+              <span>{isAnalyticsExpanded ? 'Hide Matrix' : 'View Matrix'}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isAnalyticsExpanded ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+        </div>
+      )}
+
+      {isAnalyticsExpanded && (
+        <>
       {/* 1. Header & Controls Card */}
       <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-indigo-950 text-white p-5 rounded-2xl shadow-md border border-teal-800/40 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1357,6 +1384,8 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Export Charts Modal */}
       <ExportChartsModal

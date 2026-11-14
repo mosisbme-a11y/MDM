@@ -14,6 +14,7 @@ import {
   Hospital,
   Warehouse,
   ChevronRight,
+  ChevronDown,
   ExternalLink,
   PlusCircle,
   FileCheck,
@@ -451,6 +452,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stage131ViewMode, setStage131ViewMode] = useState<'matrix' | 'tools'>('matrix');
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
+  const [showHeadOfficeSummaryMatrix, setShowHeadOfficeSummaryMatrix] = useState(false);
 
 
   // Take Action modal state for EPSS to MOH requests
@@ -696,6 +698,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         return { currentStage: 'all', currentSubStep: 'all' };
     }
   }, [currentSubTab]);
+
+  useEffect(() => {
+    if (currentStage === 'head-office-dsp') {
+      setShowHeadOfficeSummaryMatrix(false);
+    }
+  }, [currentStage, currentSubStep]);
 
   const liveAggregatedStage4Data = useMemo<Stage4MatrixData>(() => {
     const agg = aggregateRhbSubmissionsToMoh(records);
@@ -2352,118 +2360,250 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {/* Mechanism 1: Request Items & Order Process Master Table */}
 
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
-                  Summary: {currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} ({filteredRecords.length} Documents)
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
+          {currentStage === 'head-office-dsp' ? (
+            <>
               <button
                 type="button"
-                onClick={() => {
-                  const csv = filteredRecords.map((r, idx) => {
-                    const dspInfo = getDossierDisplayInfo(r, idx);
-                    return {
-                      'S/N': idx + 1,
-                      'Date': r.dateSubmitted,
-                      'DSP Name': dspInfo.dspName,
-                      'Authorized person': dspInfo.authorizedPerson,
-                      'Organazation': dspInfo.organization,
-                      'Role': dspInfo.role,
-                      'Status': dspInfo.status,
-                      'Reference': r.dspRefNumber
-                    };
-                  });
-                  downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
-                }}
-                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                onClick={() => setShowHeadOfficeSummaryMatrix(!showHeadOfficeSummaryMatrix)}
+                className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export Summary CSV</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
+                    Summary: {stagesList.find(s => s.stageKey === currentStage)?.label}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-100 text-amber-800">
+                    {filteredRecords.length} Documents
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-slate-500 shrink-0">
+                  <span>{showHeadOfficeSummaryMatrix ? 'Hide Matrix' : 'View Matrix'}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showHeadOfficeSummaryMatrix ? 'rotate-180' : ''}`} />
+                </div>
               </button>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            {/* User-Requested Summary Template */}
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
-                  <th className="py-2.5 px-3 text-center w-20 italic">View</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
-                {filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center bg-slate-50/30">
-                      <div className="flex flex-col items-center gap-2">
-                        <FileText className="w-8 h-8 text-slate-200" />
-                        <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecords.map((rec, idx) => {
-                    const dspInfo = getDossierDisplayInfo(rec, idx);
-                    return (
-                      <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
-                        <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
-                          {idx + 1}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
-                          {rec.dateSubmitted}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                          {dspInfo.dspName}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
-                          {dspInfo.authorizedPerson}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                          {dspInfo.organization}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
-                          {dspInfo.role}
-                        </td>
-                        <td className="py-2.5 px-3 border-r border-slate-100 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            dspInfo.status === 'Approved' 
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}>
-                            {dspInfo.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecord(rec)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
-                            title="View dossier details"
-                          >
-                            <Eye className="w-3 h-3 text-amber-600" />
-                            <span>View</span>
-                          </button>
+              {showHeadOfficeSummaryMatrix && (
+                <div className="border-t border-slate-200">
+                  <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-200 flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csv = filteredRecords.map((r, idx) => {
+                          const dspInfo = getDossierDisplayInfo(r, idx);
+                          return {
+                            'S/N': idx + 1,
+                            'Date': r.dateSubmitted,
+                            'DSP Name': dspInfo.dspName,
+                            'Authorized person': dspInfo.authorizedPerson,
+                            'Organazation': dspInfo.organization,
+                            'Role': dspInfo.role,
+                            'Status': dspInfo.status,
+                            'Reference': r.dspRefNumber
+                          };
+                        });
+                        downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
+                      }}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export Summary CSV</span>
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    {/* User-Requested Summary Template */}
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
+                          <th className="py-2.5 px-3 text-center w-20 italic">View</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
+                        {filteredRecords.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="py-12 text-center bg-slate-50/30">
+                              <div className="flex flex-col items-center gap-2">
+                                <FileText className="w-8 h-8 text-slate-200" />
+                                <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredRecords.map((rec, idx) => {
+                            const dspInfo = getDossierDisplayInfo(rec, idx);
+                            return (
+                              <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
+                                <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                                  {idx + 1}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
+                                  {rec.dateSubmitted}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                                  {dspInfo.dspName}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                                  {dspInfo.authorizedPerson}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                                  {dspInfo.organization}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                                  {dspInfo.role}
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    dspInfo.status === 'Approved' 
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                                  }`}>
+                                    {dspInfo.status}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRecord(rec)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                                    title="View dossier details"
+                                  >
+                                    <Eye className="w-3 h-3 text-amber-600" />
+                                    <span>View</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
+                      Summary: {currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} ({filteredRecords.length} Documents)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csv = filteredRecords.map((r, idx) => {
+                        const dspInfo = getDossierDisplayInfo(r, idx);
+                        return {
+                          'S/N': idx + 1,
+                          'Date': r.dateSubmitted,
+                          'DSP Name': dspInfo.dspName,
+                          'Authorized person': dspInfo.authorizedPerson,
+                          'Organazation': dspInfo.organization,
+                          'Role': dspInfo.role,
+                          'Status': dspInfo.status,
+                          'Reference': r.dspRefNumber
+                        };
+                      });
+                      downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
+                    }}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Summary CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {/* User-Requested Summary Template */}
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
+                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
+                      <th className="py-2.5 px-3 text-center w-20 italic">View</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
+                    {filteredRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center bg-slate-50/30">
+                          <div className="flex flex-col items-center gap-2">
+                            <FileText className="w-8 h-8 text-slate-200" />
+                            <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
+                          </div>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      filteredRecords.map((rec, idx) => {
+                        const dspInfo = getDossierDisplayInfo(rec, idx);
+                        return (
+                          <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
+                            <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
+                              {rec.dateSubmitted}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                              {dspInfo.dspName}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                              {dspInfo.authorizedPerson}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                              {dspInfo.organization}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                              {dspInfo.role}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                dspInfo.status === 'Approved' 
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}>
+                                {dspInfo.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecord(rec)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                                title="View dossier details"
+                              >
+                                <Eye className="w-3 h-3 text-amber-600" />
+                                <span>View</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
       </>
