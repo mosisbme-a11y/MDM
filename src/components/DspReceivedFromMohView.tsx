@@ -19,6 +19,7 @@ import {
   Trash2,
   Printer,
   ChevronRight,
+  ChevronDown,
   Check,
   ShieldCheck,
   Mail,
@@ -102,15 +103,83 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
           targetedRegions: ['Oromia', 'Addis Ababa', 'Amhara', 'Sidama'],
           targetedFacilitiesCount: 10,
           officialLetterRef: 'MOH/LET/2026/8912',
-          signatory: 'Dr. Bethlehem (MOH Director)',
-          signatoryRole: 'Director',
+          signatory: 'Dr. Bethlehem (MOH PMD Director)',
+          signatoryRole: 'Director, PMD Directorate',
+          letterFileName: 'MOH_Endorsement_Letter_8912.pdf',
+          letterFileSize: '158.4 KB',
           itemsIncluded: [
-            { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 20, plant: 'AA01 Central' },
-            { material: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult', quantity: 20, plant: 'AA01 Central' },
-            { material: '403-XRRB-0101N', description: 'Bowel - With Stand, Stainless Steel.', quantity: 20, plant: 'AA01 Central' },
-            { material: '403-XRRD-0101-001', description: 'Cold box', quantity: 20, plant: 'AA01 Central' },
-            { material: '401-WICU-0101N', description: 'Couch - Delivery', quantity: 20, plant: 'AA01 Central' },
-            { material: '401-WICU-0101N', description: 'Couch - Examination', quantity: 20, plant: 'AA01 Central' }
+            {
+              material: '403-XRRD-0101',
+              description: 'Anesthesia machine - with Patient mon',
+              quantity: 20,
+              totalAmount: 4500000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'SDG-ME-23-001-011',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '403-XRRD-0102',
+              description: 'Bed - Patient, Fowler, Adult',
+              quantity: 25,
+              totalAmount: 1875000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'SDG-ME-23-001-012',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '403-XRRB-0101N',
+              description: 'Bowel - With Stand, Stainless Steel.',
+              quantity: 20,
+              totalAmount: 625000,
+              valuationTypeDesc: 'Moving Average (V)',
+              wbsElement: 'GF-ME-24-002-005',
+              budgetSource: 'GF',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '403-XRRD-0101-001',
+              description: 'Cold box for Vaccine Storage',
+              quantity: 15,
+              totalAmount: 1500000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'GAVI-ME-24-001-003',
+              budgetSource: 'GAVI',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '401-WICU-0101N',
+              description: 'Couch - Delivery Hydraulic Heavy Duty',
+              quantity: 20,
+              totalAmount: 3500000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'UNICEF-MNCH-24-001',
+              budgetSource: 'UNICEF',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '401-WICU-0102N',
+              description: 'Couch - Examination Standard Medical',
+              quantity: 20,
+              totalAmount: 3000000,
+              valuationTypeDesc: 'Moving Average (V)',
+              wbsElement: 'SDG-ME-23-001-014',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            }
           ],
           notes: 'Official Health Facility Breakdown transmitted from MOH PMD Directorate to EPSS Head Office.'
         },
@@ -133,12 +202,58 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
           targetedFacilitiesCount: 8,
           officialLetterRef: 'MOH/LET/2026/9021',
           signatory: 'Dr. Abebe (MOH PMD Team Lead)',
-          signatoryRole: 'Team Lead',
+          signatoryRole: 'Team Lead, Medical Equipment Directorate',
+          letterFileName: 'MOH_MCH_Transmittal_Letter_9021.pdf',
+          letterFileSize: '134.2 KB',
           itemsIncluded: [
-            { material: '403-XRRD-0101', description: 'Anesthesia machine - with Patient mon', quantity: 20, plant: 'AA01 Central' },
-            { material: '403-XRRD-0101', description: 'Bed - Patient, Fowler, Adult', quantity: 20, plant: 'AA01 Central' },
-            { material: '401-WICU-0101N', description: 'Couch - Delivery', quantity: 20, plant: 'AA01 Central' },
-            { material: '401-WICU-0101N', description: 'Couch - Examination', quantity: 20, plant: 'AA01 Central' }
+            {
+              material: '403-XRRD-0101',
+              description: 'Anesthesia machine - with Patient mon',
+              quantity: 15,
+              totalAmount: 3375000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'SDG-ME-23-001-011',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '403-XRRD-0102',
+              description: 'Bed - Patient, Fowler, Adult',
+              quantity: 25,
+              totalAmount: 1875000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'SDG-ME-23-001-012',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '401-WICU-0101N',
+              description: 'Couch - Delivery Hydraulic Heavy Duty',
+              quantity: 20,
+              totalAmount: 3500000,
+              valuationTypeDesc: 'Standard Price (S)',
+              wbsElement: 'UNICEF-MNCH-24-001',
+              budgetSource: 'UNICEF',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            },
+            {
+              material: '401-WICU-0102N',
+              description: 'Couch - Examination Standard Medical',
+              quantity: 20,
+              totalAmount: 1250000,
+              valuationTypeDesc: 'Moving Average (V)',
+              wbsElement: 'SDG-ME-23-001-014',
+              budgetSource: 'WB',
+              requestDate: TODAY_ISO_DATE,
+              dspRequestTo: 'Ministry of Health (PMD)',
+              plant: 'AA01 Central'
+            }
           ],
           notes: 'MCH Ward priority equipment breakdown sent from MOH PMD to EPSS Head Office.'
         }
@@ -149,6 +264,11 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
   // Handle selected dossier for full view
   const [selectedDossier, setSelectedDossier] = useState<DspWorkflowRecord | null>(null);
+
+  // Active dossier helper
+  const activeRecord = useMemo(() => {
+    return selectedDossier || receivedRecords[0] || null;
+  }, [selectedDossier, receivedRecords]);
 
   // Load the exact received rows (from receivedRecord or empty)
   const [receivedRows, setReceivedRows] = useState<DspRequestTemplateRow[]>([]);
@@ -161,14 +281,14 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
         id: `rec-item-${idx}-${mainRecord.id}`,
         srNo: idx + 1,
         material: it.material,
-        materialDescription: it.description,
-        qty: it.quantity || 1,
-        totalAmount: it.totalAmount || (it.quantity * 250000),
+        materialDescription: it.description || it.materialDescription || 'Medical Equipment',
+        qty: Number(it.quantity || (it as any).qty || 1),
+        totalAmount: Number(it.totalAmount || ((it.quantity || 1) * 250000)),
         valuationTypeDesc: it.valuationTypeDesc || 'Standard Price (S)',
         wbsElement: it.wbsElement || 'SDG-ME-23-001-011',
         budgetSource: it.budgetSource || 'WB',
         requestDate: it.requestDate || mainRecord.dateSubmitted || TODAY_ISO_DATE,
-        dspRequestTo: 'MOH'
+        dspRequestTo: it.dspRequestTo || 'Ministry of Health (PMD Directorate)'
       }));
       setReceivedRows(mapped);
     } else {
@@ -176,9 +296,55 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
     }
   }, [selectedDossier, receivedRecords]);
 
+  // Collapsible state for DSP Dossier Archive (Received from EPSS) - collapsed by default for 2.1
+  const [showArchiveMatrix, setShowArchiveMatrix] = useState(!is21);
+
+  useEffect(() => {
+    setShowArchiveMatrix(!is21);
+  }, [is21]);
+
   // Transmitted Official Letters Folder State
   const [selectedFolderModal, setSelectedFolderModal] = useState<any | null>(null);
   const [transmittedFolderList, setTransmittedFolderList] = useState<any[]>([]);
+
+  const handleDownloadDossierLetter = (dossier: DspWorkflowRecord | null) => {
+    if (!dossier) return;
+    const content = `FEDERAL DEMOCRATIC REPUBLIC OF ETHIOPIA - MINISTRY OF HEALTH (MOH)
+PMD DIRECTORATE — OFFICIAL HEALTH FACILITY EQUIPMENT ALLOCATION DOSSIER
+================================================================================
+DSP Reference Number: ${dossier.dspRefNumber}
+DSP Dossier Name: ${dossier.dspName || 'National Medical Device Allocation'}
+Official Letter Ref: ${dossier.officialLetterRef || 'MOH/LET/2026/8912'}
+Date Endorsed: ${dossier.dateSubmitted || TODAY_ISO_DATE}
+Sender Organization: ${dossier.senderOrg || 'Ministry of Health (PMD Directorate)'}
+Recipient Organization: ${dossier.recipientOrg || 'EPSS Head Office (Medical Equipment Directorate)'}
+Authorized Signatory: ${dossier.signatory || 'Dr. Bethlehem (MOH PMD Director)'} (${dossier.signatoryRole || 'Director, PMD Directorate'})
+Official Status: ${dossier.status || 'Endorsed & Approved'}
+
+ALLOCATION QUOTA SUMMARY:
+- Total Equipment Materials: ${dossier.totalDevices || (dossier.itemsIncluded?.length || 0)} Items
+- Total Allocation Quantity: ${formatNumber(dossier.totalQuantity || 0)} Units
+- Total Budget Valuation: ${formatCurrency(dossier.totalValuationETB || 0)}
+- Targeted Priority Regions: ${(dossier.targetedRegions || ['Oromia', 'Addis Ababa', 'Amhara', 'Sidama']).join(', ')}
+
+EQUIPMENT LINE ITEMS:
+${(dossier.itemsIncluded || []).map((it: any, i: number) => 
+  `${i + 1}. [${it.material}] ${it.description} — Qty: ${it.quantity} | Valuation: ${it.valuationTypeDesc || 'Standard'} | WBS: ${it.wbsElement || 'SDG-ME-23'} | Budget: ${it.budgetSource || 'WB'} | Total: ${formatCurrency(it.totalAmount || (it.quantity * 250000))}`
+).join('\n')}
+
+Official Endorsement Note: ${dossier.notes || 'Endorsed priority health facility equipment allocation transmitted to EPSS.'}`;
+
+    const blob = new Blob([content], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MOH_Official_Dossier_${dossier.dspRefNumber.replace(/[\/\s]/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`✓ Downloaded Official Covering Letter PDF (${dossier.dspRefNumber})`);
+  };
 
   const handleUploadDirectLetterToFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -615,7 +781,7 @@ Notes: ${folder.notes || 'N/A'}`;
                 type="button"
                 onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
                 className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0B1527] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] active:border-b-0 active:translate-y-[4px]"
-                title="Return to Sub-Step 1.1: DSP Request to MOH"
+                title="Return to DSP Request to MOH"
               >
                 <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
                 <span className="uppercase font-black">DSP Request to MOH</span>
@@ -647,575 +813,677 @@ Notes: ${folder.notes || 'N/A'}`;
       </div>
 
       {/* OFFICIAL DOSSIER ARCHIVE SECTION (DSP RECEIVED FROM MOH / EPSS) */}
-      <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-md space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-slate-900 text-amber-400 rounded-xl shadow-xs">
-              <FolderArchive className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <span>{is21 ? 'DSP Dossier Archive (Received from EPSS)' : 'DSP Dossiers Transmitted & Received from MOH'}</span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-amber-400 text-slate-950 uppercase shadow-3xs">
-                  {receivedRecords.length} DOSSIERS
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+        {is21 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowArchiveMatrix(!showArchiveMatrix)}
+              className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <FolderArchive className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  DSP Dossier Archive (Received from EPSS)
                 </span>
-              </h3>
-              <p className="text-[11px] text-slate-600 font-medium">
-                {is21 
-                  ? 'Official Equipment Allocations transmitted from EPSS HO, stored as files by DSP Name.'
-                  : 'Official Health Facility Breakdown dossiers transmitted from MOH PMD Directorate to EPSS Head Office.'}
-              </p>
-            </div>
-          </div>
-            
-            <button
-              type="button"
-              onClick={handleQuickTransmitCurrentFrom11}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Simulate Received DSP</span>
-            </button>
-          </div>
-
-          {receivedRecords.length === 0 ? (
-            <div className="p-10 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
-                <FileText className="w-6 h-6 text-slate-300" />
-              </div>
-              <p className="text-xs text-slate-500 font-bold">No DSP Dossiers received yet.</p>
-              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                Once a DSP Request is sent from EPSS HO (Sub-step 1.1), it will appear here as an official file named after its DSP Name.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-md bg-slate-50/30 p-1">
-              <table className="w-full border-collapse text-left text-xs bg-white rounded-xl overflow-hidden">
-                <thead>
-                  <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
-                    <th className="py-4 px-4 w-12 text-center border-r border-white/10">S/N</th>
-                    <th className="py-4 px-6 border-r border-white/10">Date</th>
-                    <th className="py-4 px-6 border-r border-white/10">Dsp Name</th>
-                    <th className="py-4 px-6 border-r border-white/10">Status</th>
-                    <th className="py-4 px-4 w-24 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                  {receivedRecords.map((rec, idx) => (
-                    <tr 
-                      key={rec.id} 
-                      onClick={() => setSelectedDossier(rec)}
-                      className="hover:bg-indigo-50/50 cursor-pointer transition-all group"
-                    >
-                      <td className="py-4 px-4 text-center font-bold text-slate-400 font-mono border-r border-slate-50">
-                        {idx + 1}
-                      </td>
-                      <td className="py-4 px-6 font-mono font-bold text-slate-600 border-r border-slate-50">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{rec.dateSubmitted}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 border-r border-slate-50">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-amber-100 text-amber-800 rounded-xl group-hover:bg-amber-200 group-hover:scale-110 transition-all shadow-3xs">
-                            <FileText className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-black uppercase text-slate-900 leading-tight tracking-tight">
-                              {rec.dspName || "Unnamed Request"}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 border-r border-slate-50">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-3xs">
-                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                            Stored & Verified
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase shadow-sm group-hover:shadow-md transition-all active:scale-95"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View Full</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-      {/* Legacy Transmitted Folder concepts removed in favor of Dossier List, but we can keep it as a 'Letters Folder' if needed */}
-      {!is21 && (
-        <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-xs space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl">
-                <FolderArchive className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span>📁 Transmitted EPSS to MOH Official Letters Folder</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
-                    {transmittedFolderList.length} Stored Envelopes
-                  </span>
-                </h3>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="file" id="folder-direct-letter-upload" className="hidden" onChange={handleUploadDirectLetterToFolder} />
-              <label htmlFor="folder-direct-letter-upload" className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all">
-                <Paperclip className="w-3.5 h-3.5" />
-                <span>Upload Letter to Folder</span>
-              </label>
-            </div>
-          </div>
-
-          {transmittedFolderList.length === 0 ? (
-            <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 text-[11px] text-slate-400 font-bold">
-              No official letters stored in this folder yet.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {transmittedFolderList.map((folder, fIdx) => (
-                <div key={folder.id || fIdx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-indigo-700">{folder.dspRefNumber}</span>
-                    <button onClick={() => handleRemoveFolderLetter(folder.id)} className="text-rose-400 hover:text-rose-600"><Trash2 size={12} /></button>
-                  </div>
-                  <h4 className="text-[11px] font-black truncate">{folder.subject}</h4>
-                  <div className="flex items-center justify-between">
-                    <button onClick={() => handleDownloadFolderLetter(folder)} className="px-2 py-1 bg-amber-200 text-amber-950 rounded text-[10px] font-bold flex items-center gap-1">
-                      <Download size={10} />
-                      <span>PDF</span>
-                    </button>
-                    <button onClick={() => setSelectedFolderModal(folder)} className="text-indigo-600 text-[10px] font-bold hover:underline">Inspect</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Inspect Folder Letter Dossier Modal */}
-      {selectedFolderModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-indigo-600 tracking-widest uppercase">
-                  📁 Official Letter Folder Envelope
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800">
+                  {receivedRecords.length} Dossiers
                 </span>
-                <h3 className="text-base font-bold text-slate-900 mt-0.5">
-                  Dossier Details
-                </h3>
               </div>
-              <button
-                onClick={() => setSelectedFolderModal(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  {/* Institutional routing hidden */}
-                </div>
-                <div>
-                  {/* Institutional routing hidden */}
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">TRANSMITTAL DATE</span>
-                  <span className="text-slate-800 font-mono font-bold">{selectedFolderModal.dateTransmitted}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">SIGNATORY & ROLE</span>
-                  <span className="text-slate-800 font-semibold">{selectedFolderModal.signatory} ({selectedFolderModal.signatoryRole})</span>
-                </div>
+              <div className="flex items-center gap-1.5 text-slate-500 shrink-0 font-bold ml-2">
+                <span>{showArchiveMatrix ? 'Hide Matrix' : 'View Matrix'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showArchiveMatrix ? 'rotate-180' : ''}`} />
               </div>
-              <div className="pt-2 border-t border-slate-200">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">SUBJECT</span>
-                <span className="text-slate-800 font-medium">{selectedFolderModal.subject}</span>
-              </div>
-            </div>
-
-            {/* Attached Letter File Banner */}
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 text-amber-900 rounded-lg">
-                  <Paperclip size={20} />
-                </div>
-                <div>
-                  <div className="text-xs font-black text-amber-950 font-mono">
-                    {selectedFolderModal.letterFileName || 'Official_Covering_Letter.pdf'}
-                  </div>
-                  <div className="text-[10px] text-amber-800 font-bold mt-0.5">
-                    Verified Binary Attachment Stream • Capacity: {selectedFolderModal.letterFileSize || '142.5 KB'}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDownloadFolderLetter(selectedFolderModal)}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              >
-                <Download size={14} />
-                <span>Download PDF</span>
-              </button>
-            </div>
-
-            {/* Equipment Allocation Summary */}
-            <div className="space-y-2">
-              <div className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <FileSpreadsheet size={16} className="text-emerald-600" />
-                <span>Equipment Allocation Items inside this Letter Dossier ({selectedFolderModal.totalDevices} Items)</span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs font-bold">
-                <span>Total Quantity: <strong className="text-cyan-800 font-mono font-black">{formatNumber(selectedFolderModal.totalQuantity)} Units</strong></span>
-                <span>Total Valuation: <strong className="text-emerald-700 font-mono font-black">{formatCurrency(selectedFolderModal.totalValuationETB)}</strong></span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                onClick={() => setSelectedFolderModal(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Empty State vs Active Data */}
-      {receivedRows.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
-            <Building2 className="w-8 h-8" />
-          </div>
-
-          <div className="max-w-md mx-auto space-y-1.5">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-              Awaiting DSP Request Transmission to MOH
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              The previous default mock items (Ultrasound, Ventilator, X-Ray) have been cleared. Once you click <strong className="text-slate-800">"Send to MOH"</strong> from Sub-Step 1.1, the exact 10-column materials you transmitted will appear here inside <strong className="text-slate-800">• DSP Received from MOH</strong>.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => onSelectSubTab?.('dsp-ho-1-1')}
-              className="px-4 py-2 rounded-xl bg-[#0B1527] hover:bg-[#111f38] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-md"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse" />
-              <span>Go to Sub-Step 1.1: DSP Request to MOH</span>
-              <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
-            <button
-              type="button"
-              onClick={handleQuickTransmitCurrentFrom11}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-2 transition cursor-pointer shadow-sm"
-              title="Instantly transmit current Program (HP) items from stock and populate 1.2"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Transmit & Store Current Stock Items Now</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Key Metric Confirmation Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                  Materials Endorsed
-                </div>
-                <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">
-                  {totals.lineItemsCount} Items
-                </div>
-                <div className="text-[10px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Exact Transmitted Copy
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
-                <Layers className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                  Total Allocated Units
-                </div>
-                <div className="text-xl font-black text-cyan-700 mt-0.5 font-mono">
-                  {formatNumber(totals.totalQty)} Units
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Priority Health Program (HP)
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600">
-                <Building2 className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                  Total Budget Valuation
-                </div>
-                <div className="text-xl font-black text-emerald-600 mt-0.5 font-mono">
-                  {formatCurrency(totals.totalValuation)}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Sources: {totals.uniqueBudgets.join(', ') || 'WB'}
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                  MOH Response Ref & SLA
-                </div>
-                <div className="text-xs font-mono font-black text-amber-700 mt-0.5 truncate">
-                  {(selectedDossier || receivedRecords[0])?.dspRefNumber || `MOH/PMD-DSP/${new Date().getFullYear()}/042`}
-                </div>
-                <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                  Date: {(selectedDossier || receivedRecords[0])?.dateSubmitted || TODAY_ISO_DATE} • Turnaround: 0d (Instant)
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Filter & Search Bar */}
-          <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search material code, description, WBS, budget..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <select
-                value={budgetFilter}
-                onChange={(e) => setBudgetFilter(e.target.value)}
-                className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
-              >
-                <option value="all">All Budget Sources</option>
-                {totals.uniqueBudgets.map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={handleDownloadCSV}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>Export CSV</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClearReceivedData}
-                className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-                title="Clear received data and revert to empty"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Clear</span>
-              </button>
-            </div>
-          </div>
-
-      {/* Dossier Table Section (Visible if is21 and dossier selected, or if not is21) */}
-      {(!is21 || selectedDossier) && (
-        <div className="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-500">
-          <div className="bg-[#0B1527] p-6 text-white">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-400 rounded-2xl text-slate-950 shadow-lg shadow-amber-400/20">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-black uppercase tracking-widest leading-tight text-white">
-                      {is21 ? `OFFICIAL DSP DOSSIER: ${selectedDossier?.dspName}` : 'DSP Received from MOH — Official Allocation Dossier'}
-                    </h3>
-                    <span className="px-3 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-tighter">
-                      Verified Data
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-[11px] font-bold text-amber-400/90">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Reference:</span>
-                      <span className="underline italic font-mono">{is21 ? selectedDossier?.dspRefNumber : (receivedRecords[0]?.dspRefNumber || 'EPSS/MD-DSP/2026/042')}</span>
-                    </div>
-                    <div className="w-px h-3 bg-white/20 hidden md:block" />
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Transmitted:</span>
-                      <span className="font-mono">{is21 ? selectedDossier?.dateSubmitted : (receivedRecords[0]?.dateSubmitted || TODAY_ISO_DATE)}</span>
-                    </div>
-                    <div className="w-px h-3 bg-white/20 hidden md:block" />
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-slate-400 uppercase tracking-widest text-[9px]">Sender:</span>
-                      <span className="uppercase">{is21 ? selectedDossier?.senderOrg : 'MOH PMD Directorate'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handlePrintDossier}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/10"
-                  title="Print Dossier"
-                >
-                  <Printer className="w-5 h-5" />
-                </button>
-                {is21 && (
-                  <button 
-                    onClick={() => setSelectedDossier(null)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-widest transition cursor-pointer shadow-lg shadow-rose-600/20 active:scale-95"
+            {showArchiveMatrix && (
+              <div className="p-4 border-t border-slate-200 space-y-4">
+                <div className="flex items-center justify-end pb-1">
+                  <button
+                    type="button"
+                    onClick={handleQuickTransmitCurrentFrom11}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
                   >
-                    <X className="w-4 h-4" />
-                    <span>Close Dossier</span>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Simulate Received DSP</span>
                   </button>
+                </div>
+
+                {receivedRecords.length === 0 ? (
+                  <div className="p-10 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                      <FileText className="w-6 h-6 text-slate-300" />
+                    </div>
+                    <p className="text-xs text-slate-500 font-bold">No DSP Dossiers received yet.</p>
+                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                      Once a DSP Request is sent from EPSS HO (Sub-step 1.1), it will appear here as an official file named after its DSP Name.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-md bg-slate-50/30 p-1">
+                    <table className="w-full border-collapse text-left text-xs bg-white rounded-xl overflow-hidden">
+                      <thead>
+                        <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
+                          <th className="py-4 px-4 w-12 text-center border-r border-white/10">S/N</th>
+                          <th className="py-4 px-6 border-r border-white/10">Date</th>
+                          <th className="py-4 px-6 border-r border-white/10">Dsp Name</th>
+                          <th className="py-4 px-6 border-r border-white/10">Status</th>
+                          <th className="py-4 px-4 w-24 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                        {receivedRecords.map((rec, idx) => (
+                          <tr 
+                            key={rec.id} 
+                            onClick={() => setSelectedDossier(rec)}
+                            className="hover:bg-indigo-50/50 cursor-pointer transition-all group"
+                          >
+                            <td className="py-4 px-4 text-center font-bold text-slate-400 font-mono border-r border-slate-50">
+                              {idx + 1}
+                            </td>
+                            <td className="py-4 px-6 font-mono font-bold text-slate-600 border-r border-slate-50">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{rec.dateSubmitted}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 border-r border-slate-50">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-amber-100 text-amber-800 rounded-xl group-hover:bg-amber-200 group-hover:scale-110 transition-all shadow-3xs">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-black uppercase text-slate-900 leading-tight tracking-tight">
+                                    {rec.dspName || "Unnamed Request"}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 border-r border-slate-50">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-3xs">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                  Stored & Verified
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase shadow-sm group-hover:shadow-md transition-all active:scale-95"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View Full</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-4 space-y-5">
+            {/* 1. Official Received MOH Dossiers Table Archive */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-slate-900 text-amber-400 rounded-xl shadow-xs">
+                    <FolderArchive className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <span>Official Dossier Archive — Received from MOH</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-amber-400 text-slate-950 uppercase shadow-3xs">
+                        {receivedRecords.length} DOSSIERS
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      Official Health Facility Breakdown dossiers transmitted from MOH PMD Directorate to EPSS Head Office. Click any dossier to view its exact 10-column data table.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="dossier-direct-letter-upload"
+                    className="hidden"
+                    onChange={handleUploadDirectLetterToFolder}
+                  />
+                  <label
+                    htmlFor="dossier-direct-letter-upload"
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-black text-[10px] uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    <span>Upload Covering Letter</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleQuickTransmitCurrentFrom11}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Simulate Received DSP</span>
+                  </button>
+                </div>
+              </div>
+
+              {receivedRecords.length === 0 ? (
+                <div className="p-10 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                    <FileText className="w-6 h-6 text-slate-300" />
+                  </div>
+                  <p className="text-xs text-slate-500 font-bold">No DSP Dossiers received yet.</p>
+                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Once a DSP Request is sent from EPSS HO (Sub-step 1.1), it will appear here as an official file named after its DSP Name.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-slate-50/40 p-1">
+                  <table className="w-full border-collapse text-left text-xs bg-white rounded-xl overflow-hidden">
+                    <thead>
+                      <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
+                        <th className="py-3 px-3 w-10 text-center border-r border-white/10">S/N</th>
+                        <th className="py-3 px-3 border-r border-white/10 w-24">Date</th>
+                        <th className="py-3 px-4 border-r border-white/10 min-w-[200px]">DSP Dossier Name & Ref</th>
+                        <th className="py-3 px-3 border-r border-white/10 min-w-[130px]">Official Letter</th>
+                        <th className="py-3 px-3 border-r border-white/10 min-w-[140px]">Signatory & Role</th>
+                        <th className="py-3 px-3 border-r border-white/10 text-right w-24">Items / Qty</th>
+                        <th className="py-3 px-3 border-r border-white/10 text-right w-28">Valuation (ETB)</th>
+                        <th className="py-3 px-3 border-r border-white/10 text-center w-28">Status</th>
+                        <th className="py-3 px-3 text-center w-36">Dossier Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {receivedRecords.map((rec, idx) => {
+                        const isSelected = activeRecord?.id === rec.id;
+                        return (
+                          <tr
+                            key={rec.id}
+                            onClick={() => setSelectedDossier(rec)}
+                            className={`cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-amber-50/80 border-l-4 border-l-amber-500 font-semibold'
+                                : 'hover:bg-indigo-50/40'
+                            }`}
+                          >
+                            <td className="py-3 px-3 text-center font-bold text-slate-500 font-mono border-r border-slate-100">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-600 border-r border-slate-100 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{rec.dateSubmitted}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 border-r border-slate-100">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`p-2 rounded-xl transition-all ${
+                                  isSelected ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-black text-slate-900 leading-tight uppercase truncate">
+                                    {rec.dspName || "National Allocation Matrix"}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-indigo-700 font-bold mt-0.5">
+                                    {rec.dspRefNumber}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 border-r border-slate-100 font-mono text-[11px] text-slate-700">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold">{rec.officialLetterRef || 'MOH/LET/2026/8912'}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 border-r border-slate-100 text-[11px]">
+                              <div className="font-bold text-slate-900">{rec.signatory || 'Dr. Bethlehem (MOH PMD)'}</div>
+                              <div className="text-[10px] text-slate-500">{rec.signatoryRole || 'Director'}</div>
+                            </td>
+                            <td className="py-3 px-3 border-r border-slate-100 text-right font-mono text-xs">
+                              <span className="font-black text-slate-900">{rec.totalDevices || rec.itemsIncluded?.length || 6} Items</span>
+                              <span className="text-[10px] text-cyan-800 font-bold block">{formatNumber(rec.totalQuantity || 120)} Units</span>
+                            </td>
+                            <td className="py-3 px-3 border-r border-slate-100 text-right font-mono font-black text-emerald-700 text-xs whitespace-nowrap">
+                              {formatCurrency(rec.totalValuationETB || 15000000)}
+                            </td>
+                            <td className="py-3 px-3 border-r border-slate-100 text-center whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-3xs">
+                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                Stored & Verified
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadDossierLetter(rec);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center gap-1 transition"
+                                  title="Download Official Covering Letter PDF"
+                                >
+                                  <Download className="w-3 h-3 text-amber-600" />
+                                  <span>PDF</span>
+                                </button>
+
+                                {isSelected ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-950 font-black text-[10px] uppercase shadow-xs">
+                                    <Check className="w-3 h-3 text-slate-950" />
+                                    <span>Selected</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDossier(rec)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase shadow-xs transition active:scale-95 cursor-pointer"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>Select</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Inspect Folder Letter Dossier Modal */}
+            {selectedFolderModal && (
+              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
+                  <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-indigo-600 tracking-widest uppercase">
+                        📁 Official Letter Folder Envelope
+                      </span>
+                      <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                        Dossier Details
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setSelectedFolderModal(null)}
+                      className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-bold block">TRANSMITTAL DATE</span>
+                        <span className="text-slate-800 font-mono font-bold">{selectedFolderModal.dateTransmitted}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-bold block">SIGNATORY & ROLE</span>
+                        <span className="text-slate-800 font-semibold">{selectedFolderModal.signatory} ({selectedFolderModal.signatoryRole})</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-200">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">SUBJECT</span>
+                      <span className="text-slate-800 font-medium">{selectedFolderModal.subject}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-100 text-amber-900 rounded-lg">
+                        <Paperclip size={20} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-amber-950 font-mono">
+                          {selectedFolderModal.letterFileName || 'Official_Covering_Letter.pdf'}
+                        </div>
+                        <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                          Verified Binary Attachment Stream • Capacity: {selectedFolderModal.letterFileSize || '142.5 KB'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadFolderLetter(selectedFolderModal)}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    >
+                      <Download size={14} />
+                      <span>Download PDF</span>
+                    </button>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedFolderModal(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Selected Dossier: Full 10-Column Data Table Section */}
+            <div className="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-500">
+              {/* Official Selected Dossier Header */}
+              <div className="bg-[#0B1527] p-6 text-white border-b-2 border-amber-400">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3.5 bg-amber-400 rounded-2xl text-slate-950 shadow-lg shadow-amber-400/20 shrink-0">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                          OFFICIAL DOSSIER FOR SELECTED
+                        </span>
+                        <span className="px-3 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[10px] font-black uppercase tracking-tight">
+                          {activeRecord?.status || 'Endorsed & Approved'}
+                        </span>
+                      </div>
+                      <h3 className="text-base md:text-lg font-black uppercase tracking-wide leading-tight text-white">
+                        {activeRecord?.dspName || 'DSP 2026 - National Health Facility Allocation Matrix'}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-[11px] font-bold text-slate-300 mt-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 uppercase tracking-widest text-[9px]">Reference:</span>
+                          <span className="text-amber-300 font-mono font-bold">{activeRecord?.dspRefNumber || 'MOH/PMD-DSP/2026/088'}</span>
+                        </div>
+                        <div className="w-px h-3 bg-white/20 hidden md:block" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 uppercase tracking-widest text-[9px]">Official Letter:</span>
+                          <span className="font-mono text-white">{activeRecord?.officialLetterRef || 'MOH/LET/2026/8912'}</span>
+                        </div>
+                        <div className="w-px h-3 bg-white/20 hidden md:block" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 uppercase tracking-widest text-[9px]">Authority:</span>
+                          <span className="text-white">{activeRecord?.signatory || 'Dr. Bethlehem (MOH PMD Director)'}</span>
+                        </div>
+                        <div className="w-px h-3 bg-white/20 hidden md:block" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 uppercase tracking-widest text-[9px]">Date:</span>
+                          <span className="font-mono text-white">{activeRecord?.dateSubmitted || TODAY_ISO_DATE}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadDossierLetter(activeRecord)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95"
+                      title="Download Official Covering Letter PDF"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Letter PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadExcel}
+                      disabled={receivedRows.length === 0}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+                      title="Export Full 10-Column Data to Excel (.xlsx)"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>Excel (10-Col)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadCSV}
+                      disabled={receivedRows.length === 0}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-700 active:scale-95 disabled:opacity-50"
+                      title="Export CSV"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-400" />
+                      <span>CSV</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handlePrintDossier}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer border border-slate-700"
+                      title="Print Dossier"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Metric Confirmation Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-50/70 border-b border-slate-200">
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                      Materials Endorsed
+                    </div>
+                    <div className="text-xl font-black text-slate-900 mt-0.5 font-mono">
+                      {totals.lineItemsCount} Items
+                    </div>
+                    <div className="text-[10px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Exact MOH Received Copy
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                      Total Allocated Units
+                    </div>
+                    <div className="text-xl font-black text-cyan-700 mt-0.5 font-mono">
+                      {formatNumber(totals.totalQty)} Units
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Priority Health Program (HP)
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                      Total Budget Valuation
+                    </div>
+                    <div className="text-xl font-black text-emerald-600 mt-0.5 font-mono">
+                      {formatCurrency(totals.totalValuation)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Sources: {totals.uniqueBudgets.join(', ') || 'WB'}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                      MOH Approval Ref & SLA
+                    </div>
+                    <div className="text-xs font-mono font-black text-amber-700 mt-0.5 truncate">
+                      {activeRecord?.dspRefNumber || `MOH/PMD-DSP/${new Date().getFullYear()}/042`}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      Date: {activeRecord?.dateSubmitted || TODAY_ISO_DATE} • Turnaround: 0d (Instant)
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-600">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="bg-white border-b border-slate-200 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search material code, description, WBS, budget..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <select
+                    value={budgetFilter}
+                    onChange={(e) => setBudgetFilter(e.target.value)}
+                    className="bg-white border border-slate-200 text-xs text-slate-700 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="all">All Budget Sources</option>
+                    {totals.uniqueBudgets.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+
+                  <span className="text-xs font-bold text-slate-500 font-mono px-2">
+                    {filteredRows.length} of {receivedRows.length} Rows
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleClearReceivedData}
+                    className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                    title="Clear received data"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Clear Data</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* FULL 10-COLUMN DATA TABLE AS RECEIVED FROM MOH */}
+              <div className="overflow-x-auto bg-slate-50/50 p-1">
+                <table className="w-full border-collapse text-xs select-text bg-white rounded-2xl overflow-hidden border border-slate-900 shadow-md">
+                  {/* Official Orange Header with Italic Bold Text */}
+                  <thead>
+                    <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
+                      <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
+                        S/N
+                      </th>
+                      <th className="py-2.5 px-3 text-left border-r border-black min-w-[140px] whitespace-nowrap font-mono">
+                        Material
+                      </th>
+                      <th className="py-2.5 px-3 text-left border-r border-black min-w-[260px]">
+                        Material Description
+                      </th>
+                      <th className="py-2.5 px-3 text-right border-r border-black min-w-[70px] whitespace-nowrap">
+                        Qty
+                      </th>
+                      <th className="py-2.5 px-3 text-right border-r border-black min-w-[140px] whitespace-nowrap">
+                        Total Amount
+                      </th>
+                      <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap">
+                        Valuation Type Desc
+                      </th>
+                      <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap font-mono">
+                        WBS Element
+                      </th>
+                      <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
+                        Budget Source
+                      </th>
+                      <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
+                        Request Date
+                      </th>
+                      <th className="py-2.5 px-3 text-center min-w-[130px] whitespace-nowrap">
+                        DSP request to
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-slate-500 font-bold border-b border-slate-200">
+                          No materials found in this transmitted dossier.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRows.map((row, idx) => (
+                        <tr key={row.id || idx} className="hover:bg-amber-50/60 transition-all border-b border-slate-200">
+                          <td className="py-3 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-700">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 font-mono font-black text-indigo-950">
+                            {row.material}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 font-bold text-slate-900">
+                            {row.materialDescription}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-black text-cyan-800 text-sm">
+                            {formatNumber(row.qty)}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">
+                            {formatCurrency(row.totalAmount)}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 font-medium text-slate-700">
+                            {row.valuationTypeDesc}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 font-mono text-xs font-bold text-slate-800">
+                            {row.wbsElement}
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 text-center font-black text-indigo-700 uppercase">
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono text-[10px]">
+                              {row.budgetSource}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 border-r border-slate-200 text-center font-mono text-slate-600">
+                            {row.requestDate}
+                          </td>
+                          <td className="py-3 px-3 text-center font-bold text-amber-900 bg-amber-50/50">
+                            {row.dspRequestTo || 'Ministry of Health (PMD)'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {/* Table Footer Totals */}
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-black text-xs">
+                      <td colSpan={3} className="py-3 px-4 text-right uppercase tracking-wider text-amber-400 font-mono">
+                        Total ({filteredRows.length} Line Items):
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-cyan-300 font-black">
+                        {formatNumber(totals.totalQty)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-emerald-400 font-black">
+                        {formatCurrency(totals.totalValuation)}
+                      </td>
+                      <td colSpan={5}></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>
-
-          <div className="overflow-x-auto bg-slate-50/50 p-1">
-            <table className="w-full border-collapse text-xs select-text bg-white rounded-2xl overflow-hidden border border-slate-900 shadow-md">
-              {/* Official Orange Header with Italic Bold Text */}
-              <thead>
-                <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
-                    S/N
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[140px] whitespace-nowrap font-mono">
-                    Material
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[260px]">
-                    Material Description
-                  </th>
-                  <th className="py-2.5 px-3 text-right border-r border-black min-w-[70px] whitespace-nowrap">
-                    Qty
-                  </th>
-                  <th className="py-2.5 px-3 text-right border-r border-black min-w-[140px] whitespace-nowrap">
-                    Total Amount
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap">
-                    Valuation Type Desc
-                  </th>
-                  <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] whitespace-nowrap font-mono">
-                    WBS Element
-                  </th>
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
-                    Budget Source
-                  </th>
-                  <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px] whitespace-nowrap">
-                    Request Date
-                  </th>
-                  <th className="py-2.5 px-3 text-center min-w-[130px] whitespace-nowrap">
-                    DSP request to
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-8 text-center text-slate-500 font-bold border-b border-slate-200">
-                      No materials found in this transmitted dossier.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row, idx) => (
-                    <tr key={row.id || idx} className="hover:bg-amber-50/60 transition-all border-b border-slate-200">
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-700">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-mono font-black text-indigo-950">
-                        {row.material}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-bold text-slate-900">
-                        {row.materialDescription}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-black text-cyan-800 text-sm">
-                        {formatNumber(row.qty)}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">
-                        {formatCurrency(row.totalAmount)}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-medium text-slate-700">
-                        {row.valuationTypeDesc}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 font-mono text-xs font-bold text-slate-800">
-                        {row.wbsElement}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-black text-indigo-700 uppercase">
-                        {row.budgetSource}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200 text-center font-mono text-slate-600">
-                        {row.requestDate}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-amber-900 bg-amber-50/50">
-                        {row.dspRequestTo || 'MOH'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {/* Table Footer Totals */}
-              <tfoot>
-                <tr className="bg-slate-900 text-white font-black text-xs">
-                  <td colSpan={3} className="py-3 px-4 text-right uppercase tracking-wider text-amber-400 font-mono">
-                    Total ({filteredRows.length} Line Items):
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-cyan-300 font-black">
-                    {formatNumber(totals.totalQty)}
-                  </td>
-                  <td className="py-3 px-3 text-right font-mono text-emerald-400 font-black">
-                    {formatCurrency(totals.totalValuation)}
-                  </td>
-                  <td colSpan={5}></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* PIPELINE FOOTER */}
       {(!is21 || (is21 && selectedDossier)) && (
@@ -1241,8 +1509,6 @@ Notes: ${folder.notes || 'N/A'}`;
             </button>
           </div>
         </div>
-      )}
-      </>
       )}
     </div>
   );

@@ -453,6 +453,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
   const [showHeadOfficeSummaryMatrix, setShowHeadOfficeSummaryMatrix] = useState(false);
+  const [selectedStageKey, setSelectedStageKey] = useState<string>('head-office-dsp');
 
 
   // Take Action modal state for EPSS to MOH requests
@@ -703,7 +704,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
     if (currentStage === 'head-office-dsp') {
       setShowHeadOfficeSummaryMatrix(false);
     }
+    if (currentStage !== 'all') {
+      setSelectedStageKey(currentStage);
+    }
   }, [currentStage, currentSubStep]);
+
+  const activeStageKey = currentStage !== 'all' ? currentStage : selectedStageKey;
 
   const liveAggregatedStage4Data = useMemo<Stage4MatrixData>(() => {
     const agg = aggregateRhbSubmissionsToMoh(records);
@@ -955,6 +961,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       ]
     },
   ];
+  const activeStageObj = stagesList.find(s => s.stageKey === activeStageKey) || stagesList[0];
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
@@ -1419,148 +1426,28 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         }}
       />
 
-      {/* 4-Section DSP Management Interactive Pipeline Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="text-[11px] font-bold text-slate-500 px-1 flex items-center justify-between">
-          <span className="uppercase tracking-wider">DSP MANAGEMENT INSTITUTIONAL HIERARCHY</span>
-          <span className="text-[10px] text-amber-600 font-medium italic">Click main section or sub-step to view and collect data</span>
-        </div>
-
-        {/* 4 Major Category Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {stagesList
-            .filter(stg => currentStage === 'all' || stg.stageKey === currentStage)
-            .map((stg) => {
-            const isSelected = currentStage === stg.stageKey;
-            return (
-              <div
-                key={stg.id}
-                onClick={() => {
-                  if (isSelected) {
-                    onSelectSubTab?.('dsp-mgmt'); // Reset to all/default
-                  } else {
-                    onSelectSubTab?.(stg.id as any);
-                  }
-                }}
-                className={`p-4 rounded-2xl text-left transition-all border-b-4 active:border-b-0 active:translate-y-[4px] cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                  isSelected
-                    ? 'bg-amber-50 border-amber-500 shadow-[0_4px_0_rgb(245,158,11)] ring-2 ring-amber-500/10'
-                    : 'bg-white border-slate-200 shadow-[0_4px_0_rgb(226,232,240)] hover:border-slate-300 hover:bg-slate-50/60'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${stg.color}`} />
-                  {isSelected && (
-                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                      ACTIVE STAGE
-                    </span>
-                  )}
-                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                    {stg.count} Dossiers
-                  </span>
-                </div>
-                <div className={`text-sm font-black leading-snug ${isSelected ? 'text-amber-900' : 'text-slate-700'}`}>
-                  {stg.label}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                  {stg.subSteps.length} Sub-Steps
-                </div>
-                {isSelected && (
-                  <div className="absolute top-0 right-0 p-2 text-amber-600 font-bold text-[10px]">
-                    Click to show all
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Sub-Steps Selector Pills Bar */}
-        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 overflow-x-auto">
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 ml-1">
-            {currentStage === 'all'
-              ? 'ALL SUB-STEPS:'
-              : `${stagesList.find(s => s.stageKey === currentStage)?.label || ''} SUB-STEPS:`}
-          </span>
-          {stagesList
-            .filter(stg => currentStage === 'all' || stg.stageKey === currentStage)
-            .flatMap(stg => stg.subSteps)
-            .map((sub) => {
-              const isSubSelected = currentSubStep === sub.id;
-              const programHpStockCount = (multipleStockItems || []).filter(isProgramHpStockItem).length || 5;
-              
-              let subCount = records.filter(r => canonicalizeSubStage(r.subStage, r.stage) === sub.id).length;
-              if (sub.id === '1.1') {
-                subCount = programHpStockCount;
-              } else if (sub.id === '1.2') {
-                const r12List = records.filter(r => {
-                  const s = canonicalizeSubStage(r.subStage, r.stage);
-                  return s === '1.2' || r.stage === 'head-office-dsp' || r.recipientOrg === 'EPSS Head Office' || r.recipientOrg === 'EPSS';
-                });
-                subCount = r12List.length > 0 ? r12List.length : 2;
-              } else if (sub.id === '2.2') {
-                try {
-                  const stored = null;
-                  if (stored) {
-                    const parsed = JSON.parse(stored);
-                    if (Array.isArray(parsed) && parsed.length > 0) subCount = parsed.length;
-                  }
-                } catch {}
-              } else if (sub.id === '2.3' || sub.id === '2.4') {
-                subCount = records.filter(isRhbSubmittedToMohRecord).length;
-              } else if (sub.id === '2.5') {
-                const r25Count = records.filter(
-                  (r) => canonicalizeSubStage(r.subStage, r.stage) === '2.5' || r.stage === 'moh-to-epss-ho'
-                ).length;
-                subCount = r25Count > 0 ? r25Count : (liveAggregatedStage4Data.rows.length > 0 ? 1 : 0);
-              } else if (sub.id === '1.3.3') {
-                const mappedDossiers = records.filter(
-                  (r) =>
-                    r.hubAggregationData?.mappedFromMapHfToHub === true ||
-                    (r.hubAggregationData?.status === 'Mapped & Ready' &&
-                      Array.isArray(r.hubAggregationData?.allocations) &&
-                      r.hubAggregationData.allocations.length > 0)
-                );
-                const plantCodes = new Set<string>();
-                mappedDossiers.forEach((d) => {
-                  (d.hubAggregationData?.allocations || []).forEach((a: any) => {
-                    const code = (a.hubCode || '').trim().toUpperCase();
-                    if (code && code !== 'HO01') plantCodes.add(code);
-                  });
-                });
-                subCount = plantCodes.size;
-              } else if (sub.id === '3.2') {
-                subCount = records.filter(
-                  (r) => canonicalizeSubStage(r.subStage, r.stage) === '3.2' || isRhbSubmittedToMohRecord(r)
-                ).length;
-              }
-
-              return (
-                <button
-                  key={sub.id}
-                  onClick={() => onSelectSubTab?.(sub.subTab)}
-                  className={`group relative px-3.5 py-1.5 rounded-full text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
-                    isSubSelected
-                      ? 'bg-[#0B1527] text-white border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]'
-                      : 'bg-[#EBF1F6] text-[#1E3A5F] hover:bg-[#DEE7EF] border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] hover:border-[#CAD6E2]'
-                  }`}
-                  title={`${sub.id} ${sub.label}`}
-                >
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black shrink-0 ${
-                    isSubSelected ? 'bg-amber-400 text-slate-950' : 'bg-white text-slate-700 border border-slate-200'
-                  }`}>
-                    {sub.id}
-                  </span>
-                  <span className="tracking-tight uppercase">{sub.label}</span>
-                  {subCount > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${isSubSelected ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40' : 'bg-[#D5E1EC] text-[#1E3A5F]'}`}>
-                      {subCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-        </div>
+      {/* Active Stage Sub-Steps Selector Pills Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm flex flex-wrap items-center gap-1.5 overflow-x-auto">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 ml-1">
+          {activeStageObj.label.toUpperCase()} SUB-STEPS:
+        </span>
+        {activeStageObj.subSteps.map((sub) => {
+          const isSubSelected = currentSubStep === sub.id;
+          return (
+            <button
+              key={sub.id}
+              onClick={() => onSelectSubTab?.(sub.subTab)}
+              className={`group relative px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
+                isSubSelected
+                  ? 'bg-[#0B1527] text-white border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]'
+                  : 'bg-[#EBF1F6] text-[#1E3A5F] hover:bg-[#DEE7EF] border-[#D5E1EC] shadow-[0_4px_0_rgb(213,225,236)] hover:border-[#CAD6E2]'
+              }`}
+              title={sub.label}
+            >
+              <span className="tracking-tight uppercase">{sub.label}</span>
+            </button>
+          );
+        })}
       </div>
 
 
@@ -1640,7 +1527,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && (
         <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-800">Stage 3 Display Format:</span>
+            <span className="text-xs font-bold text-slate-800">RHB Breakdown Display Format:</span>
             <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
               <button
                 onClick={() => setStage3ViewMode('matrix')}
@@ -1677,7 +1564,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {currentStage === 'moh-to-epss-ho' && (
         <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-800">Stage 4 Display Format:</span>
+            <span className="text-xs font-bold text-slate-800">MOH to EPSS Breakdown Display Format:</span>
             <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
               <button
                 onClick={() => setStage4ViewMode('matrix')}
@@ -1714,7 +1601,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       {currentStage === 'epss-ho-aggregation' && (
         <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-800">Stage 5 Display Format:</span>
+            <span className="text-xs font-bold text-slate-800">EPSS HO Aggregation Display Format:</span>
             <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
               <button
                 onClick={() => setStage5ViewMode('hub-aggregation')}
@@ -1820,7 +1707,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
-          title="3. DSP Submitted Region to MOH - Health Facility Breakdown Matrix"
+          title="DSP Submitted Region to MOH - Health Facility Breakdown Matrix"
           subtitle=""
         />
       ) : (currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && stage3ViewMode === 'ledger' ? (
@@ -1867,7 +1754,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
-          title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
+          title="DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
           subtitle="Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers"
         />
       ) : (currentSubStep === '1.1' || (currentSubTab as string) === 'dsp-ho-1-1' || (currentSubTab as string) === 'dsp-request-moh-epss') ? (
@@ -1954,7 +1841,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 onSelectSubTab?.('dsp-ho-1-3-3');
               }}
               onUpdateData={commitStage131MappedData}
-              title="1.3.1 Map HF to EPSS Hub — Health Facility Breakdown Matrix"
+              title="Map HF to EPSS Hub — Health Facility Breakdown Matrix"
               subtitle="Official Map HF to HUB matrix template showing delivering plants and health facility allocations"
             />
           ) : (
@@ -2251,60 +2138,11 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             setSelectedRecord(newRecord);
             onSelectSubTab?.('dsp-ho-1-3-1'); // Transition to EPSS HO Aggregation step
           }}
-          title="2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix"
+          title="DSP Aggr. Submitted to EPSS - Health Facility Matrix"
           subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"
         />
       ) : (
         <>
-          {/* Clear Stage Sub-Steps Directory when clicking one of the 4 main DSP Management sections */}
-          {currentStage !== 'all' && currentSubStep === 'all' && (() => {
-            const activeStageObj = stagesList.find(s => s.stageKey === currentStage);
-            if (!activeStageObj) return null;
-            return (
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${activeStageObj.color}`} />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                      {activeStageObj.label} — Sub-Steps
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
-                    {activeStageObj.subSteps.length} Sub-Steps
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {activeStageObj.subSteps.map((sub) => {
-                    const meta = SUBMITTING_CRITERIA_MAP[sub.id];
-                    return (
-                      <button
-                        key={sub.id}
-                        type="button"
-                        onClick={() => onSelectSubTab?.(sub.subTab)}
-                        className="group text-left p-3.5 rounded-xl bg-slate-50/80 hover:bg-[#0B1527] border border-slate-200 hover:border-[#0B1527] transition-all cursor-pointer flex items-start justify-between gap-3 shadow-2xs"
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-900 group-hover:text-white truncate transition-colors">
-                              {sub.label}
-                            </span>
-                          </div>
-                          {meta && (
-                            <p className="text-[10px] text-slate-500 group-hover:text-slate-300 truncate transition-colors">
-                              {meta.sender} → {meta.recipient}
-                            </p>
-                          )}
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 shrink-0 mt-0.5 transition-colors" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Filter and Search Bar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
             <div className="relative w-full sm:w-80">
@@ -2815,7 +2653,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 <Stage4MohSubmittedMatrixTable
                   data={selectedRecord.stage4MatrixData}
                   isEditable={false}
-                  title="4. DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
+                  title="DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
                   subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS"
                 />
               </div>
