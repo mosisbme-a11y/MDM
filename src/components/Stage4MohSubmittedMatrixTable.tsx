@@ -785,11 +785,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                   ? '2.5 DSP Aggr. Submitted to EPSS - Health Facility Matrix' 
                   : title}
               </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
-                Official MoH Two-Tier Format
-              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
           </div>
         </div>
 
@@ -836,7 +832,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             title="Download blank matrix templates"
           >
             <Download size={14} className="text-purple-600" />
-            <span>Download Template</span>
           </button>
 
           <button
@@ -860,38 +855,6 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
           >
             {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
-        </div>
-      </div>
-
-      {/* KPI Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtered Region</div>
-          <div className="text-sm font-black font-mono text-purple-700 mt-0.5 flex items-center gap-1.5">
-            <Building2 size={14} className="text-purple-600" />
-            <span>{selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter}</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Allocated Health Facilities</div>
-          <div className="text-sm font-black font-mono text-indigo-700 mt-0.5">
-            {filteredRows.length} Center{filteredRows.length !== 1 ? 's' : ''} (of {rows.length})
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Equipment Types</div>
-          <div className="text-sm font-black font-mono text-slate-800 mt-0.5">
-            {columns.length} Items Configured
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-2xs">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Quantity Earmarked</div>
-          <div className="text-sm font-black font-mono text-emerald-700 mt-0.5">
-            {formatNumber(grandTotalUnits)} Units
-          </div>
         </div>
       </div>
 
