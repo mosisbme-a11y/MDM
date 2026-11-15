@@ -259,10 +259,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [autoPopulateFacilitySearch, setAutoPopulateFacilitySearch] = useState('');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isHubMapped, setIsHubMapped] = useState(showHubColumn);
+  const effectiveShowHubColumn = (allowedTier === 'moh-osp-management' || allowedTier === 'rhb-breakdown-management') ? false : showHubColumn;
+  const [isHubMapped, setIsHubMapped] = useState(effectiveShowHubColumn);
   useEffect(() => {
-    setIsHubMapped(showHubColumn);
-  }, [showHubColumn]);
+    setIsHubMapped(effectiveShowHubColumn);
+  }, [effectiveShowHubColumn]);
   const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
 
   const handleSelectAllCatalogItems = () => {
@@ -2713,13 +2714,21 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
                 <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  DSP Project / Matrix Reference Title
+                  DSP Project / Matrix Reference Title {allowedTier && allowedTier !== 'head-office-dsp' && <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-1 font-mono">Auto-Filled by EPSS (Read-Only)</span>}
                 </label>
                 <input 
                   type="text"
                   value={dspProjectName}
-                  onChange={(e) => setDspProjectName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
+                  onChange={(e) => {
+                    if (allowedTier && allowedTier !== 'head-office-dsp') return;
+                    setDspProjectName(e.target.value);
+                  }}
+                  disabled={Boolean(allowedTier && allowedTier !== 'head-office-dsp')}
+                  className={`w-full px-3 py-2 border rounded-lg text-xs font-bold ${
+                    allowedTier && allowedTier !== 'head-office-dsp'
+                      ? 'bg-slate-100 border-slate-300 text-slate-700 cursor-not-allowed'
+                      : 'bg-white border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900'
+                  }`}
                 />
               </div>
 
