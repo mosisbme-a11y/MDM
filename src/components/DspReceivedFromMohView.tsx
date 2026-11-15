@@ -90,15 +90,23 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
   const [selectedDossierId, setSelectedDossierId] = useState<string>('');
   const [showArchiveMatrix, setShowArchiveMatrix] = useState(!is21);
+  const prevTopDossierIdRef = React.useRef<string>('');
 
   useEffect(() => {
     setShowArchiveMatrix(!is21);
   }, [is21]);
 
   useEffect(() => {
+    const topId = receivedRecords[0]?.id || '';
+    if (topId && topId !== prevTopDossierIdRef.current) {
+      prevTopDossierIdRef.current = topId;
+      setSelectedDossierId(topId);
+      return;
+    }
     if (receivedRecords.length > 0 && !receivedRecords.some(r => r.id === selectedDossierId)) {
       setSelectedDossierId(receivedRecords[0].id);
     } else if (receivedRecords.length === 0 && selectedDossierId) {
+      prevTopDossierIdRef.current = '';
       setSelectedDossierId('');
     }
   }, [receivedRecords, selectedDossierId]);

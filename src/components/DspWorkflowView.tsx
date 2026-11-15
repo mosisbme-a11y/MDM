@@ -734,7 +734,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         woreda: r.woreda,
         healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
         packages: r.packages || 'MCH',
-        plant: r.hub || undefined,
         quantities: { ...r.quantities }
       }))
     };
@@ -756,6 +755,110 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       quantities: { ...(r.quantities || {}) }
     }))
   });
+
+  const handleMohTransmitToEpss = (metadata: {
+    signatory: string;
+    role: string;
+    organization: string;
+    dspName?: string;
+    date: string;
+    matrixData: Stage4MatrixData;
+  }) => {
+    const ts = Date.now();
+    const refNum = `MOH/EPSS-HO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
+    const letterRef = `MOH/LET/${ts.toString().slice(-4)}`;
+
+    const cleanMatrixData: Stage4MatrixData = {
+      date: metadata.matrixData.date || metadata.date,
+      region: metadata.matrixData.region || 'All Regions',
+      columns: (metadata.matrixData.columns || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        code: c.code
+      })),
+      rows: (metadata.matrixData.rows || []).map(({ plant: _omitPlant, ...r }, idx) => ({
+        id: r.id || `s4-sent-${ts}-${idx}`,
+        date: r.date || metadata.date,
+        region: r.region || '',
+        zone: r.zone || '',
+        woreda: r.woreda || '',
+        healthFacility: r.healthFacility || '',
+        packages: r.packages || 'MCH',
+        quantities: { ...(r.quantities || {}) }
+      }))
+    };
+
+    const totalUnits = cleanMatrixData.rows.reduce(
+      (sum, r) => sum + cleanMatrixData.columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0),
+      0
+    );
+    const regionsList = [...new Set(cleanMatrixData.rows.map(r => r.region))].filter(Boolean);
+    const itemsSummary = cleanMatrixData.columns.map(c => ({
+      material: c.code,
+      description: c.name,
+      quantity: cleanMatrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
+      plant: 'HO01 Central'
+    }));
+    const convertedFacilityMatrix = convertStage4ToFacilityMatrix(cleanMatrixData);
+    const dossierTitle =
+      metadata.dspName || `MOH to EPSS Health Facility Matrix (${regionsList.join(', ') || 'National'})`;
+
+    // 1. Incoming dossier in EPSS 1.2 (DSP Received from MOH) with full columns & all rows
+    const received12Record: DspWorkflowRecord = {
+      id: `dsp-moh-to-epss-12-${ts}`,
+      dspRefNumber: refNum,
+      dspName: dossierTitle,
+      stage: 'head-office-dsp',
+      subStage: '1.2',
+      stageTitle: '1.2 DSP Received from MOH',
+      senderOrg: metadata.organization,
+      recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      subject: `DSP [${dossierTitle}]: Received from MOH (${cleanMatrixData.rows.length} Facilities, ${totalUnits} Units)`,
+      status: 'Endorsed & Approved',
+      dateSubmitted: metadata.date,
+      totalDevices: cleanMatrixData.columns.length,
+      totalQuantity: totalUnits,
+      totalValuationETB: 0,
+      targetedRegions: regionsList,
+      targetedFacilitiesCount: cleanMatrixData.rows.length,
+      officialLetterRef: letterRef,
+      signatory: metadata.signatory,
+      signatoryRole: metadata.role,
+      authorizedPerson: metadata.signatory,
+      organization: metadata.organization,
+      role: metadata.role,
+      itemsIncluded: itemsSummary,
+      stage4MatrixData: cleanMatrixData,
+      facilityMatrixData: convertedFacilityMatrix,
+      notes: `Exact Health Facility Breakdown Matrix transmitted from ${metadata.organization} to EPSS Head Office (${cleanMatrixData.columns.length} equipment columns, ${cleanMatrixData.rows.length} facilities). Signatory: ${metadata.signatory} (${metadata.role}).`
+    };
+
+    // 2. Linked record for 1.3.1 Map HF to Hub
+    const map131Record: DspWorkflowRecord = {
+      ...received12Record,
+      id: `dsp-moh-to-epss-12-${ts}-map-131`,
+      stage: 'head-office-dsp',
+      subStage: '1.3.1',
+      stageTitle: '1.3.1 Map HF to Hub',
+      status: 'Submitted & Pending'
+    };
+
+    setRecords(prev => [map131Record, received12Record, ...prev]);
+    setSelectedRecord(received12Record);
+    onTriggerCloudSync?.(
+      `MOH Health Facility Breakdown (${cleanMatrixData.rows.length} facilities, ${cleanMatrixData.columns.length} columns, ${totalUnits} units) stored in 1.2 DSP Received from MOH`,
+      {
+        type: 'CREATE',
+        title: `MOH to EPSS Dossier: ${refNum}`,
+        payload: received12Record
+      }
+    );
+    setActionFeedbackToast(
+      `✓ Sent exact ${cleanMatrixData.rows.length}-facility × ${cleanMatrixData.columns.length}-column Matrix to EPSS & stored dossier in 1.2 DSP Received from MOH!`
+    );
+    setTimeout(() => setActionFeedbackToast(null), 5000);
+    onSelectSubTab?.('dsp-ho-1-2');
+  };
 
   const rhbScopedRecords = useMemo(
     () => records.filter((r) => isDossierInTier(r, 'rhb-breakdown-management')),
@@ -1853,6 +1956,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return prev;
             });
           }}
+          onTransmitEPSS={handleMohTransmitToEpss}
           title="DSP Submitted MOH to EPSS - Health Facility Breakdown Matrix"
           subtitle="Official breakdown format submitted by MOH PMD to EPSS with two-tier equipment headers"
         />
@@ -2249,80 +2353,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               return [newRec, ...prev];
             });
           }}
-          onTransmitEPSS={(metadata) => {
-            const ts = Date.now();
-            const refNum = `MOH/EPSS-HO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
-            const letterRef = `MOH/LET/${ts.toString().slice(-4)}`;
-            const totalUnits = metadata.matrixData.rows.reduce(
-              (sum, r) => sum + metadata.matrixData.columns.reduce((cs, c) => cs + (Number(r.quantities[c.id]) || 0), 0),
-              0
-            );
-            const regionsList = [...new Set(metadata.matrixData.rows.map(r => r.region))].filter(Boolean);
-            const itemsSummary = metadata.matrixData.columns.map(c => ({
-              material: c.code,
-              description: c.name,
-              quantity: metadata.matrixData.rows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0),
-              plant: 'HO01 Central'
-            }));
-            const convertedFacilityMatrix = convertStage4ToFacilityMatrix(metadata.matrixData);
-            const dossierTitle = metadata.dspName || `MOH to EPSS Health Facility Matrix (${regionsList.join(', ') || 'National'})`;
-
-            // 1. Incoming record in EPSS 1.2 (DSP Received from MOH) — exact HF matrix sent by MOH
-            const received12Record: DspWorkflowRecord = {
-              id: `dsp-moh-to-epss-12-${ts}`,
-              dspRefNumber: refNum,
-              dspName: dossierTitle,
-              stage: 'head-office-dsp',
-              subStage: '1.2',
-              stageTitle: 'Head Office DSP Management',
-              senderOrg: metadata.organization,
-              recipientOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-              subject: `DSP [${dossierTitle}]: Received from MOH (${metadata.matrixData.rows.length} Facilities, ${totalUnits} Units)`,
-              status: 'Endorsed & Approved',
-              dateSubmitted: metadata.date,
-              totalDevices: metadata.matrixData.columns.length,
-              totalQuantity: totalUnits,
-              totalValuationETB: 0,
-              targetedRegions: regionsList,
-              targetedFacilitiesCount: metadata.matrixData.rows.length,
-              officialLetterRef: letterRef,
-              signatory: metadata.signatory,
-              signatoryRole: metadata.role,
-              authorizedPerson: metadata.signatory,
-              organization: metadata.organization,
-              role: metadata.role,
-              itemsIncluded: itemsSummary,
-              stage4MatrixData: metadata.matrixData,
-              facilityMatrixData: convertedFacilityMatrix,
-              notes: `Exact Health Facility Breakdown Matrix transmitted from ${metadata.organization} to EPSS Head Office. Signatory: ${metadata.signatory} (${metadata.role}).`
-            };
-
-            // 2. Linked record for 1.3.1 Map HF to Hub
-            const map131Record: DspWorkflowRecord = {
-              ...received12Record,
-              id: `dsp-moh-to-epss-12-${ts}-map-131`,
-              stage: 'head-office-dsp',
-              subStage: '1.3.1',
-              stageTitle: '1.3.1 Map HF to Hub',
-              status: 'Submitted & Pending'
-            };
-
-            setRecords(prev => [map131Record, received12Record, ...prev]);
-            setSelectedRecord(map131Record);
-            onTriggerCloudSync?.(
-              `MOH Health Facility Breakdown (${metadata.matrixData.rows.length} facilities, ${totalUnits} units) transmitted to EPSS (1.2 & 1.3.1)`,
-              {
-                type: 'CREATE',
-                title: `MOH to EPSS Dossier: ${refNum}`,
-                payload: received12Record
-              }
-            );
-            setActionFeedbackToast(
-              `✓ Sent exact ${metadata.matrixData.rows.length}-facility Health Facility Matrix to EPSS (1.2 DSP Received from MOH & 1.3.1 Map HF to Hub)!`
-            );
-            setTimeout(() => setActionFeedbackToast(null), 5000);
-            onSelectSubTab?.('dsp-ho-1-2');
-          }}
+          onTransmitEPSS={handleMohTransmitToEpss}
           title="DSP Aggr. Submitted to EPSS - Health Facility Matrix"
           subtitle="Official two-tier equipment allocation matrix submitted by MOH PMD to EPSS Head Office"
         />

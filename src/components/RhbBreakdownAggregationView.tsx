@@ -159,7 +159,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
       woreda: r.woreda,
       healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
       packages: r.packages || 'MCH',
-      plant: r.hub || undefined,
       quantities: { ...r.quantities }
     }));
 
