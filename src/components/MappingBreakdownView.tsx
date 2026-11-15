@@ -1054,40 +1054,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       </div>
 
       {/* Hub Distribution KPI Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-cyan-50 text-cyan-600 border border-cyan-100">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Health Facilities Mapped</div>
-            <div className="text-xl font-black text-slate-900">{currentRows.length.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-500 font-medium">Mapped to Regional Catchment Areas</div>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Equipment Allocated</div>
-            <div className="text-xl font-black text-slate-900">{totalAllocatedUnits.toLocaleString()} <span className="text-xs text-slate-400 font-normal">Units</span></div>
-            <div className="text-[10px] text-slate-500 font-medium">{currentCols.length} Device Types in Matrix</div>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-            <Building className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Delivering Plants (Hubs)</div>
-            <div className="text-xl font-black text-indigo-700">{uniqueHubsCount} <span className="text-xs text-slate-400 font-normal">Active</span></div>
-            <div className="text-[10px] text-slate-500 font-medium">EPSS Regional Hubs & Branches</div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-4">
         <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 shadow-sm flex items-center gap-3.5">
           <div className="p-3 rounded-xl bg-emerald-500 text-white shadow-xs">
             <Truck className="w-5 h-5" />
