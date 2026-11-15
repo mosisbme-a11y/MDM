@@ -259,11 +259,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [autoPopulateFacilitySearch, setAutoPopulateFacilitySearch] = useState('');
   const [isEditingMode, setIsEditingMode] = useState(isEditable);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const effectiveShowHubColumn = (allowedTier === 'moh-osp-management' || allowedTier === 'rhb-breakdown-management') ? false : showHubColumn;
+  const isAllowedHubContext = allowedTier !== 'moh-osp-management' && allowedTier !== 'rhb-breakdown-management';
+  const effectiveShowHubColumn = isAllowedHubContext ? showHubColumn : false;
   const [isHubMapped, setIsHubMapped] = useState(effectiveShowHubColumn);
   useEffect(() => {
     setIsHubMapped(effectiveShowHubColumn);
   }, [effectiveShowHubColumn]);
+  const activeHubMapped = isAllowedHubContext && isHubMapped;
   const [matrixTemplateFormat, setMatrixTemplateFormat] = useState<'item' | 'epss' | 'dsp-received-from-moh' | 'moh-to-epss' | 'submit-breakdown-to-moh' | 'dsp-aggr-submitted-to-epss'>('dsp-aggr-submitted-to-epss');
 
   const handleSelectAllCatalogItems = () => {
@@ -1182,7 +1184,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         'Woreda',
         'Name of health facility',
         'List of Packages',
-        ...(isHubMapped ? ['HUB'] : []),
+        ...(activeHubMapped ? ['HUB'] : []),
         ...columns.map(c => c.name)
       ]);
       aoa.push([
@@ -1191,7 +1193,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         '',
         '',
         'List of Packages',
-        ...(isHubMapped ? [''] : []),
+        ...(activeHubMapped ? [''] : []),
         ...columns.map(c => c.code)
       ]);
       filteredRows.forEach(r => {
@@ -1201,7 +1203,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           r.woreda,
           r.healthFacility || r.customerDescription,
           r.packages || 'MCH',
-          ...(isHubMapped ? [r.hub || 'AA01'] : []),
+          ...(activeHubMapped ? [r.hub || 'AA01'] : []),
           ...columns.map(c => {
             const val = r.quantities[c.id];
             return val === 0 ? '' : (val ?? '');
@@ -1440,20 +1442,20 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
         {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
         <div className="relative flex flex-wrap items-center gap-2">
-            {showHubColumn && (
+            {effectiveShowHubColumn && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleMapHfToHub}
                   disabled={isAnalyzing}
                   className={`px-6 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-xl transition-all transform active:scale-95 border cursor-pointer tracking-wider uppercase flex items-center gap-2 ${
-                    isHubMapped 
+                    activeHubMapped 
                       ? 'bg-emerald-600 border-emerald-400 text-white' 
                       : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400 text-white'
                   }`}
                 >
                   {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
-                  <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
+                  <span>{activeHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
                 </button>
 
                 {onProceedToAggregation && (
@@ -1492,27 +1494,27 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               type="button"
               onClick={() => setIsSubmitDropdownOpen(!isSubmitDropdownOpen)}
               className="flex items-center gap-3 px-6 py-2.5 bg-[#0a0f1d] hover:bg-black text-white rounded-full font-black text-xs sm:text-sm shadow-xl hover:shadow-emerald-900/40 transition-all transform active:scale-95 border border-slate-700/80 cursor-pointer tracking-wider uppercase group"
-              title={showHubColumn || isHubMapped ? "Submit official breakdown matrix to EPSS Hubs and Branches for distribution execution" : "Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"}
+              title={activeHubMapped ? "Submit official breakdown matrix to EPSS Hubs and Branches for distribution execution" : "Submit official breakdown matrix to MOH via System Transmittal, Email, or WhatsApp"}
             >
-              <span className={`w-3.5 h-3.5 rounded-full animate-pulse shrink-0 ${showHubColumn || isHubMapped ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)]' : 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)]'}`} />
-              <span className={`tracking-widest font-black text-white transition-colors ${showHubColumn || isHubMapped ? 'group-hover:text-emerald-300' : 'group-hover:text-amber-300'}`}>
-                {showHubColumn || isHubMapped ? 'SUBMIT BREAKDOWN FOR HUB/BRANCHES' : 'SUBMIT BREAKDOWN TO MOH'}
+              <span className={`w-3.5 h-3.5 rounded-full animate-pulse shrink-0 ${activeHubMapped ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)]' : 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,1)]'}`} />
+              <span className={`tracking-widest font-black text-white transition-colors ${activeHubMapped ? 'group-hover:text-emerald-300' : 'group-hover:text-amber-300'}`}>
+                {activeHubMapped ? 'SUBMIT BREAKDOWN FOR HUB/BRANCHES' : 'SUBMIT BREAKDOWN TO MOH'}
               </span>
-              <span className={`w-6 h-6 rounded-full text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1 ${showHubColumn || isHubMapped ? 'bg-emerald-400' : 'bg-amber-400'}`}>
+              <span className={`w-6 h-6 rounded-full text-slate-950 flex items-center justify-center font-black text-xs shadow-inner shrink-0 ml-1 ${activeHubMapped ? 'bg-emerald-400' : 'bg-amber-400'}`}>
                 3
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${showHubColumn || isHubMapped ? 'text-emerald-400' : 'text-amber-400'} ${isSubmitDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 transition-transform ${activeHubMapped ? 'text-emerald-400' : 'text-amber-400'} ${isSubmitDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Submission Channels Dropdown Popover */}
             {isSubmitDropdownOpen && (
-              <div className={`absolute right-0 mt-2 w-80 bg-[#0a0f1d] border-2 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 ${showHubColumn || isHubMapped ? 'border-emerald-400/80' : 'border-amber-400/80'}`}>
+              <div className={`absolute right-0 mt-2 w-80 bg-[#0a0f1d] border-2 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 ${activeHubMapped ? 'border-emerald-400/80' : 'border-amber-400/80'}`}>
                 <div className="px-3 py-2 border-b border-slate-800">
-                  <span className={`text-[10px] font-black uppercase tracking-wider block ${showHubColumn || isHubMapped ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {showHubColumn || isHubMapped ? 'Select Hub / Branch Submission Channel:' : 'Select MOH Submission Channel:'}
+                  <span className={`text-[10px] font-black uppercase tracking-wider block ${activeHubMapped ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {activeHubMapped ? 'Select Hub / Branch Submission Channel:' : 'Select MOH Submission Channel:'}
                   </span>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    {showHubColumn || isHubMapped ? 'Official dispatch routes for EPSS Hubs & Delivering Branches' : 'Official dispatch routes for PMD MOH'}
+                    {activeHubMapped ? 'Official dispatch routes for EPSS Hubs & Delivering Branches' : 'Official dispatch routes for PMD MOH'}
                   </span>
                 </div>
 
@@ -1521,7 +1523,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     type="button"
                     onClick={() => {
                       setIsSubmitDropdownOpen(false);
-                      setTransmittalDestination(showHubColumn || isHubMapped ? 'EPSS' : 'MOH');
+                      setTransmittalDestination(activeHubMapped ? 'EPSS' : 'MOH');
                       setIsTransmitModalOpen(true);
                     }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-800 text-left transition cursor-pointer text-xs group"
@@ -1531,10 +1533,10 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     </div>
                     <div>
                       <div className="font-bold text-white group-hover:text-emerald-300">
-                        {showHubColumn || isHubMapped ? '1. Direct System Transmittal to Hubs/Branches' : '1. Direct System Transmittal'}
+                        {activeHubMapped ? '1. Direct System Transmittal to Hubs/Branches' : '1. Direct System Transmittal'}
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {showHubColumn || isHubMapped ? 'Digital authorization & branch warehouse manifests' : 'Digital authorization & audit log'}
+                        {activeHubMapped ? 'Digital authorization & branch warehouse manifests' : 'Digital authorization & audit log'}
                       </div>
                     </div>
                   </button>
@@ -1543,7 +1545,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     type="button"
                     onClick={() => {
                       setIsSubmitDropdownOpen(false);
-                      if (showHubColumn || isHubMapped) {
+                      if (activeHubMapped) {
                         setEmailTo('hubs-dispatch@epss.gov.et, aa01@epss.gov.et, ad01@epss.gov.et, bd01@epss.gov.et, di01@epss.gov.et');
                         setEmailSubject(`Official EPSS Health Facility Allocation Matrix for Regional Hubs & Branches - ${internalDate}`);
                       }
@@ -1556,10 +1558,10 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     </div>
                     <div>
                       <div className="font-bold text-white group-hover:text-cyan-300">
-                        {showHubColumn || isHubMapped ? '2. Send via Email to Hub Managers' : '2. Send via Email'}
+                        {activeHubMapped ? '2. Send via Email to Hub Managers' : '2. Send via Email'}
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {showHubColumn || isHubMapped ? 'Targeting hubs-dispatch@epss.gov.et & branches' : 'Targeting moh.pmd@moh.gov.et'}
+                        {activeHubMapped ? 'Targeting hubs-dispatch@epss.gov.et & branches' : 'Targeting moh.pmd@moh.gov.et'}
                       </div>
                     </div>
                   </button>
@@ -1577,10 +1579,10 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     </div>
                     <div>
                       <div className="font-bold text-white group-hover:text-emerald-300">
-                        {showHubColumn || isHubMapped ? '3. Send via WhatsApp Hub Desk' : '3. Send via WhatsApp Desk'}
+                        {activeHubMapped ? '3. Send via WhatsApp Hub Desk' : '3. Send via WhatsApp Desk'}
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {showHubColumn || isHubMapped ? 'Regional Hub Coordinators & Logistics Network' : 'Web dispatch & auto Excel matrix'}
+                        {activeHubMapped ? 'Regional Hub Coordinators & Logistics Network' : 'Web dispatch & auto Excel matrix'}
                       </div>
                     </div>
                   </button>
@@ -2236,7 +2238,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                  <th className="p-2.5 italic bg-[#dbeafe] text-slate-900 border-r border-slate-300 font-semibold min-w-[120px] text-center">
                    List of Packages
                  </th>
-                 {showHubColumn && isHubMapped && (
+                 {effectiveShowHubColumn && isHubMapped && (
                    <th className="p-2.5 bg-[#fef08a] text-amber-950 font-black border-r border-slate-300 min-w-[90px] text-center uppercase tracking-wider">
                      HUB
                    </th>
@@ -2303,7 +2305,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packages</th>
-                {showHubColumn && isHubMapped && (
+                {effectiveShowHubColumn && isHubMapped && (
                   <th className="p-2 bg-[#fef9c3] border-r border-slate-300 text-center font-bold text-amber-900 text-[10px]">HUB</th>
                 )}
                 {matrixTemplateFormat !== 'item' && columns.map(col => (
@@ -2553,7 +2555,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                       </td>
 
                       {/* 6. HUB Column (Auto-inserted when Map HF to Hub is clicked) */}
-                      {showHubColumn && isHubMapped && (
+                      {effectiveShowHubColumn && isHubMapped && (
                         <td className="p-2.5 text-center font-mono font-black border-r border-slate-200 bg-amber-100/70 text-amber-950 min-w-[90px]">
                           {row.hub || 'AA01'}
                         </td>
@@ -2661,7 +2663,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center font-mono font-bold bg-[#eff6ff]/30 text-blue-800">
                   -
                 </td>
-                {showHubColumn && isHubMapped && (
+                {effectiveShowHubColumn && isHubMapped && (
                   <td className="p-2.5 border-r border-slate-300 text-center font-mono font-black text-amber-900 bg-amber-100/60 text-[11px]">
                     -
                   </td>
