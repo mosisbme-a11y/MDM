@@ -95,7 +95,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   dspRecords = []
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
-  const [settings, setSettings] = useState<SystemSettingsConfig>(loadSystemSettings);
+  const [settings, setSettings] = useState<SystemSettingsConfig>(() => ({
+    ...loadSystemSettings(),
+    fontScale
+  }));
+
+  useEffect(() => {
+    setSettings(prev => (prev.fontScale === fontScale ? prev : { ...prev, fontScale }));
+  }, [fontScale]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);

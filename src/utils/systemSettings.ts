@@ -58,7 +58,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingsConfig = {
   tableRowDensity: 'comfortable',
   headerNavThemeId: 'professional-gray',
   highContrast: false,
-  fontScale: 'normal',
+  fontScale: 'compact',
   criticalStockThreshold: 5,
   reorderStockThreshold: 15,
   nearExpiryDays: 90,
@@ -77,7 +77,7 @@ const SETTINGS_STORAGE_KEY = 'epss_system_settings_v1';
 
 export const applyFontScaleToDOM = (scale?: SystemSettingsConfig['fontScale']): void => {
   if (typeof document === 'undefined') return;
-  const currentScale = scale || loadSystemSettings().fontScale || 'normal';
+  const currentScale = scale || loadSystemSettings().fontScale || 'compact';
   const root = document.documentElement;
 
   // Clear previous scale classes
