@@ -858,55 +858,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
         </div>
       </div>
 
-      {/* Controls & Column Picker Strip */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="relative w-full sm:w-60">
-            <Search size={14} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search facility, zone, woreda, package..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500"
-            />
-          </div>
 
-          <select
-            value={selectedRegionFilter}
-            onChange={(e) => setSelectedRegionFilter(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-medium cursor-pointer focus:outline-none focus:border-purple-500"
-          >
-            <option value="all">All Regions ({uniqueRegions.length})</option>
-            {uniqueRegions.map(reg => (
-              <option key={reg} value={reg}>{reg}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Buttons to Add Row & Columns */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            title="Add a new health facility row"
-          >
-            <Plus size={14} />
-            <span>+ Add Facility Row</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsColumnPickerOpen(!isColumnPickerOpen)}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <Layers size={14} />
-            <span>{isColumnPickerOpen ? 'Close Equipment' : 'Manage Equipment (' + columns.length + ')'}</span>
-          </button>
-        </div>
-      </div>
 
       {/* Column Configurator Drawer */}
       {isColumnPickerOpen && (
