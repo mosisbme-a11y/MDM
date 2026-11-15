@@ -720,3 +720,37 @@ export interface DspWorkflowRecord {
   role?: string;
 }
 
+export interface SupplyPlanRecord {
+  id: string;
+  // Group 1: MD CDSS Supply Plan
+  sn: string | number;
+  materialCode: string;
+  materialDescription: string;
+  unit: string;
+  // Group 2: Demand Status
+  annualDemand: number;
+  stockOnHand: number;
+  committedQuantity: number;
+  deliveredQuantity: number;
+  unmetDemand: number;
+  stockOutItems: string;
+  // Group 3: Tender Status
+  tenderQty: number | '';
+  tenderPo: string;
+  tenderStatus: string;
+  rootCauseForRetendering: string;
+  // Group 4: Contract Status
+  pipelineQty: number | '';
+  contractPo: string;
+  contractStatus: string;
+  rootCauseForPend: string;
+  // Group 5: Action Plan
+  responsibleBody: string;
+  edd: string;
+  // Final Column: Remark
+  remark: string;
+  uploadedAt?: string;
+  sourceFile?: string;
+}
+
+

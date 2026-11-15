@@ -71,6 +71,7 @@ import { MappingBreakdownView } from './components/MappingBreakdownView';
 import { normalizeDspRecord } from './data/defaultDspWorkflows';
 
 import { MdCdssManagementView } from './components/MdCdssManagementView';
+import { SupplyPlanManagementView } from './components/SupplyPlanManagementView';
 import { TotalDeliveryAgreementSection } from './components/TotalDeliveryAgreementSection';
 import { HpMdManagementView } from './components/HpMdManagementView';
 import { DonationManagementView } from './components/DonationManagementView';
@@ -110,6 +111,7 @@ import {
   ReceivingDataRecord,
   DistributionDataRecord,
   ProgramMdRecord,
+  SupplyPlanRecord,
   MasterDataLog,
   DspWorkflowRecord
 } from './types';
@@ -390,6 +392,7 @@ export function App() {
       if (centralData.confirmedBatches !== undefined) setConfirmedBatches(centralData.confirmedBatches);
       if (centralData.categoryThresholds !== undefined) setCategoryThresholds(centralData.categoryThresholds);
       if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
+      if (centralData.supplyPlanRecords !== undefined) setSupplyPlanRecords(centralData.supplyPlanRecords);
 
       if (centralData.counts) {
         setCentralSyncStatus({
@@ -518,6 +521,24 @@ export function App() {
           });
           return changed ? Array.from(map.values()) : prev;
         });
+      }
+
+      if (remoteData.supplyPlanRecords !== undefined) {
+        if (remoteData.supplyPlanRecords.length === 0 && /clear/i.test(remoteData.updateKind || '')) {
+          setSupplyPlanRecords([]);
+        } else if (remoteData.supplyPlanRecords.length > 0) {
+          setSupplyPlanRecords(prev => {
+            const map = new Map(prev.map(i => [i.id, i]));
+            let changed = false;
+            remoteData.supplyPlanRecords!.forEach(r => {
+              if (!map.has(r.id) || JSON.stringify(map.get(r.id)) !== JSON.stringify(r)) {
+                map.set(r.id, r);
+                changed = true;
+              }
+            });
+            return changed ? Array.from(map.values()) : prev;
+          });
+        }
       }
 
       if (remoteData.dsp22Columns) {
@@ -907,6 +928,91 @@ export function App() {
     triggerCloudSyncToast(`Deleted Program MD record.`, {
       type: 'DELETE',
       title: `Delete Program MD Record`
+    });
+  };
+
+  // MD CDSS Supply Plan Dataset (21-column two-tier schema)
+  const [supplyPlanRecords, setSupplyPlanRecords] = useState<SupplyPlanRecord[]>([]);
+
+  const handleUploadSupplyPlanData = (newRecords: SupplyPlanRecord[], mode: 'append' | 'replace' = 'replace', fileName?: string) => {
+    const updated = mode === 'replace' ? newRecords : [...supplyPlanRecords, ...newRecords];
+    setSupplyPlanRecords(updated);
+    pushCentralMasterData({
+      supplyPlanRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Upload Supply Plan (${newRecords.length} Records)`
+    });
+    recordMasterDataLog({
+      type: 'Supply Plan',
+      fileName: fileName || 'MD CDSS Supply Plan',
+      rowCount: newRecords.length,
+      uploadedAt: new Date().toISOString(),
+      status: 'Success'
+    });
+    triggerCloudSyncToast(
+      `✓ Successfully saved ${newRecords.length} Supply Plan records (Total: ${updated.length}).`,
+      {
+        type: 'CREATE',
+        title: `Upload ${newRecords.length} Supply Plan Records`,
+        payload: newRecords
+      }
+    );
+  };
+
+  const handleClearSupplyPlanData = () => {
+    setSupplyPlanRecords([]);
+    pushCentralMasterData({
+      supplyPlanRecords: [],
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: 'Clear Supply Plan Records'
+    });
+    triggerCloudSyncToast('Cleared all Supply Plan records.', {
+      type: 'DELETE',
+      title: 'Clear Supply Plan Records'
+    });
+  };
+
+  const handleAddSupplyPlanRecord = (record: SupplyPlanRecord) => {
+    const updated = [record, ...supplyPlanRecords];
+    setSupplyPlanRecords(updated);
+    pushCentralMasterData({
+      supplyPlanRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Add Supply Plan Item: ${record.materialCode || record.materialDescription}`
+    });
+    triggerCloudSyncToast(`Added Supply Plan item ${record.materialCode || record.materialDescription}.`, {
+      type: 'CREATE',
+      title: `Add Supply Plan Item`,
+      payload: record
+    });
+  };
+
+  const handleUpdateSupplyPlanRecord = (record: SupplyPlanRecord) => {
+    const updated = supplyPlanRecords.map(r => r.id === record.id ? record : r);
+    setSupplyPlanRecords(updated);
+    pushCentralMasterData({
+      supplyPlanRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Update Supply Plan Item: ${record.materialCode || record.materialDescription}`
+    });
+    triggerCloudSyncToast(`Updated Supply Plan item ${record.materialCode || record.materialDescription}.`, {
+      type: 'UPDATE',
+      title: `Update Supply Plan Item`,
+      payload: record
+    });
+  };
+
+  const handleDeleteSupplyPlanRecord = (id: string) => {
+    const updated = supplyPlanRecords.filter(r => r.id !== id);
+    setSupplyPlanRecords(updated);
+    pushCentralMasterData({
+      supplyPlanRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Delete Supply Plan Item: ${id}`
+    });
+    triggerCloudSyncToast(`Deleted Supply Plan item.`, {
+      type: 'DELETE',
+      title: `Delete Supply Plan Item`
     });
   };
 
@@ -3437,6 +3543,16 @@ export function App() {
                 onSelectSubTab={(tab) => setEpssSubTab(tab)}
                 items={mohFilteredItems}
                 onSelectItem={(item) => setSelectedDevice(item)}
+              />
+            ) : deliverySubTab === 'supply' ? (
+              <SupplyPlanManagementView
+                records={supplyPlanRecords}
+                onUploadRecords={handleUploadSupplyPlanData}
+                onClearRecords={handleClearSupplyPlanData}
+                onAddRecord={handleAddSupplyPlanRecord}
+                onUpdateRecord={handleUpdateSupplyPlanRecord}
+                onDeleteRecord={handleDeleteSupplyPlanRecord}
+                isAdmin={isAdmin}
               />
             ) : (
               <DeliveryStatusView

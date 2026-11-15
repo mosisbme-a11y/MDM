@@ -6,6 +6,7 @@ import {
   MaterialMasterRecord,
   HealthFacilityRecord,
   ProgramMdRecord,
+  SupplyPlanRecord,
   NoBkdItem,
   ConfirmedUploadBatch,
   CategoryThreshold,
@@ -24,6 +25,7 @@ export interface CentralMasterDataCounts {
   materialMaster: number;
   hfList: number;
   programMd?: number;
+  supplyPlan?: number;
   noBkd?: number;
   confirmedBatches?: number;
   dspWorkflows?: number;
@@ -44,6 +46,7 @@ export interface CentralMasterData {
   materialMasterItems?: MaterialMasterRecord[];
   hfListItems?: HealthFacilityRecord[];
   programMdRecords?: ProgramMdRecord[];
+  supplyPlanRecords?: SupplyPlanRecord[];
   noBkdItems?: NoBkdItem[];
   confirmedBatches?: ConfirmedUploadBatch[];
   dspWorkflowRecords?: DspWorkflowRecord[];
@@ -113,6 +116,7 @@ const ARRAY_FIELDS = [
   'materialMasterItems',
   'hfListItems',
   'programMdRecords',
+  'supplyPlanRecords',
   'noBkdItems',
   'confirmedBatches',
   'dspWorkflowRecords',
