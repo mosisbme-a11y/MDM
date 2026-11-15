@@ -487,6 +487,8 @@ export const RegionBreakdownModal: React.FC<RegionBreakdownModalProps> = ({
                 hfListItems={hfListItems}
                 onUpdateData={handleMatrixUpdate}
                 isEditable={true}
+                allowedTier="rhb-breakdown-management"
+                showHubColumn={false}
                 title="Regional Health Facility Allocation Matrix"
                 subtitle="Live interactive editor. Click cells to modify facility details or allocated equipment quantities."
               />

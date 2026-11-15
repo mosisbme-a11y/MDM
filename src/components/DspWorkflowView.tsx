@@ -98,7 +98,8 @@ import {
   DspHierarchyTierId,
   getDspHierarchyInfo,
   isDossierInTier,
-  isDossierInSubStep
+  isDossierInSubStep,
+  getDossierTier
 } from '../data/defaultDspWorkflows';
 import { isProgramHpStockItem } from '../data/defaultDspRequestTemplateData';
 import { mapFacilityToHub, getHubByCode } from '../data/epssHubs';
@@ -2927,7 +2928,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                     <RegionBreakdownMatrixTable
                       data={selectedRecord.facilityMatrixData}
                       isEditable={false}
-                      showHubColumn={Boolean(selectedRecord.facilityMatrixData.rows.some(r => r.hub))}
+                      allowedTier={getDossierTier(selectedRecord)}
+                      showHubColumn={false}
                       title="Exact Sent Health Facility Breakdown Matrix"
                       subtitle="Exact two-tier equipment allocation matrix as transmitted"
                     />
