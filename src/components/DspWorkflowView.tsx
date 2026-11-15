@@ -1124,13 +1124,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
                 DSP Management & Institutional Distribution Workflow
               </h2>
-              <span className="text-[10px] font-bold text-amber-600 font-mono tracking-widest uppercase">
-                • MOH ⇄ EPSS ⇄ RHB ⇄ Plants
-              </span>
             </div>
-            <p className="text-xs text-slate-500">
-              End-to-end tracking of Distribution Suggestion Plans, official quota requests, regional breakdowns, and plant release orders
-            </p>
           </div>
         </div>
 
@@ -1177,26 +1171,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           >
             <Download className="w-3.5 h-3.5 text-amber-500" />
             <span>Export DSP Dossier</span>
-          </button>
-          <button
-            onClick={() => setIsSavedDraftsManagerOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-amber-200 shadow-xs relative"
-          >
-            <Archive className="w-3.5 h-3.5 text-amber-600" />
-            <span>Saved Drafts</span>
-            {(() => {
-              const scopedDraftCount = records.filter(r => {
-                const isDraft = (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft';
-                if (!isDraft) return false;
-                if (currentStage !== 'all') return isDossierInTier(r, currentStage as DspHierarchyTierId);
-                return true;
-              }).length;
-              return scopedDraftCount > 0 ? (
-                <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
-                  {scopedDraftCount}
-                </span>
-              ) : null;
-            })()}
           </button>
         </div>
       </div>
@@ -1488,6 +1462,28 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             </button>
           );
         })}
+        {(currentStage === 'moh-osp-management' || currentStage === 'rhb-breakdown-management') && (
+          <button
+            type="button"
+            onClick={() => setIsSavedDraftsManagerOpen(true)}
+            className="ml-auto px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-amber-200 shadow-xs relative"
+          >
+            <Archive className="w-3.5 h-3.5 text-amber-600" />
+            <span>Saved Drafts</span>
+            {(() => {
+              const scopedDraftCount = records.filter(r => {
+                const isDraft = (r.status as string) === 'Draft' || (r.status as string) === 'Saved Draft';
+                if (!isDraft) return false;
+                return isDossierInTier(r, currentStage as DspHierarchyTierId);
+              }).length;
+              return scopedDraftCount > 0 ? (
+                <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {scopedDraftCount}
+                </span>
+              ) : null;
+            })()}
+          </button>
+        )}
       </div>
 
 
