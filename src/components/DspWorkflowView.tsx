@@ -78,6 +78,7 @@ import { DspReceivedFromMohView } from './DspReceivedFromMohView';
 import { DspBreakdownReceivedFromMohView } from './DspBreakdownReceivedFromMohView';
 import { DspBreakdownMohToRhbView } from './DspBreakdownMohToRhbView';
 import { MappingBreakdownView } from './MappingBreakdownView';
+import { DossierFacilityMatrixDetailsTable } from './DossierFacilityMatrixDetailsTable';
 import { StageSourceDataModal } from './StageSourceDataModal';
 import { SavedDraftsManagerModal } from './SavedDraftsManagerModal';
 import { 
@@ -2936,29 +2937,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 );
               }
 
-              if (selectedRecord.stage4MatrixData) {
+              const facilityMatrixPayload = selectedRecord.stage4MatrixData || selectedRecord.facilityMatrixData;
+              if (facilityMatrixPayload) {
                 return (
                   <div className="space-y-2 border-t border-slate-200 pt-3">
-                    <Stage4MohSubmittedMatrixTable
-                      data={selectedRecord.stage4MatrixData}
-                      isEditable={false}
+                    <DossierFacilityMatrixDetailsTable
+                      data={facilityMatrixPayload}
+                      record={selectedRecord}
                       title="Exact Sent Health Facility Breakdown Matrix"
-                      subtitle="Exact two-tier equipment allocation matrix as transmitted"
-                    />
-                  </div>
-                );
-              }
-
-              if (selectedRecord.facilityMatrixData) {
-                return (
-                  <div className="space-y-2 border-t border-slate-200 pt-3">
-                    <RegionBreakdownMatrixTable
-                      data={selectedRecord.facilityMatrixData}
-                      isEditable={false}
-                      allowedTier={getDossierTier(selectedRecord)}
-                      showHubColumn={false}
-                      title="Exact Sent Health Facility Breakdown Matrix"
-                      subtitle="Exact two-tier equipment allocation matrix as transmitted"
+                      subtitle="Official two-tier equipment allocation matrix as transmitted (Full Columns Dossier)"
                     />
                   </div>
                 );

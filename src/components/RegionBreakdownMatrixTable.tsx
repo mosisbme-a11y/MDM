@@ -35,7 +35,8 @@ import {
   Volume2,
   VolumeX,
   Map as MapIcon,
-  RefreshCw
+  RefreshCw,
+  Printer
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
@@ -58,6 +59,7 @@ export interface RegionBreakdownColumn {
 
 export interface RegionBreakdownRow {
   id: string;
+  date?: string;
   region: string;
   zone: string;
   woreda: string;
@@ -1288,6 +1290,61 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     showToast(`✓ Exported ${filename}`);
   };
 
+  // Export to CSV matching the full matrix columns
+  const handleExportCSV = () => {
+    const esc = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const headerRow1 = [
+      'S/N',
+      'Date',
+      'Region',
+      'Zone',
+      'Woreda',
+      'Name of health facility',
+      'List of Packages',
+      ...(effectiveShowHubColumn && isHubMapped ? ['HUB'] : []),
+      ...columns.map(c => c.name)
+    ];
+    const headerRow2 = [
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'List of Packages',
+      ...(effectiveShowHubColumn && isHubMapped ? ['HUB'] : []),
+      ...columns.map(c => c.code)
+    ];
+    const bodyRows = filteredRows.map((r, idx) => [
+      idx + 1,
+      esc(r.date || internalDate),
+      esc(r.region),
+      esc(r.zone),
+      esc(r.woreda),
+      esc(r.customerDescription || r.healthFacility),
+      esc(r.packages || 'MCH'),
+      ...(effectiveShowHubColumn && isHubMapped ? [esc(r.hub || 'AA01')] : []),
+      ...columns.map(c => Number(r.quantities[c.id]) || 0)
+    ].join(','));
+
+    const csvContent = [
+      headerRow1.map(esc).join(','),
+      headerRow2.map(esc).join(','),
+      ...bodyRows
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Facility_Breakdown_Matrix_${selectedRegionFilter !== 'all' ? selectedRegionFilter : 'All_Regions'}_${internalDate}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✓ Exported CSV matrix');
+  };
+
   // Download official blank template
   const handleDownloadTemplate = () => {
     const fmt = matrixTemplateFormat;
@@ -1361,7 +1418,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       )}
 
       {/* 🚨 BENCHMARK OVER-ALLOCATION ALARM BANNER */}
-      {overAllocatedColumns.length > 0 && (
+      {isEditable && overAllocatedColumns.length > 0 && (
         <div className="bg-gradient-to-r from-rose-900 via-rose-950 to-red-900 border-2 border-rose-400 rounded-2xl p-4 text-white shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3">
           <div className="flex items-start gap-3">
             <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-lg shrink-0 border border-rose-400 animate-bounce">
@@ -1440,8 +1497,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           </div>
         </div>
 
-        {/* SUBMIT BREAKDOWN TO MOH 3 Pill Button with Interactive Dropdown */}
-        <div className="relative flex flex-wrap items-center gap-2">
+        {/* Actions Bar */}
+        {isEditable ? (
+          <div className="relative flex flex-wrap items-center gap-2">
             {effectiveShowHubColumn && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1590,14 +1648,53 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               </div>
             )}
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Download complete two-tier breakdown matrix in Excel (.xlsx)"
+            >
+              <FileSpreadsheet size={14} />
+              <span>Export Excel (.xlsx)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-black transition flex items-center gap-1.5 cursor-pointer border border-slate-700 shadow-sm active:scale-95"
+              title="Download CSV"
+            >
+              <Download size={14} className="text-amber-400" />
+              <span>CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer transition shadow-2xs"
+              title="Print dossier matrix"
+            >
+              <Printer size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 cursor-pointer transition"
+              title={isFullScreen ? 'Exit full screen' : 'Expand full screen'}
+            >
+              {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          </div>
+        )}
+      </div>
 
 
 
 
 
       {/* Equipment Column Configurator */}
-      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50/60 border border-amber-200 rounded-2xl p-3.5 shadow-2xs space-y-3">
+      {isEditable && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50/60 border border-amber-200 rounded-2xl p-3.5 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-amber-600 text-white shadow-2xs">
@@ -1870,7 +1967,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 + Add Column
               </button>
             </div>
-      </div>
+          </div>
+        )}
       
       {/* Region Selector & Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3 shadow-2xs">
@@ -2223,6 +2321,12 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
               {/* Header Row 1: Matching exact attachment structure */}
               <tr className="border-b border-slate-300 text-xs font-medium">
+                <th className="p-2.5 font-bold bg-[#fed7aa] text-slate-900 border-r border-slate-300 w-12 text-center shrink-0">
+                  S/N
+                </th>
+                <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[105px]">
+                  Date
+                </th>
                 <th className="p-2.5 italic bg-[#fed7aa] text-slate-900 border-r border-slate-300 font-semibold min-w-[110px]">
                   Region
                 </th>
@@ -2304,6 +2408,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
+                <th className="p-2 bg-[#ffedd5] border-r border-slate-300"></th>
                 <th className="p-2 bg-[#eff6ff] italic text-slate-600 text-[10px] text-center border-r border-slate-300">List of Packages</th>
                 {effectiveShowHubColumn && isHubMapped && (
                   <th className="p-2 bg-[#fef9c3] border-r border-slate-300 text-center font-bold text-amber-900 text-[10px]">HUB</th>
@@ -2378,6 +2484,16 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
                   return (
                     <tr key={row.id} className={`transition-all duration-700 ${isRecentlyLoaded ? 'bg-amber-50/90 border-l-4 border-amber-500 shadow-2xs' : 'hover:bg-slate-50/70'}`}>
+                      {/* S/N */}
+                      <td className="p-2.5 text-center font-mono font-bold text-slate-500 border-r border-slate-200">
+                        {rowIdx + 1}
+                      </td>
+
+                      {/* Date */}
+                      <td className="p-2.5 text-slate-600 font-mono text-[11px] border-r border-slate-200 whitespace-nowrap">
+                        {row.date || internalDate}
+                      </td>
+
                       {/* 1. Region */}
                       <td className="p-2.5 text-slate-800 border-r border-slate-200 font-bold min-w-[110px]">
                         {isRecentlyLoaded && (
@@ -2628,7 +2744,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
               {/* Inline Add Facility Row Button Row */}
               <tr className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
-                <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + 7) + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
+                <td colSpan={(matrixTemplateFormat === 'item' ? 5 : columns.length + 9) + (isEditingMode ? 1 : 0)} className="p-2.5 text-center">
                   <button
                     type="button"
                     onClick={handleAddRow}
@@ -2645,10 +2761,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             {/* Total Footer Row */}
             <tfoot>
               <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300 text-slate-900 text-xs">
-                <td className="p-2.5 border-r border-slate-300 uppercase tracking-wider text-[11px]">
+                <td className="p-2.5 border-r border-slate-300 uppercase tracking-wider text-[11px] font-black">
                   Total
                 </td>
-                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px]">
+                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center">
+                  -
+                </td>
+                <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center">
                   -
                 </td>
                 <td className="p-2.5 border-r border-slate-300 text-slate-500 text-[11px] text-center">

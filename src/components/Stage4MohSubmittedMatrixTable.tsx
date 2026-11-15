@@ -791,26 +791,30 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Send to EPSS Button - Prominent Action */}
-          <button
-            type="button"
-            onClick={() => setIsTransmitModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-2 cursor-pointer border-b-4 border-amber-700 shadow-md transition-all active:border-b-0 active:translate-y-[2px]"
-            title="Send official aggregated breakdown matrix directly to EPSS Head Office"
-          >
-            <Send size={15} className="text-slate-950" />
-            <span className="uppercase font-black tracking-wider">Send to EPSS</span>
-          </button>
+          {isEditable && (
+            <>
+              {/* Send to EPSS Button - Prominent Action */}
+              <button
+                type="button"
+                onClick={() => setIsTransmitModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-2 cursor-pointer border-b-4 border-amber-700 shadow-md transition-all active:border-b-0 active:translate-y-[2px]"
+                title="Send official aggregated breakdown matrix directly to EPSS Head Office"
+              >
+                <Send size={15} className="text-slate-950" />
+                <span className="uppercase font-black tracking-wider">Send to EPSS</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-            title="Import Excel or CSV matching this format"
-          >
-            <Upload size={14} />
-            <span>Upload / Import Matrix</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Import Excel or CSV matching this format"
+              >
+                <Upload size={14} />
+                <span>Upload / Import Matrix</span>
+              </button>
+            </>
+          )}
 
           <button
             type="button"
@@ -834,18 +838,20 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             <Download size={14} className="text-purple-600" />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsEditingMode(!isEditingMode)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-              isEditingMode
-                ? 'bg-purple-50 border-purple-300 text-purple-800'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Edit3 size={14} />
-            <span>{isEditingMode ? 'Finish Editing' : 'Edit Matrix'}</span>
-          </button>
+          {isEditable && (
+            <button
+              type="button"
+              onClick={() => setIsEditingMode(!isEditingMode)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                isEditingMode
+                  ? 'bg-purple-50 border-purple-300 text-purple-800'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Edit3 size={14} />
+              <span>{isEditingMode ? 'Finish Editing' : 'Edit Matrix'}</span>
+            </button>
+          )}
 
           <button
             type="button"
