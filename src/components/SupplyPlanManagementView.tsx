@@ -668,17 +668,49 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
     let tenderQty = 0;
     let pipelineQty = 0;
 
+    // Line-of-item counts for KPI cards
+    let annualDemandLines = 0;
+    let stockOnHandLines = 0;
+    let committedLines = 0;
+    let deliveredLines = 0;
+    let unmetLines = 0;
+    let tenderLines = 0;
+    let pipelineLines = 0;
+
     filteredRecords.forEach(r => {
-      annualDemand += Number(r.annualDemand) || 0;
-      stockOnHand += Number(r.stockOnHand) || 0;
-      committedQuantity += Number(r.committedQuantity) || 0;
-      deliveredQuantity += Number(r.deliveredQuantity) || 0;
-      unmetDemand += Number(r.unmetDemand) || 0;
+      const aDemand = Number(r.annualDemand) || 0;
+      const soh = Number(r.stockOnHand) || 0;
+      const committed = Number(r.committedQuantity) || 0;
+      const delivered = Number(r.deliveredQuantity) || 0;
+      const unmet = Number(r.unmetDemand) || 0;
+
+      annualDemand += aDemand;
+      stockOnHand += soh;
+      committedQuantity += committed;
+      deliveredQuantity += delivered;
+      unmetDemand += unmet;
+
+      if (aDemand > 0) annualDemandLines += 1;
+      if (soh > 0) stockOnHandLines += 1;
+      if (committed > 0) committedLines += 1;
+      if (delivered > 0) deliveredLines += 1;
+      if (unmet < 0 || unmet !== 0) unmetLines += 1;
+
       if ((r.stockOutItems || '').trim().toLowerCase() === 'yes') {
         stockOutYesCount += 1;
       }
+
+      const hasTenderQty = typeof r.tenderQty === 'number' && r.tenderQty > 0;
       if (typeof r.tenderQty === 'number') tenderQty += r.tenderQty;
+      if (hasTenderQty || Boolean(r.tenderPo?.trim()) || Boolean(r.tenderStatus?.trim())) {
+        tenderLines += 1;
+      }
+
+      const hasPipelineQty = typeof r.pipelineQty === 'number' && r.pipelineQty > 0;
       if (typeof r.pipelineQty === 'number') pipelineQty += r.pipelineQty;
+      if (hasPipelineQty || Boolean(r.contractPo?.trim()) || Boolean(r.contractStatus?.trim())) {
+        pipelineLines += 1;
+      }
     });
 
     return {
@@ -689,7 +721,14 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
       unmetDemand,
       stockOutYesCount,
       tenderQty,
-      pipelineQty
+      pipelineQty,
+      annualDemandLines,
+      stockOnHandLines,
+      committedLines,
+      deliveredLines,
+      unmetLines,
+      tenderLines,
+      pipelineLines
     };
   }, [filteredRecords]);
 
@@ -1077,7 +1116,7 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
         </div>
       </div>
 
-      {/* KPI Strip */}
+      {/* KPI Strip (Counted by Line of Item) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -1085,7 +1124,7 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
             <Boxes className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-xl font-black text-slate-900 mt-1 tabular-nums">{formatNumber(filteredRecords.length)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">of {records.length} uploaded</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">of {formatNumber(records.length)} line items</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
@@ -1093,17 +1132,17 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
             <span>Annual Demand</span>
             <ClipboardList className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1 tabular-nums">{formatNumber(totals.annualDemand)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">SOH: {formatNumber(totals.stockOnHand)}</div>
+          <div className="text-xl font-black text-slate-900 mt-1 tabular-nums">{formatNumber(totals.annualDemandLines)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">SOH Items: {formatNumber(totals.stockOnHandLines)}</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            <span>Delivered Qty</span>
+            <span>Delivered Items</span>
             <PackageCheck className="w-4 h-4 text-teal-600" />
           </div>
-          <div className="text-xl font-black text-teal-700 mt-1 tabular-nums">{formatNumber(totals.deliveredQuantity)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Committed: {formatNumber(totals.committedQuantity)}</div>
+          <div className="text-xl font-black text-teal-700 mt-1 tabular-nums">{formatNumber(totals.deliveredLines)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">Committed: {formatNumber(totals.committedLines)} items</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
@@ -1111,26 +1150,26 @@ export const SupplyPlanManagementView: React.FC<SupplyPlanManagementViewProps> =
             <span>Unmet / Stock Out</span>
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
-          <div className="text-xl font-black text-rose-700 mt-1 tabular-nums">{formatNumber(totals.unmetDemand)}</div>
-          <div className="text-[11px] text-rose-600 font-semibold mt-0.5">{totals.stockOutYesCount} Stock-Out (Yes)</div>
+          <div className="text-xl font-black text-rose-700 mt-1 tabular-nums">{formatNumber(totals.unmetLines)}</div>
+          <div className="text-[11px] text-rose-600 font-semibold mt-0.5">{formatNumber(totals.stockOutYesCount)} Stock-Out (Yes)</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            <span>Tender Qty</span>
+            <span>Tender Status</span>
             <ShoppingCart className="w-4 h-4 text-sky-600" />
           </div>
-          <div className="text-xl font-black text-sky-700 mt-1 tabular-nums">{formatNumber(totals.tenderQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Active tender volume</div>
+          <div className="text-xl font-black text-sky-700 mt-1 tabular-nums">{formatNumber(totals.tenderLines)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">Active tender line items</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            <span>Pipeline Qty</span>
+            <span>Contract Pipeline</span>
             <FileCheck2 className="w-4 h-4 text-lime-700" />
           </div>
-          <div className="text-xl font-black text-lime-800 mt-1 tabular-nums">{formatNumber(totals.pipelineQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Contract pipeline</div>
+          <div className="text-xl font-black text-lime-800 mt-1 tabular-nums">{formatNumber(totals.pipelineLines)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">Pipeline line items</div>
         </div>
       </div>
 
