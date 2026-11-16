@@ -2113,7 +2113,7 @@ Authorized Directorate Desk`;
                   {/* RIGHT / SIDEBAR COLUMN (4 cols): Confirmation Criteria, Signatory, Transmit Action */}
                   <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto pr-1">
                     {/* CONFIRMATION CRITERIA SECTION (CORE USER REQUIREMENT) */}
-                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-3.5">
+                    <div className="hidden">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
