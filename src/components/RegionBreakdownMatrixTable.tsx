@@ -1481,7 +1481,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className={allowedTier === 'head-office-dsp' ? 'hidden' : 'flex items-center gap-2'}>
               <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase">
                 {title}
               </h3>
@@ -1490,7 +1490,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               </span>
             </div>
             {subtitle && (
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className={allowedTier === 'head-office-dsp' ? 'hidden' : 'text-xs text-slate-500 mt-0.5'}>
                 {subtitle}
               </p>
             )}
@@ -1702,14 +1702,14 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                <span className={allowedTier === 'head-office-dsp' ? 'hidden' : 'text-xs font-black text-slate-900 uppercase tracking-wider'}>
                   {disableBreakdownLink ? 'Equipment & Facility Mapping Matrix' : 'Breakdown Request Source Data'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/70 text-amber-900 font-mono">
+                <span className={allowedTier === 'head-office-dsp' ? 'hidden' : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/70 text-amber-900 font-mono'}>
                   {disableBreakdownLink ? 'Interactive Matrix' : 'Selectable Request'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600">
+              <p className={allowedTier === 'head-office-dsp' ? 'hidden' : 'text-[11px] text-slate-600'}>
                 {disableBreakdownLink 
                   ? 'Manage equipment columns, view quantities, and map facility distribution across regions and hubs'
                   : 'Select a breakdown request to dynamically update equipment columns and health facility allocations'}
@@ -1722,7 +1722,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             <button
               type="button"
               onClick={() => setShowBenchmarkPanel(!showBenchmarkPanel)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
+              className={allowedTier === 'head-office-dsp' ? 'hidden' : `px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
                 overAllocatedColumns.length > 0 
                   ? 'bg-rose-600 text-white border-rose-500 animate-pulse font-black' 
                   : showBenchmarkPanel 
@@ -1920,7 +1920,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             )}
 
             {/* Active Columns Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <div className={allowedTier === 'head-office-dsp' ? 'hidden' : 'flex flex-wrap items-center gap-1.5 pt-1'}>
               {columns.map((col) => (
                 <div
                   key={col.id}
@@ -1943,7 +1943,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
 
 
             {/* Add Custom Equipment Column Inputs */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-100">
+            <div className={allowedTier === 'head-office-dsp' ? 'hidden' : 'flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-100'}>
               <input
                 type="text"
                 placeholder="New Equipment Description (e.g. Patient Monitor)..."
