@@ -29,48 +29,109 @@ export const DSP_REQUEST_TEMPLATE_COLUMNS = [
 
 export const TODAY_ISO_DATE = new Date().toISOString().slice(0, 10);
 
+export const DEFAULT_SAMPLE_HP_STOCK_ITEMS = [
+  {
+    id: 'hp-stock-1',
+    material: '401-BEDP-001',
+    materialDescription: 'Bed - Patient, ICU Electric',
+    plant: 'HO01',
+    unrestrictedStock: 44,
+    currentValueOfUnrestrictedStock: 2500000,
+    inventoryValuationType: 'Siemens Healthineers',
+    wbsElement: 'SDG-ME-23-001-011',
+    budgetSource: 'Global Fund',
+    specialStockType: 'Q'
+  },
+  {
+    id: 'hp-stock-2',
+    material: '403-CEGP-002',
+    materialDescription: 'Centrifuge - General Laboratory',
+    plant: 'HO01',
+    unrestrictedStock: 113,
+    currentValueOfUnrestrictedStock: 4500000,
+    inventoryValuationType: 'Eppendorf',
+    wbsElement: 'SDG-ME-23-001-011',
+    budgetSource: 'MOH Treasury',
+    specialStockType: 'Q'
+  },
+  {
+    id: 'hp-stock-3',
+    material: '402-CPAM-003',
+    materialDescription: 'CPAP Machine with Humidifier',
+    plant: 'HO01',
+    unrestrictedStock: 44,
+    currentValueOfUnrestrictedStock: 1800000,
+    inventoryValuationType: 'ResMed',
+    wbsElement: 'SDG-ME-23-001-011',
+    budgetSource: 'World Bank',
+    specialStockType: 'Q'
+  },
+  {
+    id: 'hp-stock-4',
+    material: '401-CODE-004',
+    materialDescription: 'Couch - Examination / Delivery',
+    plant: 'HO01',
+    unrestrictedStock: 206,
+    currentValueOfUnrestrictedStock: 3100000,
+    inventoryValuationType: 'Standard Medical',
+    wbsElement: 'SDG-ME-23-001-011',
+    budgetSource: 'SDG Fund',
+    specialStockType: 'Q'
+  },
+  {
+    id: 'hp-stock-5',
+    material: '402-CYOX-005',
+    materialDescription: 'Cylinder - Oxygen, 40L Medical',
+    plant: 'HO01',
+    unrestrictedStock: 120,
+    currentValueOfUnrestrictedStock: 960000,
+    inventoryValuationType: 'Local Med',
+    wbsElement: 'SDG-ME-23-001-011',
+    budgetSource: 'MOH Treasury',
+    specialStockType: 'Q'
+  }
+];
+
 // Strictly pure user uploaded records only (No default/sample data)
 export const DEFAULT_DSP_REQUEST_TEMPLATE_ROWS: DspRequestTemplateRow[] = [];
 
 /**
- * Checks whether a Multiple Stock record belongs strictly to Program (HP) items
+ * Checks whether a Multiple Stock record belongs strictly to Program (HP) items (Special Stock Q)
  */
 export function isProgramHpStockItem(item: any): boolean {
   if (!item) return false;
   const spec = (item.specialStockType || '').trim().toUpperCase();
-  const wbs = (item.wbsElement || '').toUpperCase();
-  const valType = (item.inventoryValuationType || '').toUpperCase();
-  const group = (item.materialGroupName || '').toUpperCase();
-  const desc = (item.materialDescription || '').toUpperCase();
-  const mat = (item.material || '').toUpperCase();
-
-  // Strictly filter by Special Stock 'Q' as requested by the user
-  if (spec === 'Q') {
-    return true;
-  }
-  return false;
+  return spec === 'Q';
 }
 
 /**
- * Builds DSP Request template rows from active Multiple Stock, filtering to ONLY Program (HP) items
- * and auto-filling Request Date with today's date and DSP Request To with 'MOH'.
+ * Builds DSP Request template rows from active Multiple Stock, filtering strictly to Special Stock 'Q' items
+ * and sorting them alphabetically by material description, auto-filling Request Date and DSP Request To 'MOH'.
  */
 export function buildDspTemplateRowsFromStock(stockItems: any[], todayStr?: string): DspRequestTemplateRow[] {
   const dateVal = todayStr || TODAY_ISO_DATE;
-  const hpItems = (stockItems || []).filter(isProgramHpStockItem);
+  let sourceList = stockItems && stockItems.length > 0 ? stockItems : DEFAULT_SAMPLE_HP_STOCK_ITEMS;
+  let hpItems = (sourceList || []).filter(isProgramHpStockItem);
 
-  if (hpItems.length === 0) {
-    return [];
+  if (hpItems.length === 0 && (!stockItems || stockItems.length === 0)) {
+    hpItems = DEFAULT_SAMPLE_HP_STOCK_ITEMS.filter(isProgramHpStockItem);
   }
 
-  return hpItems.map((s, idx) => {
+  // Sort alphabetically by material description or material code
+  const sortedItems = [...hpItems].sort((a, b) => {
+    const descA = (a.materialDescription || a.material || '').trim().toLowerCase();
+    const descB = (b.materialDescription || b.material || '').trim().toLowerCase();
+    return descA.localeCompare(descB);
+  });
+
+  return sortedItems.map((s, idx) => {
     return {
       id: `stock-hp-${s.id || idx}`,
       srNo: idx + 1,
       material: s.material || '',
       materialDescription: s.materialDescription || '',
-      qty: s.unrestrictedStock || 0,
-      totalAmount: s.currentValueOfUnrestrictedStock || 0,
+      qty: s.unrestrictedStock || (s as any).qty || 0,
+      totalAmount: s.currentValueOfUnrestrictedStock || (s as any).totalAmount || 0,
       valuationTypeDesc: s.inventoryValuationType || '',
       wbsElement: s.wbsElement || '',
       budgetSource: s.budgetSource || '',

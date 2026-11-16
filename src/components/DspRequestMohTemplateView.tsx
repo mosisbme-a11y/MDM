@@ -47,6 +47,7 @@ import {
   DspRequestTemplateRow, 
   DSP_REQUEST_TEMPLATE_COLUMNS, 
   DEFAULT_DSP_REQUEST_TEMPLATE_ROWS,
+  DEFAULT_SAMPLE_HP_STOCK_ITEMS,
   TODAY_ISO_DATE,
   isProgramHpStockItem,
   buildDspTemplateRowsFromStock,
@@ -85,9 +86,10 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
   onOpenDspRequestModal,
   onSelectSubTab
 }) => {
-  // Filter multipleStockItems to ONLY Program (HP) items
+  // Filter multipleStockItems to Program (HP) items, falling back to sample items if empty
   const programHpStockItems = useMemo(() => {
-    return (multipleStockItems || []).filter(isProgramHpStockItem);
+    const list = multipleStockItems && multipleStockItems.length > 0 ? multipleStockItems : DEFAULT_SAMPLE_HP_STOCK_ITEMS;
+    return (list || []).filter(isProgramHpStockItem);
   }, [multipleStockItems]);
 
   // Track if live linked to Multiple Stock
