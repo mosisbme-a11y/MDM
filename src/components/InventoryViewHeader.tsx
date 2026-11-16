@@ -202,15 +202,9 @@ export const InventoryViewHeader: React.FC<InventoryViewHeaderProps> = ({
             <Logo isAdmin={isAdmin} size="sm" variant="mark-only" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight">
-                Medical Device Master Inventory
-              </h2>
-              <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 hidden md:inline-flex items-center gap-1">
-                <Layers className="w-3 h-3 text-slate-400" />
-                <span>12 Sub-Tabs</span>
-              </span>
-            </div>
+            <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight">
+              Medical Device Master Inventory
+            </h2>
           </div>
         </div>
 
