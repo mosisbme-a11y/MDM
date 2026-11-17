@@ -907,9 +907,6 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               <div>
                 <h2 className="text-2xl font-black tracking-tight uppercase flex items-center gap-2 flex-wrap">
                   <span>Mapping Breakdown System</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-cyan-400/20 text-cyan-300 font-mono border border-cyan-400/40">
-                    Official Template Engine
-                  </span>
                   {isHubMapped && (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-400/50 flex items-center gap-1 animate-in fade-in">
                       <CheckCircle2 size={12} className="text-emerald-400" />
@@ -1243,22 +1240,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         )}
       </div>
 
-      {/* Hub Distribution KPI Strip */}
-      <div className="grid grid-cols-1 gap-4">
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-emerald-500 text-white shadow-xs">
-            <Truck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">Dispatch Target</div>
-            <div className="text-sm font-black text-emerald-950 flex items-center gap-1.5 mt-0.5">
-              <span>Hubs / Branches</span>
-              <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-200 text-emerald-900 font-mono font-bold">READY</span>
-            </div>
-            <div className="text-[10px] text-emerald-700/80 font-medium">Direct Transmittal to EPSS Plants</div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Main Breakdown Matrix Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
