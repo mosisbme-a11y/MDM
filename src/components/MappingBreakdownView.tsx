@@ -25,7 +25,8 @@ import {
   Building,
   Truck,
   Check,
-  Share2
+  Share2,
+  Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -60,14 +61,29 @@ const KNOWN_ETHIOPIAN_REGIONS = [
  * Automatically detects or infers Facility Name, Region, Zone, Woreda, and Equipment/Quantities.
  * Preserves exact uploaded item descriptions and item codes.
  */
-function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[]): {
+function processAnyFileRows(rawInput: any, hfMasterData: HealthFacilityRecord[]): {
   columns: RegionBreakdownColumn[];
   rows: RegionBreakdownRow[];
   detectedFacilityHeader: string;
   detectedRegionHeader: string;
 } {
-  if (!rowsJson || rowsJson.length === 0) {
+  if (!rawInput) {
     throw new Error('The uploaded file is empty or could not be read.');
+  }
+
+  // 1. Convert input to 2D array of rows (aoa)
+  let aoa: any[][] = [];
+  if (Array.isArray(rawInput)) {
+    if (rawInput.length > 0 && Array.isArray(rawInput[0])) {
+      aoa = rawInput as any[][];
+    } else if (rawInput.length > 0 && typeof rawInput[0] === 'object') {
+      const keys = Object.keys(rawInput[0]);
+      aoa = [keys, ...rawInput.map(r => keys.map(k => r[k]))];
+    }
+  }
+
+  if (aoa.length === 0) {
+    throw new Error('The uploaded file contains no rows.');
   }
 
   // Helper to extract embedded item code e.g. "Anesthesia machine (403-XRRD-0101)" or "Bed [CODE: 401-WICU-0101]"
@@ -75,7 +91,6 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
     const text = (rawText || '').trim();
     if (!text) return { name: 'Item', code: fallbackCode || 'CODE-01' };
 
-    // Match code in parentheses or brackets e.g. (403-XRRD-0101) or [403-XRRD-0101]
     const bracketMatch = text.match(/[\(\[](?:code:\s*)?([A-Z0-9]{3,}(?:-[A-Z0-9]+)+)[\)\]]/i);
     if (bracketMatch) {
       const code = bracketMatch[1].trim();
@@ -83,7 +98,6 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
       return { name: name || text, code };
     }
 
-    // Match trailing code pattern e.g. "Anesthesia machine - 403-XRRD-0101"
     const trailingMatch = text.match(/[-–—]\s*([A-Z0-9]{3,}(?:-[A-Z0-9]+)+)$/i);
     if (trailingMatch) {
       const code = trailingMatch[1].trim();
@@ -94,280 +108,237 @@ function processAnyFileRows(rowsJson: any[], hfMasterData: HealthFacilityRecord[
     return { name: text, code: fallbackCode || text };
   };
 
-  // 1. Extract all headers
-  const headers = Object.keys(rowsJson[0]);
+  // 2. Scan first 6 rows to locate the administrative header row
+  let adminHeaderRowIdx = -1;
+  let regionIdx = -1;
+  let zoneIdx = -1;
+  let woredaIdx = -1;
+  let facilityIdx = -1;
+  let hubIdx = -1;
+  let packagesIdx = -1;
+  let detectedFacilityHeader = 'Name of health facility';
+  let detectedRegionHeader = 'Region';
 
-  // 2. Comprehensive Header Regex Patterns
-  const facilityRegex = /facility|customer|hospital|health|center|clinic|site|destination|location|unit|institution|organization|consignee|beneficiary|recipient|to_name|to|name|description|descr|cust|hf_name|hf|benef/i;
-  const regionRegex = /region|state|province|area|territory|rhb|place/i;
-  const zoneRegex = /zone|district|subcity|sub_city/i;
-  const woredaRegex = /woreda|subdistrict|town|city/i;
-  const hubRegex = /hub|delivering|plant/i;
-  const itemRegex = /item|material|description|article|product|device|equipment|name/i;
-  const qtyRegex = /qty|quantity|amount|total|count|allocated/i;
-  const codeRegex = /code|material_code|sku|id|item_code|material_num|material_no|part_no|code_no/i;
+  for (let r = 0; r < Math.min(aoa.length, 6); r++) {
+    const row = aoa[r];
+    if (!Array.isArray(row)) continue;
 
-  let facilityCol = headers.find(h => facilityRegex.test(h));
-  let regionCol = headers.find(h => regionRegex.test(h));
-  let zoneCol = headers.find(h => zoneRegex.test(h));
-  let woredaCol = headers.find(h => woredaRegex.test(h));
-  let hubCol = headers.find(h => hubRegex.test(h));
-  
-  // Specific check for "List" format columns
-  let listItemCol = headers.find(h => itemRegex.test(h) && h !== facilityCol);
-  let listQtyCol = headers.find(h => qtyRegex.test(h));
-  let listCodeCol = headers.find(h => codeRegex.test(h) && h !== facilityCol && h !== listItemCol);
+    let tempRegion = -1;
+    let tempZone = -1;
+    let tempWoreda = -1;
+    let tempFacility = -1;
+    let tempHub = -1;
+    let tempPackages = -1;
+    let matchScore = 0;
 
-  // FALLBACKS for Region and Facility
-  if (!regionCol) {
-    for (const h of headers) {
-      if (h === facilityCol) continue;
-      let regionMatchesCount = 0;
-      for (const row of rowsJson.slice(0, 50)) {
-        const val = String(row[h] || '').toLowerCase().trim();
-        if (KNOWN_ETHIOPIAN_REGIONS.some(reg => val.includes(reg) || reg.includes(val))) {
-          regionMatchesCount++;
-        }
+    row.forEach((cell, cIdx) => {
+      const text = String(cell || '').trim();
+      if (!text) return;
+      const tLower = text.toLowerCase();
+
+      // Check Zone
+      if (/^(?:zone|sub[\s_-]?city|district|administrative[\s_-]?zone)$/i.test(text) || 
+          (tLower.includes('zone') && !tLower.includes('facility') && !tLower.includes('item') && !tLower.includes('material'))) {
+        if (tempZone === -1) { tempZone = cIdx; matchScore += 2; }
       }
-      if (regionMatchesCount > 0) {
-        regionCol = h;
-        break;
+      // Check Woreda
+      else if (/^(?:woreda|wereda|subdistrict|sub[\s_-]?district|town)$/i.test(text) ||
+               (tLower.includes('woreda') && !tLower.includes('facility') && !tLower.includes('item') && !tLower.includes('material'))) {
+        if (tempWoreda === -1) { tempWoreda = cIdx; matchScore += 2; }
       }
+      // Check Region
+      else if (/^(?:region|rhb|state|province)$/i.test(text) ||
+               (tLower.includes('region') && !tLower.includes('facility') && !tLower.includes('item') && !tLower.includes('material'))) {
+        if (tempRegion === -1) { tempRegion = cIdx; matchScore += 2; }
+      }
+      // Check Health Facility Name
+      else if (/^(?:name\s*of\s*(?:health\s*)?facility|health\s*facility(?:\s*name)?|facility\s*name|hf\s*name|hospital(?:\s*name)?|health\s*center|customer\s*description|customer\s*name|facility|hospital|customer|clinic)$/i.test(text) ||
+               ((tLower.includes('facility') || tLower.includes('hospital') || tLower.includes('hf') || tLower.includes('customer')) && !tLower.includes('item') && !tLower.includes('code') && !tLower.includes('qty'))) {
+        if (tempFacility === -1) { tempFacility = cIdx; matchScore += 3; }
+      }
+      // Check Packages
+      else if (/package|packege|list\s*of\s*pack/i.test(text)) {
+        if (tempPackages === -1) { tempPackages = cIdx; }
+      }
+      // Check Hub / Delivering Plant
+      else if (/^(?:hub|delivering[\s_-]?plant|plant)$/i.test(text)) {
+        if (tempHub === -1) { tempHub = cIdx; }
+      }
+    });
+
+    if (tempFacility !== -1 || (tempRegion !== -1 && tempZone !== -1) || matchScore >= 4) {
+      adminHeaderRowIdx = r;
+      regionIdx = tempRegion;
+      zoneIdx = tempZone;
+      woredaIdx = tempWoreda;
+      facilityIdx = tempFacility;
+      hubIdx = tempHub;
+      packagesIdx = tempPackages;
+      if (tempFacility !== -1) detectedFacilityHeader = String(row[tempFacility] || 'Name of health facility').trim();
+      if (tempRegion !== -1) detectedRegionHeader = String(row[tempRegion] || 'Region').trim();
+      break;
     }
   }
 
-  if (!facilityCol) {
-    let bestCol = '';
-    let maxUniqueCount = -1;
-    for (const h of headers) {
-      if (h === regionCol || h === zoneCol || h === woredaCol) continue;
-      const uniqueStrings = new Set<string>();
-      for (const row of rowsJson) {
-        const val = String(row[h] || '').trim();
-        if (val && isNaN(Number(val))) {
-          uniqueStrings.add(val);
-        }
-      }
-      if (uniqueStrings.size > maxUniqueCount) {
-        maxUniqueCount = uniqueStrings.size;
-        bestCol = h;
-      }
-    }
-    facilityCol = bestCol || headers[0];
+  // Fallback if not detected above
+  if (adminHeaderRowIdx === -1) {
+    adminHeaderRowIdx = 0;
+    const row = aoa[0] || [];
+    row.forEach((cell, cIdx) => {
+      const text = String(cell || '').trim();
+      if (!text) return;
+      if (regionIdx === -1 && /region|rhb|state/i.test(text)) regionIdx = cIdx;
+      if (zoneIdx === -1 && /zone|district/i.test(text)) zoneIdx = cIdx;
+      if (woredaIdx === -1 && /woreda|town/i.test(text)) woredaIdx = cIdx;
+      if (facilityIdx === -1 && /facility|hospital|health|customer|name/i.test(text) && !/item|material|code/i.test(text)) facilityIdx = cIdx;
+      if (hubIdx === -1 && /hub|plant/i.test(text)) hubIdx = cIdx;
+      if (packagesIdx === -1 && /package/i.test(text)) packagesIdx = cIdx;
+    });
   }
 
-  if (!regionCol) {
-    regionCol = zoneCol || headers.find(h => h !== facilityCol) || 'Region';
+  // If packages column not found in admin row, check previous row (row 0 in 2-tier template)
+  if (packagesIdx === -1 && adminHeaderRowIdx > 0) {
+    const prevRow = aoa[adminHeaderRowIdx - 1] || [];
+    prevRow.forEach((cell, cIdx) => {
+      if (/package|packege|list\s*of\s*pack/i.test(String(cell || ''))) {
+        packagesIdx = cIdx;
+      }
+    });
   }
 
-  // Detect Mode: List vs Matrix
-  const isListMode = !!(listItemCol && listQtyCol);
-  
-  let finalColumns: RegionBreakdownColumn[] = [];
-  let facilityGroups: Record<string, {
-    region: string;
-    zone: string;
-    woreda: string;
-    hub: string;
-    facility: string;
-    packages?: string;
-    quantities: Record<string, number>;
-  }> = {};
-
-  if (isListMode) {
-    // Collect all unique items to form columns preserving 100% exact description and code
-    const itemMap: Record<string, { name: string, code: string }> = {};
-    rowsJson.forEach(row => {
-      const rawItemName = String(row[listItemCol!] || '').trim();
-      if (!rawItemName) return;
-      const rawItemCode = listCodeCol ? String(row[listCodeCol!] || '').trim() : '';
-
-      if (!itemMap[rawItemName]) {
-        itemMap[rawItemName] = {
-          name: rawItemName, // EXACT uploaded item name - NEVER altered or stripped
-          code: rawItemCode || `40${Object.keys(itemMap).length + 1}-MAT`
-        };
-      }
-    });
-
-    finalColumns = Object.keys(itemMap).map((rawName, i) => ({
-      id: `col-up-${i}`,
-      name: itemMap[rawName].name,
-      code: itemMap[rawName].code
-    }));
-
-    // Group and aggregate
-    rowsJson.forEach(row => {
-      const facilityName = String(row[facilityCol!] || '').trim();
-      if (!facilityName) return;
-      const rawItemName = String(row[listItemCol!] || '').trim();
-      const qty = Number(row[listQtyCol!] || 0);
-      
-      const colObj = finalColumns.find(c => c.name === rawItemName);
-      if (!colObj) return;
-
-      if (!facilityGroups[facilityName]) {
-        const masterMatch = hfMasterData.find(hf => 
-          hf.customerDescription.toLowerCase() === facilityName.toLowerCase() || 
-          hf.customer === facilityName ||
-          hf.customerDescription.toLowerCase().includes(facilityName.toLowerCase()) ||
-          facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
-        );
-
-        const uploadedRegion = String(row[regionCol!] || '').trim();
-        const uploadedZone = zoneCol ? String(row[zoneCol!] || '').trim() : '';
-        const uploadedWoreda = woredaCol ? String(row[woredaCol!] || '').trim() : '';
-        const uploadedHub = hubCol ? String(row[hubCol!] || '').trim() : '';
-        const uploadedPkg = String(row['List of Packeges'] || row['packages'] || row['Packages'] || 'MCH').trim();
-
-        const officialMapping = mapFacilityToHub(
-          facilityName,
-          uploadedRegion || (masterMatch ? masterMatch.region : ''),
-          uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
-          uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
-          hfMasterData
-        );
-
-        // Strict Hub symbol (e.g. AA01, AD01) - excluding HO01
-        const hubSymbol = (uploadedHub && uploadedHub.toUpperCase() !== 'HO01' && !uploadedHub.toUpperCase().includes('HEAD'))
-          ? uploadedHub.toUpperCase()
-          : ((officialMapping.hubCode && officialMapping.hubCode !== 'HO01' && !officialMapping.hubCode.includes('HEAD')) ? officialMapping.hubCode : 'AA01');
-
-        facilityGroups[facilityName] = {
-          facility: facilityName, // NEVER overwrite exact uploaded facility name!
-          region: uploadedRegion || (masterMatch ? masterMatch.region : 'Addis Ababa'),
-          zone: uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
-          woreda: uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
-          packages: uploadedPkg || 'MCH',
-          hub: hubSymbol,
-          quantities: {}
-        };
-      }
-      
-      facilityGroups[facilityName].quantities[colObj.id] = (facilityGroups[facilityName].quantities[colObj.id] || 0) + qty;
-    });
-
-  } else {
-    // Matrix Mode (Columns are items)
-    const adminHeaders = [facilityCol, regionCol, zoneCol, woredaCol, hubCol].filter(Boolean) as string[];
-    let equipmentHeaders = headers.filter(h => !adminHeaders.includes(h) && !/id|date|status|time|s\.no|index|row/i.test(h));
-
-    if (equipmentHeaders.length === 0) {
-      equipmentHeaders = headers.filter(h => h !== facilityCol && h !== regionCol);
+  // If facility column still not found, search for column with non-numeric strings
+  if (facilityIdx === -1) {
+    const row = aoa[adminHeaderRowIdx] || [];
+    for (let c = 0; c < row.length; c++) {
+      if (c === regionIdx || c === zoneIdx || c === woredaIdx || c === hubIdx || c === packagesIdx) continue;
+      facilityIdx = c;
+      break;
     }
-    if (equipmentHeaders.length === 0) {
-      equipmentHeaders = ['Allocation Quantity'];
+    if (facilityIdx === -1) facilityIdx = 0;
+  }
+
+  // 3. Find Equipment Columns
+  const adminColIndices = [regionIdx, zoneIdx, woredaIdx, facilityIdx, hubIdx, packagesIdx].filter(idx => idx >= 0);
+  const maxRowLength = Math.max(...aoa.slice(0, 10).map(r => (Array.isArray(r) ? r.length : 0)));
+  const equipmentCols: { colIdx: number; name: string; code: string }[] = [];
+
+  for (let c = 0; c < maxRowLength; c++) {
+    if (adminColIndices.includes(c)) continue;
+
+    const cellAdminRow = String(aoa[adminHeaderRowIdx]?.[c] || '').trim();
+    const cellPrevRow = adminHeaderRowIdx > 0 ? String(aoa[adminHeaderRowIdx - 1]?.[c] || '').trim() : '';
+
+    // Ignore row indexing columns
+    if (/^(?:s\/?n|no|#|index|date)$/i.test(cellAdminRow) || /^(?:s\/?n|no|#|index|date)$/i.test(cellPrevRow)) {
+      continue;
     }
 
-    const firstRowData = rowsJson[0] || {};
-    const hasCodeRowInFirstRow = equipmentHeaders.some(h => {
-      const val = String(firstRowData[h] || '').trim();
-      return val && isNaN(Number(val)) && (/[A-Z0-9]{3,}/i.test(val) || val.includes('-') || val.startsWith('ITEM-'));
-    });
+    let itemName = '';
+    let itemCode = '';
 
-    let effectiveRowsJson = rowsJson;
-
-    finalColumns = equipmentHeaders.map((h, i) => {
-      let codeVal = '';
-      let nameVal = h;
-
-      if (hasCodeRowInFirstRow) {
-        codeVal = String(firstRowData[h] || '').trim();
-        if (h.startsWith('__EMPTY_') || h.toLowerCase() === 'item') {
-          nameVal = codeVal;
-        }
-      }
-
-      // Preserve 100% EXACT item name from uploaded header
-      const exactName = nameVal.trim() || `Item ${i + 1}`;
-      let finalCode = codeVal;
-      if (!finalCode) {
-        const parsed = extractCodeAndName(exactName);
-        finalCode = parsed.code !== exactName ? parsed.code : `40${i + 1}-MAT`;
-      }
-
-      return {
-        id: `col-adhoc-${i}`,
-        name: exactName, // EXACT item name as uploaded
-        code: finalCode
-      };
-    });
-
-    if (hasCodeRowInFirstRow) {
-      effectiveRowsJson = rowsJson.slice(1);
+    if (adminHeaderRowIdx > 0 && cellPrevRow && cellPrevRow !== 'List of Packeges') {
+      itemName = cellPrevRow;
+      itemCode = cellAdminRow || `40${equipmentCols.length + 1}-MAT`;
+    } else if (cellAdminRow) {
+      const parsed = extractCodeAndName(cellAdminRow, `40${equipmentCols.length + 1}-MAT`);
+      itemName = parsed.name;
+      itemCode = parsed.code;
+    } else if (cellPrevRow && cellPrevRow !== 'List of Packeges') {
+      const parsed = extractCodeAndName(cellPrevRow, `40${equipmentCols.length + 1}-MAT`);
+      itemName = parsed.name;
+      itemCode = parsed.code;
     }
 
-    effectiveRowsJson.forEach(row => {
-      const facilityName = String(row[facilityCol!] || '').trim();
-      if (!facilityName || facilityName === 'Unknown Facility') return;
-
-      if (!facilityGroups[facilityName]) {
-        const masterMatch = hfMasterData.find(hf => 
-          hf.customerDescription.toLowerCase() === facilityName.toLowerCase() || 
-          hf.customer === facilityName ||
-          hf.customerDescription.toLowerCase().includes(facilityName.toLowerCase()) ||
-          facilityName.toLowerCase().includes(hf.customerDescription.toLowerCase())
-        );
-
-        const uploadedRegion = String(row[regionCol!] || '').trim();
-        const uploadedZone = zoneCol ? String(row[zoneCol!] || '').trim() : '';
-        const uploadedWoreda = woredaCol ? String(row[woredaCol!] || '').trim() : '';
-        const uploadedHub = hubCol ? String(row[hubCol!] || '').trim() : '';
-        const uploadedPkg = String(row['List of Packeges'] || row['packages'] || row['Packages'] || 'MCH').trim();
-
-        const officialMapping = mapFacilityToHub(
-          facilityName,
-          uploadedRegion || (masterMatch ? masterMatch.region : ''),
-          uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
-          uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
-          hfMasterData
-        );
-
-        // Strict Hub symbol (e.g. AA01, AD01) - excluding HO01
-        const hubSymbol = (uploadedHub && uploadedHub.toUpperCase() !== 'HO01' && !uploadedHub.toUpperCase().includes('HEAD'))
-          ? uploadedHub.toUpperCase()
-          : ((officialMapping.hubCode && officialMapping.hubCode !== 'HO01' && !officialMapping.hubCode.includes('HEAD')) ? officialMapping.hubCode : 'AA01');
-
-        facilityGroups[facilityName] = {
-          facility: facilityName, // NEVER overwrite exact uploaded facility name!
-          region: uploadedRegion || (masterMatch ? masterMatch.region : 'Addis Ababa'),
-          zone: uploadedZone || (masterMatch ? masterMatch.zoneDescription : ''),
-          woreda: uploadedWoreda || (masterMatch ? masterMatch.woredaDescription : ''),
-          packages: uploadedPkg || 'MCH',
-          hub: hubSymbol,
-          quantities: {}
-        };
-      }
-
-      equipmentHeaders.forEach((headerName, colIdx) => {
-        const col = finalColumns[colIdx];
-        const cellVal = row[headerName];
-        const qty = typeof cellVal === 'number' ? cellVal : (Number(cellVal) || 0);
-        facilityGroups[facilityName].quantities[col.id] = (facilityGroups[facilityName].quantities[col.id] || 0) + qty;
+    if (itemName || itemCode) {
+      equipmentCols.push({
+        colIdx: c,
+        name: itemName || itemCode || `Item ${equipmentCols.length + 1}`,
+        code: itemCode || `40${equipmentCols.length + 1}-MAT`
       });
+    }
+  }
+
+  if (equipmentCols.length === 0) {
+    equipmentCols.push({
+      colIdx: maxRowLength > adminColIndices.length ? adminColIndices.length : maxRowLength,
+      name: 'Allocation Quantity',
+      code: 'QTY'
     });
   }
 
-  // Convert groups to final rows
-  const finalRows: RegionBreakdownRow[] = Object.values(facilityGroups).map((g, i) => {
-    return {
-      id: `row-up-${i}-${Date.now()}`,
-      region: g.region,
-      zone: g.zone,
-      woreda: g.woreda,
-      hub: g.hub,
-      healthFacility: g.facility,
-      customerDescription: g.facility,
-      packages: g.packages || 'MCH',
-      quantities: g.quantities
-    };
-  });
+  // 4. Data Rows Starting Point
+  let dataStartRowIdx = adminHeaderRowIdx + 1;
+  if (dataStartRowIdx < aoa.length) {
+    const checkCell = String(aoa[dataStartRowIdx]?.[facilityIdx] || '').trim();
+    if (!checkCell || /^(?:40[0-9]|item|code|description)/i.test(checkCell)) {
+      dataStartRowIdx++;
+    }
+  }
+
+  const finalColumns: RegionBreakdownColumn[] = equipmentCols.map((col, idx) => ({
+    id: `col-adhoc-${idx}`,
+    name: col.name, // 100% EXACT UPLOADED ITEM NAME - NEVER ALTERED
+    code: col.code
+  }));
+
+  const finalRows: RegionBreakdownRow[] = [];
+
+  for (let r = dataStartRowIdx; r < aoa.length; r++) {
+    const rowData = aoa[r];
+    if (!Array.isArray(rowData) || rowData.length === 0) continue;
+
+    const rawFacility = facilityIdx >= 0 ? String(rowData[facilityIdx] ?? '').trim() : '';
+    // Skip empty lines, repeated headers, or summary rows
+    if (!rawFacility || /^(?:total|grand\s*total|name\s*of\s*health\s*facility|facility|hf\s*name)$/i.test(rawFacility)) {
+      continue;
+    }
+
+    // CRITICAL USER REQUIREMENT: EXACT NAME WHAT USER UPLOADS ONLY!
+    const exactHFName = rawFacility;
+    const exactZone = zoneIdx >= 0 ? String(rowData[zoneIdx] ?? '').trim() : '';
+    const exactWoreda = woredaIdx >= 0 ? String(rowData[woredaIdx] ?? '').trim() : '';
+    const exactRegion = regionIdx >= 0 ? String(rowData[regionIdx] ?? '').trim() : '';
+    const exactPkg = packagesIdx >= 0 ? String(rowData[packagesIdx] ?? 'MCH').trim() : 'MCH';
+    const exactHub = hubIdx >= 0 ? String(rowData[hubIdx] ?? '').trim() : '';
+
+    // Map facility to Hub based on exact uploaded information
+    const mapping = mapFacilityToHub(
+      exactHFName,
+      exactRegion,
+      exactZone,
+      exactWoreda,
+      hfMasterData
+    );
+
+    const hubSymbol = (exactHub && exactHub.toUpperCase() !== 'HO01' && !exactHub.toUpperCase().includes('HEAD'))
+      ? exactHub.toUpperCase()
+      : ((mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01');
+
+    // Extract quantities for each column
+    const quantities: Record<string, number> = {};
+    equipmentCols.forEach((col, cIdx) => {
+      const cellVal = rowData[col.colIdx];
+      quantities[`col-adhoc-${cIdx}`] = typeof cellVal === 'number' ? cellVal : (Number(cellVal) || 0);
+    });
+
+    finalRows.push({
+      id: `row-up-${r}-${Date.now()}`,
+      region: exactRegion || mapping.region || 'Oromia',
+      zone: exactZone, // 100% EXACT NAME WHAT USER UPLOADS ONLY - NEVER OVERWRITTEN!
+      woreda: exactWoreda, // 100% EXACT NAME WHAT USER UPLOADS ONLY - NEVER OVERWRITTEN!
+      healthFacility: exactHFName, // 100% EXACT NAME WHAT USER UPLOADS ONLY - NEVER OVERWRITTEN!
+      customerDescription: exactHFName, // 100% EXACT NAME WHAT USER UPLOADS ONLY - NEVER OVERWRITTEN!
+      packages: exactPkg || 'MCH',
+      hub: hubSymbol,
+      quantities
+    });
+  }
 
   return {
-    columns: finalColumns.length > 0 ? finalColumns : [{ id: 'col-placeholder', name: 'Allocation Quantity', code: 'QTY' }],
+    columns: finalColumns,
     rows: finalRows,
-    detectedFacilityHeader: facilityCol || 'Facility Name',
-    detectedRegionHeader: regionCol || 'Region'
+    detectedFacilityHeader: detectedFacilityHeader || 'Name of health facility',
+    detectedRegionHeader: detectedRegionHeader || 'Region'
   };
 }
 
@@ -393,7 +364,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   const [uploadFeedback, setUploadFeedback] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+  const currentRows = matrixData
     ? matrixData.rows
     : DEFAULT_STAGE_3_ROWS;
 
@@ -446,9 +417,18 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     setUploadFeedback({ message: 'Analyzing facilities and mapping to official regional EPSS hub symbols...', type: 'info' });
     
     setTimeout(() => {
-      const baseRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+      const baseRows = matrixData
         ? matrixData.rows
         : DEFAULT_STAGE_3_ROWS;
+
+      if (baseRows.length === 0) {
+        setIsAnalyzing(false);
+        setUploadFeedback({
+          message: 'All data is cleared (0 facilities). Please upload an Excel/CSV file or add facility rows before clicking "Map HF to HUB".',
+          type: 'error'
+        });
+        return;
+      }
 
       const baseCols = (matrixData && matrixData.columns && matrixData.columns.length > 0)
         ? matrixData.columns
@@ -470,9 +450,13 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
         return {
           ...row,
-          zone: row.zone && row.zone.trim() !== '' ? row.zone : (mapping.zone || 'East Shewa'),
-          woreda: row.woreda && row.woreda.trim() !== '' ? row.woreda : (mapping.woreda || 'Woreda 01'),
-          hub: hubSymbol // Adds/updates Hub symbol; never alters exact item names or quantities!
+          // CRITICAL: KEEP 100% EXACT UPLOADED NAMES - NEVER ALTER OR OVERWRITE HF NAME, WOREDA, OR ZONE!
+          healthFacility: row.healthFacility || row.customerDescription || 'Health Facility',
+          customerDescription: row.customerDescription || row.healthFacility || 'Health Facility',
+          zone: row.zone || '', // KEEP EXACT UPLOADED ZONE ONLY
+          woreda: row.woreda || '', // KEEP EXACT UPLOADED WOREDA ONLY
+          region: row.region || '', // KEEP EXACT UPLOADED REGION
+          hub: hubSymbol // ONLY assign / update the Hub symbol!
         };
       });
       
@@ -499,8 +483,8 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
             : 'AA01';
           return {
             ...hf,
-            zoneDescription: hf.zoneDescription || mapping.zone || 'East Shewa',
-            woredaDescription: hf.woredaDescription || mapping.woreda || 'Woreda 01',
+            zoneDescription: hf.zoneDescription || '',
+            woredaDescription: hf.woredaDescription || '',
             hub: hubSymbol
           };
         });
@@ -508,7 +492,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       }
 
       setUploadFeedback({ 
-        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols, Zone, and Woreda. Download Option (.xlsx / .csv) is now ready in the header above!`, 
+        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped to EPSS Hubs. Exact uploaded HF Name, Woreda, and Zone are 100% preserved. Download Option (.xlsx / .csv) is ready in the header!`, 
         type: 'success' 
       });
       setIsAnalyzing(false);
@@ -522,14 +506,15 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     setIsUploading(true);
     setUploadFeedback({ message: `Reading and analyzing file "${file.name}"...`, type: 'info' });
 
-    const processJson = (rawJson: any[]) => {
+    const processUniversal = (rawData: any) => {
       try {
-        if (!rawJson || rawJson.length === 0) {
+        if (!rawData || (Array.isArray(rawData) && rawData.length === 0)) {
           setUploadFeedback({ message: 'The uploaded file is empty.', type: 'error' });
+          setIsUploading(false);
           return;
         }
 
-        const parsedResult = processAnyFileRows(rawJson, hfListItems);
+        const parsedResult = processAnyFileRows(rawData, hfListItems);
 
         setMatrixData({
           date: new Date().toISOString().split('T')[0],
@@ -541,7 +526,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
         setAdHocDataActive(true);
         setIsHubMapped(false); // Reset mapped hub flag on new file upload until "MAP HF TO HUB" is clicked
         setUploadFeedback({ 
-          message: `✓ Analysis complete for "${file.name}". Processed ${parsedResult.rows.length} facilities and ${parsedResult.columns.length} exact equipment columns. Auto-detected Facility: "${parsedResult.detectedFacilityHeader}" & Region: "${parsedResult.detectedRegionHeader}". Click "MAP HF TO HUB" to auto-insert the HUB column and perform regional hub mapping.`, 
+          message: `✓ Analysis complete for "${file.name}". Processed ${parsedResult.rows.length} facilities with exact uploaded HF Name, Woreda, and Zone preserved. Click "MAP HF TO HUB" to map all facilities to designated EPSS Hubs!`, 
           type: 'success' 
         });
 
@@ -556,35 +541,14 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
 
     if (file.name.endsWith('.csv') || file.name.endsWith('.tsv') || file.name.endsWith('.txt')) {
       Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        dynamicTyping: true,
+        header: false,
+        skipEmptyLines: false,
         complete: (results) => {
           if (results.data && results.data.length > 0) {
-            processJson(results.data);
+            processUniversal(results.data as any[][]);
           } else {
-            // Retry with header: false
-            Papa.parse(file, {
-              header: false,
-              skipEmptyLines: true,
-              complete: (res2) => {
-                if (res2.data && res2.data.length > 0) {
-                  const arr2d = res2.data as any[][];
-                  const headers = arr2d[0].map((h: any, idx: number) => h ? String(h) : `Column ${idx + 1}`);
-                  const jsonRows = arr2d.slice(1).map(row => {
-                    const obj: Record<string, any> = {};
-                    headers.forEach((h, i) => {
-                      obj[h] = row[i];
-                    });
-                    return obj;
-                  });
-                  processJson(jsonRows);
-                } else {
-                  setUploadFeedback({ message: 'Could not read CSV data rows.', type: 'error' });
-                  setIsUploading(false);
-                }
-              }
-            });
+            setUploadFeedback({ message: 'Could not read CSV data rows.', type: 'error' });
+            setIsUploading(false);
           }
         },
         error: (err) => {
@@ -600,9 +564,9 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const rawJson = XLSX.utils.sheet_to_json(worksheet) as any[];
+          const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
 
-          processJson(rawJson);
+          processUniversal(aoa);
         } catch (err: any) {
           console.error('Error reading workbook:', err);
           setUploadFeedback({ message: 'Failed to parse file. Please verify it is a valid spreadsheet or CSV.', type: 'error' });
@@ -611,6 +575,24 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       };
       reader.readAsArrayBuffer(file);
     }
+  };
+
+  const handleClearAllData = () => {
+    setMatrixData({
+      date: new Date().toISOString().split('T')[0],
+      region: 'Cleared Workspace',
+      columns: DEFAULT_STAGE_3_COLUMNS,
+      rows: []
+    });
+    setAdHocDataActive(false);
+    setIsHubMapped(false);
+    setIsDownloadDropdownOpen(false);
+    setIsHubSubmitDropdownOpen(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploadFeedback({
+      message: '✓ All Clear complete: All matrix rows, uploaded records, and hub mappings have been cleared. You can now upload fresh data and map cleanly.',
+      type: 'info'
+    });
   };
 
   const handleResetToMaster = () => {
@@ -640,6 +622,10 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   };
 
   const handleDownloadHubAllocationList = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    if (currentRows.length === 0) {
+      setUploadFeedback({ message: 'No facility data available to export. Upload or add facilities first.', type: 'error' });
+      return;
+    }
     const currentDateStr = new Date().toISOString().split('T')[0];
     const exportRows = currentRows.map((r, idx) => {
       const hubCode = r.hub || 'AA01';
@@ -680,9 +666,14 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     const activeCols = (matrixData && matrixData.columns && matrixData.columns.length > 0)
       ? matrixData.columns
       : DEFAULT_STAGE_3_COLUMNS;
-    const activeRows = (matrixData && matrixData.rows && matrixData.rows.length > 0)
+    const activeRows = matrixData
       ? matrixData.rows
       : DEFAULT_STAGE_3_ROWS;
+
+    if (activeRows.length === 0) {
+      setUploadFeedback({ message: 'No facility data available to export. Upload or add facilities first.', type: 'error' });
+      return;
+    }
 
     const currentDateStr = new Date().toISOString().split('T')[0];
 
@@ -941,6 +932,21 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               accept=".xlsx,.xls,.csv" 
               className="hidden" 
             />
+
+            <button
+              type="button"
+              onClick={handleClearAllData}
+              disabled={isAnalyzing || isUploading || currentRows.length === 0}
+              className={`px-4 py-2.5 rounded-full font-black text-xs sm:text-sm shadow-lg transition-all transform active:scale-95 border tracking-wider uppercase flex items-center gap-2 ${
+                currentRows.length === 0
+                  ? 'bg-slate-800/50 border-slate-700/60 text-slate-500 cursor-not-allowed'
+                  : 'bg-rose-600/90 hover:bg-rose-500 border-rose-400/70 text-white cursor-pointer'
+              }`}
+              title="Clear all matrix data and previous uploads before mapping"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>All Clear</span>
+            </button>
 
             <button
               type="button"

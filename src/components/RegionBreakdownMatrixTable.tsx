@@ -2478,8 +2478,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                          (h.customer && h.customer === row.healthFacility)
                   );
 
-                  const activeCustDesc = row.customerDescription || matchedHf?.customerDescription || row.healthFacility;
-                  const custIdBadge = row.customerId || matchedHf?.customer || (rowIdx === 1 ? '40002328' : rowIdx === 2 ? '40002962' : null);
+                  // Prioritize exact uploaded health facility name - never overwrite with master data
+                  const activeCustDesc = row.healthFacility || row.customerDescription || 'Health Facility';
+                  const custIdBadge = row.customerId || null;
                   const isRecentlyLoaded = recentlyLoadedToken && Date.now() - recentlyLoadedToken < 30000;
 
                   return (
