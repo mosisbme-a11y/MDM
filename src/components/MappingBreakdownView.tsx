@@ -380,6 +380,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
   const [adHocDataActive, setAdHocDataActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isHubMapped, setIsHubMapped] = useState(false);
+  const [isDownloadDropdownOpen, setIsDownloadDropdownOpen] = useState(false);
   const [isHubSubmitDropdownOpen, setIsHubSubmitDropdownOpen] = useState(false);
   const [isHubTransmitModalOpen, setIsHubTransmitModalOpen] = useState(false);
   const [isHubEmailModalOpen, setIsHubEmailModalOpen] = useState(false);
@@ -507,7 +508,7 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
       }
 
       setUploadFeedback({ 
-        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols, Zone, and Woreda. All exact item descriptions & quantities intact.`, 
+        message: `✓ Mapping complete: ${updatedRows.length} facilities successfully mapped with designated EPSS Hub symbols, Zone, and Woreda. Download Option (.xlsx / .csv) is now ready in the header above!`, 
         type: 'success' 
       });
       setIsAnalyzing(false);
@@ -636,6 +637,43 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
     
     downloadCSV(`Mismatched_Mappings_${new Date().toISOString().split('T')[0]}.csv`, exportData);
     setUploadFeedback({ message: `Exported ${mismatched.length} facilities with missing regional mappings.`, type: 'success' });
+  };
+
+  const handleDownloadHubAllocationList = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const currentDateStr = new Date().toISOString().split('T')[0];
+    const exportRows = currentRows.map((r, idx) => {
+      const hubCode = r.hub || 'AA01';
+      const hubInfo = EPSS_HUBS_REGISTRY.find(h => h.code === hubCode);
+      const totalUnits = currentCols.reduce((sum, c) => sum + (Number(r.quantities[c.id]) || 0), 0);
+      return {
+        'S/N': idx + 1,
+        'Region': r.region || '',
+        'Zone': r.zone || '',
+        'Woreda': r.woreda || '',
+        'Health Facility Name': r.healthFacility || r.customerDescription || '',
+        'Package': r.packages || 'MCH',
+        'Delivering Hub Code': hubCode,
+        'Delivering Hub Name': hubInfo?.name || hubCode,
+        'Hub Regional Area': hubInfo?.region || r.region || '',
+        'Total Allocated Items': totalUnits
+      };
+    });
+
+    if (format === 'csv') {
+      downloadCSV(`EPSS_Facility_to_Hub_Mapping_${currentDateStr}.csv`, exportRows);
+      setUploadFeedback({ message: `✓ Exported facility to Hub mapping directory CSV (${exportRows.length} facilities).`, type: 'success' });
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    ws['!cols'] = [
+      { wch: 6 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 40 },
+      { wch: 12 }, { wch: 18 }, { wch: 30 }, { wch: 18 }, { wch: 18 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'HF to Hub Mapping');
+    XLSX.writeFile(wb, `EPSS_Facility_to_Hub_Mapping_${currentDateStr}.xlsx`);
+    setUploadFeedback({ message: `✓ Exported official Facility to Hub mapping directory Excel (.xlsx) with ${exportRows.length} facilities!`, type: 'success' });
   };
 
   const handleDownloadMappedData = (format: 'xlsx' | 'csv' = 'xlsx') => {
@@ -876,11 +914,17 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
                 <Layers className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-2xl font-black tracking-tight uppercase flex items-center gap-2">
+                <h2 className="text-2xl font-black tracking-tight uppercase flex items-center gap-2 flex-wrap">
                   <span>Mapping Breakdown System</span>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-cyan-400/20 text-cyan-300 font-mono border border-cyan-400/40">
                     Official Template Engine
                   </span>
+                  {isHubMapped && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-400/50 flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 size={12} className="text-emerald-400" />
+                      HUBs Mapped & Ready for Download
+                    </span>
+                  )}
                 </h2>
                 <p className="text-cyan-100/80 text-xs sm:text-sm font-medium max-w-2xl mt-0.5">
                   Analyze health facility distribution, map hubs, and generate/upload standard EPSS breakdown matrix templates.
@@ -911,6 +955,146 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
               {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapIcon className="w-4 h-4" />}
               <span>{isHubMapped ? 'Re-Map HF to HUB' : 'Map HF to HUB'}</span>
             </button>
+
+            {/* Direct Download Option - prominently available and highlighted after MAP HF to Hub */}
+            <div className="relative">
+              {isHubMapped ? (
+                <>
+                  <div className="flex items-center rounded-full bg-emerald-500 hover:bg-emerald-400 shadow-xl border border-emerald-300 text-slate-950 font-black transition-all transform active:scale-95 group">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadMappedData('xlsx')}
+                      className="px-4 py-2.5 text-xs sm:text-sm tracking-wider uppercase flex items-center gap-2 cursor-pointer font-black text-slate-950 hover:text-black transition rounded-l-full"
+                      title="Download complete mapped health facility to hub matrix as Microsoft Excel (.xlsx)"
+                    >
+                      <Download className="w-4 h-4 text-slate-950" />
+                      <span>Download Mapped Data (.xlsx)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDownloadDropdownOpen(!isDownloadDropdownOpen)}
+                      className="px-3 py-2.5 border-l border-emerald-600/40 hover:bg-emerald-600 text-slate-950 cursor-pointer rounded-r-full transition flex items-center justify-center"
+                      title="Choose download format (.xlsx or .csv)"
+                    >
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isDownloadDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+
+                  {isDownloadDropdownOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsDownloadDropdownOpen(false)} 
+                      />
+                      <div className="absolute right-0 mt-2 w-84 bg-[#0a0f1d] border-2 border-emerald-400/80 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 text-slate-100">
+                        <div className="px-3 py-2 border-b border-slate-800">
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider block">
+                            Download Mapped Hub Data Options
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Official EPSS matrix with auto-inserted HUB delivering plants
+                          </span>
+                        </div>
+                        <div className="p-1 space-y-1 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDownloadMappedData('xlsx');
+                              setIsDownloadDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-emerald-500/20 text-left transition group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+                                <FileSpreadsheet className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white group-hover:text-emerald-300">1. Full Breakdown Matrix (.xlsx)</p>
+                                <p className="text-[10px] text-slate-400">Multi-tier equipment header, HUB column & totals</p>
+                              </div>
+                            </div>
+                            <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDownloadHubAllocationList('xlsx');
+                              setIsDownloadDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-teal-500/20 text-left transition group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-teal-500/20 text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition">
+                                <Building2 className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white group-hover:text-teal-300">2. HF to Hub Directory (.xlsx)</p>
+                                <p className="text-[10px] text-slate-400">Clean list of facilities & designated EPSS Hubs</p>
+                              </div>
+                            </div>
+                            <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDownloadMappedData('csv');
+                              setIsDownloadDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-cyan-500/20 text-left transition group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white group-hover:text-cyan-300">3. Standard CSV Matrix (.csv)</p>
+                                <p className="text-[10px] text-slate-400">Comma-separated matrix with HUB column</p>
+                              </div>
+                            </div>
+                            <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDownloadItemAggregationTemplate('xlsx');
+                              setIsDownloadDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-amber-500/20 text-left transition group cursor-pointer border-t border-slate-800"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                                <Building className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white group-hover:text-amber-300">4. Hub Item Aggregation Matrix (.xlsx)</p>
+                                <p className="text-[10px] text-slate-400">Aggregated quantities per delivering Hub</p>
+                              </div>
+                            </div>
+                            <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleMapWithHubs()}
+                  className="px-4 py-2.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-600/70 text-xs sm:text-sm font-bold flex items-center gap-2 cursor-pointer transition shadow-md"
+                  title="Click to Map HF to HUB first to enable Mapped Matrix download"
+                >
+                  <Download size={15} className="text-slate-400" />
+                  <span>Download Option</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/40">
+                    Map First
+                  </span>
+                </button>
+              )}
+            </div>
 
             <button
               type="button"

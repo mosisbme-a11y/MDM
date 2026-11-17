@@ -427,6 +427,45 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     return Object.values(totals).reduce((a, b) => a + b, 0);
   }, [totals]);
 
+  // Confirmation Modal State (Full Columns Data Verification)
+  const [confirmTableFilter, setConfirmTableFilter] = useState<'approved' | 'all'>('approved');
+  const [confirmSearchQuery, setConfirmSearchQuery] = useState('');
+  const [confirmTabMode, setConfirmTabMode] = useState<'matrix' | 'schema'>('matrix');
+
+  const confirmApprovedRows = useMemo(() => {
+    return rows.filter(r => approvedRegions[r.region] !== false);
+  }, [rows, approvedRegions]);
+
+  const confirmFilteredRows = useMemo(() => {
+    const base = confirmTableFilter === 'approved' ? confirmApprovedRows : rows;
+    if (!confirmSearchQuery.trim()) return base;
+    const q = confirmSearchQuery.toLowerCase();
+    return base.filter(r =>
+      r.region.toLowerCase().includes(q) ||
+      (r.budgetSource && r.budgetSource.toLowerCase().includes(q)) ||
+      (r.date && r.date.toLowerCase().includes(q))
+    );
+  }, [confirmTableFilter, confirmApprovedRows, rows, confirmSearchQuery]);
+
+  const confirmApprovedUnits = useMemo(() => {
+    return columns.reduce((acc, c) => {
+      return acc + confirmApprovedRows.reduce((sum, r) => sum + (Number(r.quantities[c.id]) || 0), 0);
+    }, 0);
+  }, [columns, confirmApprovedRows]);
+
+  const confirmApprovedValuation = useMemo(() => {
+    return columns.reduce((sum, c) => {
+      const colQty = confirmApprovedRows.reduce((accR, r) => accR + (Number(r.quantities[c.id]) || 0), 0);
+      const srcItem = exactTransmittedItems.find(
+        it => it.materialCode.trim().toLowerCase() === c.materialCode.trim().toLowerCase()
+      );
+      if (srcItem && srcItem.totalAmount && srcItem.qty > 0) {
+        return sum + (srcItem.totalAmount / srcItem.qty) * colQty;
+      }
+      return sum;
+    }, 0);
+  }, [columns, confirmApprovedRows, exactTransmittedItems]);
+
   const handleUpdateQuantity = (rowId: string, colId: string, val: number) => {
     setRows(prev => prev.map(r => 
       r.id === rowId ? { ...r, quantities: { ...r.quantities, [colId]: val } } : r
@@ -1057,6 +1096,17 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             >
               <Eye className="w-3.5 h-3.5" />
               <span>Show EPSS Dossier</span>
+            </button>
+
+            {/* View Full Columns Confirmation Preview */}
+            <button
+              type="button"
+              onClick={() => setIsTransmitModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-teal-500"
+              title="View full columns data and regional allocations for confirmation before submitting to RHBs"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Confirm What I Send</span>
             </button>
 
             {/* Submit to RHBs with Security Verification */}
@@ -1861,7 +1911,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
           <div className={`bg-white shadow-2xl border border-slate-200 animate-scale-in flex flex-col transition-all duration-300 my-auto ${
             isTransmitModalFullScreen 
               ? 'w-full h-full rounded-none max-w-none max-h-none p-6 overflow-y-auto' 
-              : 'rounded-2xl max-w-2xl w-full p-5 space-y-4 max-h-[92vh] overflow-y-auto'
+              : 'rounded-2xl max-w-5xl lg:max-w-6xl w-full p-5 space-y-4 max-h-[92vh] overflow-y-auto'
           }`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -1878,11 +1928,19 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                    Security Authorization & Regional Verification Check
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                      Confirm & Submit DSP Breakdown to RHBs
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                      Sub-step 2.2 ➔ 3.1
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-100 text-teal-900 border border-teal-200">
+                      Full Columns Confirmation Active
+                    </span>
+                  </div>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Institutional Quota Dispatch Authorization to Regional Health Bureaus
+                    Review and confirm full equipment columns, allocated quota units, and authorized Regional Health Bureaus
                   </p>
                 </div>
               </div>
@@ -1931,6 +1989,302 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               <p className="text-[11px] text-indigo-800 leading-relaxed font-medium">
                 For security and audit purposes, please verify all 15 Ethiopian Regions authorized to receive this breakdown quota letter. Only checked regions will be granted access in Stage 3.
               </p>
+            </div>
+
+            {/* FULL COLUMNS DATA FOR CONFIRMATION (WHAT I SEND TO RHBs) */}
+            <div className="p-4 bg-gradient-to-r from-teal-50/70 via-cyan-50/50 to-blue-50/70 border-2 border-teal-300 rounded-2xl space-y-3.5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-teal-200/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-teal-600 text-white rounded-xl shadow-2xs">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                        Full Columns Data for Confirmation (What I Send)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-600 text-white font-mono">
+                        MOH ➔ RHB Transmitted Payload
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-teal-950 font-medium mt-0.5">
+                      Verify complete equipment columns, regional distribution quantities, and financial allocations before official transmittal.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  {/* View Mode Toggle: Two-Tier Matrix vs 10-Column Schema */}
+                  <div className="bg-white/90 p-1 rounded-xl border border-teal-200 flex items-center gap-1 shadow-3xs">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmTabMode('matrix')}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
+                        confirmTabMode === 'matrix'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-3 h-3" />
+                      <span>Full Matrix View</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmTabMode('schema')}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
+                        confirmTabMode === 'schema'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <FileText className="w-3 h-3" />
+                      <span>10-Column Schema</span>
+                    </button>
+                  </div>
+
+                  {/* Excel Download button */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadExcel}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                    title="Download formatted Excel (.xlsx) confirmation copy"
+                  >
+                    <Download className="w-3 h-3 text-amber-300" />
+                    <span>Excel (.xlsx)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">EQUIPMENT COLUMNS</span>
+                  <span className="text-sm font-black text-slate-900">{columns.length} Materials</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">TOTAL ALLOCATED UNITS</span>
+                  <span className="text-sm font-black text-cyan-800">{formatNumber(confirmApprovedUnits)} Units</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">TARGETED REGIONS</span>
+                  <span className="text-sm font-black text-emerald-700">{confirmApprovedRows.length} of 15 Approved</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">CUMULATIVE VALUATION</span>
+                  <span className="text-sm font-black text-indigo-900">{formatCurrency(confirmApprovedValuation)}</span>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar inside Confirmation Table */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search regions, budget source in payload..."
+                      value={confirmSearchQuery}
+                      onChange={(e) => setConfirmSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1 bg-white border border-teal-200 rounded-lg text-xs font-medium focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-teal-200 text-[10px] font-bold text-slate-600">
+                    <span>Show:</span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmTableFilter('approved')}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                        confirmTableFilter === 'approved' ? 'bg-teal-600 text-white font-black' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Approved ({confirmApprovedRows.length})
+                    </button>
+                    <span>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmTableFilter('all')}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                        confirmTableFilter === 'all' ? 'bg-teal-600 text-white font-black' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({rows.length})
+                    </button>
+                  </div>
+                </div>
+
+                <span className="text-[10px] font-mono font-bold text-teal-800 bg-white/80 px-2 py-0.5 rounded border border-teal-200">
+                  {columns.length} Columns • {confirmFilteredRows.length} Rows Shown
+                </span>
+              </div>
+
+              {/* Data Table: Mode 1: Full Two-Tier Regional Matrix Table */}
+              {confirmTabMode === 'matrix' ? (
+                <div className="border-2 border-slate-900 rounded-xl overflow-x-auto shadow-md bg-white max-h-80 overflow-y-auto">
+                  <table className="w-full border-collapse text-xs select-text min-w-[700px]">
+                    <thead>
+                      {/* Tier 1 Header: Material Descriptions */}
+                      <tr className="bg-orange-100 border-b border-black text-slate-900 font-bold sticky top-0 z-20">
+                        <th className="py-2 px-2.5 text-center border-r border-black w-10 text-[10px]">S/N</th>
+                        <th className="py-2 px-2.5 text-left border-r border-black w-24 italic text-[10px]">Date</th>
+                        <th className="py-2 px-3 text-left border-r border-black min-w-[140px] text-[11px]">Region</th>
+                        <th className="py-2 px-2.5 text-center border-r border-black w-24 bg-orange-400 text-white uppercase text-[10px]">Budget</th>
+                        {columns.map(col => (
+                          <th key={`conf-col-${col.id}`} className="py-2 px-2.5 text-center border-r border-black min-w-[150px] bg-orange-100 font-bold text-[11px] leading-tight">
+                            <div className="line-clamp-2" title={col.description}>{col.description}</div>
+                          </th>
+                        ))}
+                        <th className="py-2 px-2.5 text-center bg-yellow-200 text-slate-950 font-black w-20 text-[11px]">Row Total</th>
+                      </tr>
+                      {/* Tier 2 Header: Material Codes */}
+                      <tr className="bg-white border-b border-black font-mono text-[10px] sticky top-[33px] z-20">
+                        <th className="border-r border-black bg-slate-50"></th>
+                        <th className="border-r border-black bg-slate-50"></th>
+                        <th className="border-r border-black bg-slate-50 font-sans text-[10px] text-slate-500 px-2 text-left font-bold uppercase">15 Regions</th>
+                        <th className="border-r border-black bg-indigo-50 font-sans text-[10px] text-indigo-700 px-2 text-center font-bold">Source</th>
+                        {columns.map(col => (
+                          <th key={`conf-code-${col.id}`} className="py-1 px-2 text-center border-r border-black font-bold text-slate-800 bg-slate-50">
+                            {col.materialCode}
+                          </th>
+                        ))}
+                        <th className="bg-yellow-100 text-center text-[10px] font-bold text-slate-800">Units</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {confirmFilteredRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={columns.length + 5} className="py-8 text-center text-slate-400 font-bold">
+                            No regional breakdown rows match the current filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        confirmFilteredRows.map((row, idx) => {
+                          const isApproved = approvedRegions[row.region] !== false;
+                          const rowTotal = columns.reduce((sum, col) => sum + (Number(row.quantities[col.id]) || 0), 0);
+                          return (
+                            <tr
+                              key={`conf-row-${row.id || idx}`}
+                              className={`transition-colors ${
+                                isApproved
+                                  ? 'hover:bg-teal-50/50'
+                                  : 'bg-slate-100/70 opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <td className="py-1.5 px-2 text-center border-r border-slate-200 font-mono text-slate-500 font-bold text-[10px]">
+                                {idx + 1}
+                              </td>
+                              <td className="py-1.5 px-2 border-r border-slate-200 font-mono text-slate-600 text-[10px] whitespace-nowrap">
+                                {row.date || TODAY_ISO_DATE}
+                              </td>
+                              <td className="py-1.5 px-3 border-r border-slate-200 font-bold text-slate-900 text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-full ${isApproved ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                  <span>{row.region}</span>
+                                  {!isApproved && (
+                                    <span className="text-[9px] font-bold px-1 rounded bg-slate-200 text-slate-600">Excluded</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-2 border-r border-slate-200 text-center font-mono font-bold text-indigo-700 bg-blue-50/30 text-[10px]">
+                                {row.budgetSource || 'WB'}
+                              </td>
+                              {columns.map(col => {
+                                const val = Number(row.quantities[col.id]) || 0;
+                                return (
+                                  <td
+                                    key={`conf-qty-${row.id}-${col.id}`}
+                                    className={`py-1.5 px-2 border-r border-slate-200 text-center font-mono font-bold text-xs ${
+                                      val > 0 ? 'text-slate-950 font-black' : 'text-slate-400'
+                                    }`}
+                                  >
+                                    {val}
+                                  </td>
+                                );
+                              })}
+                              <td className="py-1.5 px-2 text-center font-mono font-black text-amber-950 bg-amber-50 text-xs">
+                                {formatNumber(rowTotal)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                    <tfoot>
+                      {/* Column Totals Footer */}
+                      <tr className="bg-slate-900 text-white font-black text-[11px] border-t-2 border-black sticky bottom-0 z-20">
+                        <td colSpan={4} className="py-2.5 px-3 text-right uppercase tracking-wider text-amber-400 font-mono text-[10px]">
+                          Total Quota for Approved Regions ({confirmApprovedRows.length} Regions):
+                        </td>
+                        {columns.map(col => {
+                          const colSum = confirmApprovedRows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+                          return (
+                            <td key={`conf-tot-${col.id}`} className="py-2.5 px-2 text-center border-r border-slate-700 font-mono text-cyan-300 font-black text-xs">
+                              {formatNumber(colSum)}
+                            </td>
+                          );
+                        })}
+                        <td className="py-2.5 px-2 text-center font-mono font-black text-emerald-300 bg-emerald-950 text-xs">
+                          {formatNumber(confirmApprovedUnits)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                /* Mode 2: Standard 10-Column Schema Table */
+                <div className="border-2 border-slate-900 rounded-xl overflow-x-auto shadow-md bg-white max-h-80 overflow-y-auto">
+                  <table className="w-full border-collapse text-xs select-text min-w-[850px]">
+                    <thead>
+                      <tr className="bg-[#FFA500] text-black italic font-bold text-[11px] border-b-2 border-black sticky top-0 z-20">
+                        <th className="py-2 px-2.5 text-center border-r border-black w-10">S/N</th>
+                        <th className="py-2 px-3 text-left border-r border-black w-28 font-mono">Material</th>
+                        <th className="py-2 px-3 text-left border-r border-black min-w-[200px]">Material Description</th>
+                        <th className="py-2 px-3 text-right border-r border-black w-20">Qty</th>
+                        <th className="py-2 px-3 text-right border-r border-black w-24">Unit Price</th>
+                        <th className="py-2 px-3 text-right border-r border-black w-28">Total Amount</th>
+                        <th className="py-2 px-3 text-left border-r border-black min-w-[120px]">Valuation Type</th>
+                        <th className="py-2 px-3 text-left border-r border-black min-w-[120px] font-mono">WBS Element</th>
+                        <th className="py-2 px-3 text-center border-r border-black w-20">Budget</th>
+                        <th className="py-2 px-3 text-center w-28">DSP Request to</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {columns.map((col, idx) => {
+                        const totalQty = confirmApprovedRows.reduce((sum, r) => sum + (Number(r.quantities[col.id]) || 0), 0);
+                        const srcItem = exactTransmittedItems.find(
+                          it => it.materialCode.trim().toLowerCase() === col.materialCode.trim().toLowerCase()
+                        );
+                        const unitPrice = srcItem && srcItem.totalAmount && srcItem.qty > 0 ? srcItem.totalAmount / srcItem.qty : 0;
+                        const lineTotal = unitPrice > 0 ? unitPrice * totalQty : 0;
+                        return (
+                          <tr key={`conf-item-${col.id}`} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-2.5 text-center border-r border-slate-200 font-mono text-slate-500 font-bold">{idx + 1}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 font-mono font-bold text-slate-900">{col.materialCode}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 font-semibold text-slate-800">{col.description}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-black text-cyan-800">{formatNumber(totalQty)}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 text-right font-mono text-slate-600">{unitPrice > 0 ? formatCurrency(unitPrice) : '-'}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{lineTotal > 0 ? formatCurrency(lineTotal) : '-'}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 text-slate-600 text-[10px]">{srcItem?.valuationTypeDesc || 'Standard Price (S)'}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 font-mono text-slate-600 text-[10px]">{srcItem?.wbsElement || '-'}</td>
+                            <td className="py-2 px-3 border-r border-slate-200 text-center font-bold text-slate-800 text-[10px]">{srcItem?.budgetSource || confirmApprovedRows[0]?.budgetSource || 'WB'}</td>
+                            <td className="py-2 px-3 text-center font-bold text-slate-900 text-[10px]">RHBs ({confirmApprovedRows.length} Regions)</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-900 text-white font-black text-[11px] border-t-2 border-black sticky bottom-0 z-20">
+                        <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider text-amber-400 font-mono">Total Allocation Quota:</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-cyan-300 font-black">{formatNumber(confirmApprovedUnits)}</td>
+                        <td className="py-2.5 px-3 border-r border-slate-700"></td>
+                        <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-black">{formatCurrency(confirmApprovedValuation)}</td>
+                        <td colSpan={4} className="py-2.5 px-3 text-[10px] text-slate-300">
+                          {columns.length} Materials allocated to {confirmApprovedRows.length} Regional Health Bureaus
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* MANUAL AUTHORIZED SIGNATORY & INSTITUTIONAL PROFILE (USER REQUIREMENT) */}
@@ -2136,7 +2490,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 max-h-48 overflow-y-auto">
+              <div className="flex flex-col gap-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200 max-h-56 overflow-y-auto">
                 {ETHIOPIAN_REGIONS.map((reg) => {
                   const isApproved = approvedRegions[reg] !== false;
                   const isPresentInTable = rows.some(r => r.region.toLowerCase() === reg.toLowerCase());
