@@ -34,8 +34,15 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
   );
 
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => regionalRecords[0]?.id || '');
+  const [checkedDossierIds, setCheckedDossierIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'single' | 'consolidated'>('single');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (regionalRecords.length > 0 && checkedDossierIds.length === 0) {
+      setCheckedDossierIds(regionalRecords.map(r => r.id));
+    }
+  }, [regionalRecords]);
 
   useEffect(() => {
     if (regionalRecords.length > 0 && !regionalRecords.some(r => r.id === selectedDossierId)) {
@@ -114,8 +121,11 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
     [selectedColumnTotals]
   );
 
-  // Consolidated across all RHBs (optional tab)
-  const consolidated = useMemo(() => aggregateRhbSubmissionsToMoh(records), [records]);
+  // Consolidated across checked RHB dossiers
+  const consolidated = useMemo(() => {
+    const subset = records.filter(r => checkedDossierIds.includes(r.id));
+    return aggregateRhbSubmissionsToMoh(subset);
+  }, [records, checkedDossierIds]);
 
   const handleExportSelectedExcel = () => {
     if (!selectedDossier) return;
@@ -234,88 +244,79 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
             </p>
           </div>
         ) : (
-          /* Selectable RHB Dossier Inbox Cards */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {regionalRecords.map(record => {
-              const isSelected = selectedDossier?.id === record.id && viewMode === 'single';
-              const facCount = record.facilityMatrixData?.rows?.length || record.targetedFacilitiesCount || 0;
-              const colCount = record.facilityMatrixData?.columns?.length || record.itemsIncluded?.length || 0;
-              return (
-                <div
-                  key={record.id}
-                  onClick={() => {
-                    setSelectedDossierId(record.id);
-                    setViewMode('single');
-                  }}
-                  className={`rounded-2xl p-4 border transition-all cursor-pointer group ${
-                    isSelected
-                      ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-400/30 shadow-md'
-                      : 'bg-white border-slate-200 hover:border-amber-400 shadow-sm'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-[10px] font-black text-amber-700 uppercase tracking-widest font-mono">
-                      {record.dspRefNumber}
-                    </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                        record.status === 'Submitted & Pending'
-                          ? 'bg-amber-100 text-amber-700'
-                          : record.status === 'Under Review'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                      }`}
+          /* Spreadsheet Table Format matching requested columns */
+          <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-[#fed7aa] text-slate-950 font-black border-b border-slate-300">
+                  <th className="p-2.5 border-r border-slate-300 text-center w-12 font-mono">S/N</th>
+                  <th className="p-2.5 border-r border-slate-300 italic min-w-[100px]">Date</th>
+                  <th className="p-2.5 border-r border-slate-300 italic min-w-[160px]">Name of Region</th>
+                  <th className="p-2.5 border-r border-slate-300 italic min-w-[180px]">DSP Name</th>
+                  <th className="p-2.5 border-r border-slate-300 italic min-w-[180px]">Authorized Person</th>
+                  <th className="p-2.5 border-r border-slate-300 text-center w-24">View</th>
+                  <th className="p-2.5 text-center w-20">Select</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 font-medium">
+                {regionalRecords.map((record, idx) => {
+                  const isSelected = selectedDossier?.id === record.id && viewMode === 'single';
+                  const isChecked = checkedDossierIds.includes(record.id);
+                  const regionName = record.targetedRegions?.join(', ') || record.senderOrg || 'Regional';
+                  return (
+                    <tr 
+                      key={record.id}
+                      className={`transition-colors hover:bg-amber-50/50 ${isSelected ? 'bg-amber-50/80 font-bold' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
                     >
-                      {record.status}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-black text-slate-900 line-clamp-1 mb-1">
-                    {record.dspName || record.subject}
-                  </h4>
-                  <div className="text-[11px] text-slate-600 font-semibold line-clamp-1 mb-2">
-                    From: {record.senderOrg}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 font-medium">
-                    <div className="flex items-center gap-1">
-                      <Building2 className="w-3 h-3 text-amber-600" />
-                      <span>{record.targetedRegions?.join(', ') || 'Regional'}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Hospital className="w-3 h-3 text-purple-600" />
-                      <span>{facCount} Facilities</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-                      <span>
-                        {colCount} Items • {formatNumber(record.totalQuantity)} Units
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                    <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <span className="font-mono font-bold text-slate-700">{record.dateSubmitted}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setSelectedDossierId(record.id);
-                        setViewMode('single');
-                      }}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-amber-500 text-slate-950'
-                          : 'bg-slate-900 hover:bg-black text-amber-300'
-                      }`}
-                    >
-                      {isSelected ? <Check className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      <span>{isSelected ? 'Selected' : 'View Full Dossier'}</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                      <td className="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-600">
+                        {idx + 1}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-200 font-mono text-slate-700 whitespace-nowrap">
+                        {record.dateSubmitted}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-200 font-black text-slate-900">
+                        {regionName}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-200 font-bold text-amber-900">
+                        {record.dspName || record.subject || record.dspRefNumber}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-200 text-slate-800">
+                        {record.signatory || record.senderOrg || 'RHB Coordinator'}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-200 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDossierId(record.id);
+                            setViewMode('single');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-amber-300 font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCheckedDossierIds(prev => [...prev, record.id]);
+                            } else {
+                              setCheckedDossierIds(prev => prev.filter(id => id !== record.id));
+                            }
+                            setViewMode('consolidated');
+                          }}
+                          className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                          title="Select to aggregate across regions"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

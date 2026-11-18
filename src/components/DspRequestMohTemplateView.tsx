@@ -1314,15 +1314,6 @@ Authorized Directorate Desk`;
             {/* Orange Header with Italic Bold Black Text */}
             <thead>
               <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
-                <th className="py-2.5 px-3 text-center border-r border-black min-w-[40px] whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={filteredRows.length > 0 && selectedRowIds.length === filteredRows.length}
-                    onChange={handleSelectAllRows}
-                    className="cursor-pointer rounded accent-black"
-                    title="Select All"
-                  />
-                </th>
                 <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
                   S/N
                 </th>
@@ -1363,7 +1354,7 @@ Authorized Directorate Desk`;
             <tbody className="bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-10 text-center text-black font-bold border-b border-black">
+                  <td colSpan={11} className="py-10 text-center text-black font-bold border-b border-black">
                     No matching Program (HP) rows found. Click "Sync HP Stock" or "Reset 5" to reload.
                   </td>
                 </tr>
@@ -1374,7 +1365,6 @@ Authorized Directorate Desk`;
                   if (isEditing) {
                     return (
                       <tr key={row.id} className="bg-amber-100 border-b border-black text-black">
-                        <td className="p-1.5 text-center border-r border-black"></td>
                         <td className="p-1.5 text-center border-r border-black font-mono font-bold">
                           {row.srNo}
                         </td>
@@ -1475,23 +1465,11 @@ Authorized Directorate Desk`;
                     );
                   }
 
-                  const isSelected = selectedRowIds.includes(row.id);
-
                   return (
                     <tr 
                       key={row.id} 
-                      className={`border-b border-black text-black font-medium transition-all group ${isSelected ? 'bg-amber-200/90' : 'hover:brightness-95'}`}
+                      className="border-b border-black text-black font-medium transition-all group hover:brightness-95"
                     >
-                      {/* Checkbox */}
-                      <td className="py-2 px-3 text-center border-r border-black">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleRowSelection(row.id)}
-                          className="cursor-pointer rounded accent-black"
-                        />
-                      </td>
-
                       {/* 1. S/N */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono font-bold">
                         {row.srNo}
@@ -1534,12 +1512,12 @@ Authorized Directorate Desk`;
                         {row.budgetSource}
                       </td>
 
-                      {/* 9. Request Date (Auto-filled with today) */}
+                      {/* 9. Request Date */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono text-[11px]">
                         {row.requestDate || TODAY_ISO_DATE}
                       </td>
 
-                      {/* 10. DSP request to (Auto-filled with MOH) */}
+                      {/* 10. DSP request to */}
                       <td className="py-2 px-3 text-center border-r border-black font-bold text-slate-950">
                         {row.dspRequestTo || 'MOH'}
                       </td>

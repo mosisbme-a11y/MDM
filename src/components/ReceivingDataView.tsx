@@ -498,14 +498,7 @@ export const ReceivingDataView: React.FC<ReceivingDataViewProps> = ({
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 font-mono uppercase">
                 {activeRecords.length.toLocaleString()} Consignments Recorded
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 font-mono flex items-center gap-1">
-                <Clock className="w-3 h-3 text-amber-500" />
-                <span>Auto Stock Holding Days Active</span>
-              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Warehouse receiving registry with auto-calculated Stock Holding Days (Posting Date - Today in Days) for real-time inventory aging intelligence
-            </p>
           </div>
         </div>
 
