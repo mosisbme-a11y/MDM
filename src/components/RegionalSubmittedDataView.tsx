@@ -202,7 +202,7 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
       {/* Header Banner */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
-          <div>
+          <div className="hidden">
             <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
               <Layers className="w-5 h-5 text-amber-600" />
               2.3 Breakdown Received from RHB (RHB ➔ MOH Exact Dossiers)
@@ -214,7 +214,7 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-amber-600" />
-              <span className="text-[11px] font-black text-amber-700 font-mono">
+              <span className="hidden text-[11px] font-black text-amber-700 font-mono">
                 {regionalRecords.length} RHB Dossier{regionalRecords.length === 1 ? '' : 's'}
               </span>
             </div>

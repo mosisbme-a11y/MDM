@@ -1083,7 +1083,7 @@ Authorized Directorate Desk`;
           <div className="flex flex-wrap items-center gap-3">
             {/* EXACT PILL BUTTON FROM USER SCREENSHOT _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
             <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0B1527] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] ring-1 ring-amber-400/20">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+              <span className="hidden w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
                 Request to MOH
               </span>
@@ -1105,7 +1105,7 @@ Authorized Directorate Desk`;
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                <span className="hidden px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
                   1. Head Office DSP Management • 1.1
                 </span>
               </div>
