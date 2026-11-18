@@ -15,7 +15,10 @@ import {
   Calendar,
   FileText,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  Mail,
+  MessageCircle,
+  Send
 } from 'lucide-react';
 import { isRhbSubmittedToMohRecord, aggregateRhbSubmissionsToMoh } from '../utils/rhbAggregation';
 
@@ -37,6 +40,27 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
   const [checkedDossierIds, setCheckedDossierIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'single' | 'consolidated'>('single');
   const [searchQuery, setSearchQuery] = useState('');
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handleResendEmail = () => {
+    if (!selectedDossier) return;
+    const subject = encodeURIComponent(`[RESEND] Official RHB Breakdown Dossier #${selectedDossier.dspRefNumber} - MOH Logistics Desk`);
+    const body = encodeURIComponent(`Dear EPSS & MOH Logistics Desk,\n\nResending official Regional Health Bureau Health Facility Breakdown Dossier:\n- Ref No: ${selectedDossier.dspRefNumber}\n- Subject: ${selectedDossier.dspName || selectedDossier.subject}\n- Sender: ${selectedDossier.senderOrg}\n- Signatory: ${selectedDossier.signatory} (${selectedDossier.signatoryRole})\n- Total Facilities: ${filteredSelectedRows.length}\n- Total Units: ${selectedGrandTotal}\n- Date Submitted: ${selectedDossier.dateSubmitted}\n\nBest regards,\n${selectedDossier.senderOrg}`);
+    window.location.href = `mailto:hubs-dispatch@epss.gov.et,moh-dsp@moh.gov.et?subject=${subject}&body=${body}`;
+    showToast(`✓ Opened email client to resend dossier #${selectedDossier.dspRefNumber} to MOH & Hub Desk.`);
+  };
+
+  const handleResendWhatsApp = () => {
+    if (!selectedDossier) return;
+    const text = encodeURIComponent(`*🏥 MINISTRY OF HEALTH - EPSS LOGISTICS DESK*\n*RESEND OFFICIAL RHB BREAKDOWN DOSSIER*\n*Ref No:* ${selectedDossier.dspRefNumber}\n*Region / Sender:* ${selectedDossier.senderOrg}\n*Facilities:* ${filteredSelectedRows.length} | *Units:* ${selectedGrandTotal}\n*Status:* Verified & Resent`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    showToast(`✓ Opened WhatsApp Web to resend dossier #${selectedDossier.dspRefNumber} to Regional Hub Desk.`);
+  };
 
   useEffect(() => {
     if (regionalRecords.length > 0 && checkedDossierIds.length === 0) {
@@ -364,14 +388,34 @@ export const RegionalSubmittedDataView: React.FC<Props> = ({ records, onSelectSu
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleResendEmail}
+                className="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                title="Resend official dossier via Email to MOH & Hub Dispatch Desk"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Resend Email</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendWhatsApp}
+                className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                title="Resend official dossier via WhatsApp to Regional Hub Coordinators"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Resend WhatsApp</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleExportSelectedExcel}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition border border-slate-700"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Exact Matrix (.xlsx)</span>
+                <span>Export (.xlsx)</span>
               </button>
             </div>
           </div>

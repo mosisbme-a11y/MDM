@@ -161,9 +161,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, currentTheme, onT
             </form>
           </div>
 
-          <div className="text-[11px] text-slate-500 font-medium">
-            Biomedical Engineering Unit • EPSS Portal
-          </div>
+
         </div>
       </div>
     </div>
