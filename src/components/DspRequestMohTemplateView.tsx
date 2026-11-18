@@ -1314,6 +1314,15 @@ Authorized Directorate Desk`;
             {/* Orange Header with Italic Bold Black Text */}
             <thead>
               <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
+                <th className="py-2.5 px-2 text-center border-r border-black w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredRows.length > 0 && filteredRows.every(r => selectedRowIds.includes(r.id))}
+                    onChange={handleSelectAllRows}
+                    className="w-4 h-4 accent-slate-900 rounded border-black cursor-pointer align-middle"
+                    title="Select all visible rows to send"
+                  />
+                </th>
                 <th className="py-2.5 px-3 text-center border-r border-black min-w-[50px] whitespace-nowrap">
                   S/N
                 </th>
@@ -1354,17 +1363,27 @@ Authorized Directorate Desk`;
             <tbody className="bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-10 text-center text-black font-bold border-b border-black">
+                  <td colSpan={12} className="py-10 text-center text-black font-bold border-b border-black">
                     No matching Program (HP) rows found. Click "Sync HP Stock" or "Reset 5" to reload.
                   </td>
                 </tr>
               ) : (
                 filteredRows.map((row, idx) => {
                   const isEditing = editingRowId === row.id;
+                  const isSelected = selectedRowIds.includes(row.id);
 
                   if (isEditing) {
                     return (
                       <tr key={row.id} className="bg-amber-100 border-b border-black text-black">
+                        <td className="p-1.5 text-center border-r border-black">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleRowSelection(row.id)}
+                            className="w-4 h-4 accent-slate-900 rounded border-black cursor-pointer align-middle"
+                            title="Select row to send"
+                          />
+                        </td>
                         <td className="p-1.5 text-center border-r border-black font-mono font-bold">
                           {row.srNo}
                         </td>
@@ -1468,8 +1487,23 @@ Authorized Directorate Desk`;
                   return (
                     <tr 
                       key={row.id} 
-                      className="border-b border-black text-black font-medium transition-all group hover:brightness-95"
+                      onClick={() => handleToggleRowSelection(row.id)}
+                      className={`border-b border-black text-black font-medium transition-all group cursor-pointer ${isSelected ? 'bg-amber-100/80' : 'hover:bg-amber-50/50'}`}
                     >
+                      {/* Checkbox */}
+                      <td
+                        className="py-2 px-2 text-center border-r border-black"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleRowSelection(row.id)}
+                          className="w-4 h-4 accent-slate-900 rounded border-black cursor-pointer align-middle"
+                          title="Select row to send"
+                        />
+                      </td>
+
                       {/* 1. S/N */}
                       <td className="py-2 px-3 text-center border-r border-black font-mono font-bold">
                         {row.srNo}
@@ -1523,7 +1557,10 @@ Authorized Directorate Desk`;
                       </td>
 
                       {/* Actions */}
-                      <td className="py-2 px-1 text-center bg-yellow-200/50">
+                      <td
+                        className="py-2 px-1 text-center bg-yellow-200/50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
