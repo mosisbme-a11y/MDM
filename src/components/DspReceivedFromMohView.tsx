@@ -739,7 +739,7 @@ Attachment: ${folder.letterFileName}`;
               <div className="flex items-center gap-2 flex-wrap">
                 <FolderArchive className="w-4 h-4 text-amber-600" />
                 <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  DSP Dossier Archive (Received from EPSS)
+                  DSP DOSSIER ARCHIVE (RECEIVED FROM EPSS)
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800">
                   {receivedRecords.length} Dossiers
@@ -789,8 +789,9 @@ Attachment: ${folder.letterFileName}`;
                         <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
                           <th className="py-4 px-4 w-12 text-center border-r border-white/10">S/N</th>
                           <th className="py-4 px-6 border-r border-white/10">Date</th>
-                          <th className="py-4 px-6 border-r border-white/10">Dsp Name &amp; Ref</th>
-                          <th className="py-4 px-6 border-r border-white/10">Items / Units</th>
+                          <th className="py-4 px-6 border-r border-white/10">DSP Name</th>
+                          <th className="py-4 px-6 border-r border-white/10">Authorized person</th>
+                          <th className="py-4 px-6 border-r border-white/10">Role</th>
                           <th className="py-4 px-6 border-r border-white/10">Status</th>
                           <th className="py-4 px-4 w-28 text-center">Action</th>
                         </tr>
@@ -828,9 +829,11 @@ Attachment: ${folder.letterFileName}`;
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-4 px-6 border-r border-slate-50 font-mono">
-                                <span className="font-black text-slate-900">{rec.totalDevices || rec.itemsIncluded?.length || 0} Items</span>
-                                <span className="text-[10px] text-cyan-800 font-bold block">{formatNumber(rec.totalQuantity || 0)} Units</span>
+                              <td className="py-4 px-6 border-r border-slate-50 font-bold text-slate-900">
+                                {rec.signatory || 'Authorized Person'}
+                              </td>
+                              <td className="py-4 px-6 border-r border-slate-50 text-slate-600">
+                                {rec.signatoryRole || 'Technical Lead'}
                               </td>
                               <td className="py-4 px-6 border-r border-slate-50">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">

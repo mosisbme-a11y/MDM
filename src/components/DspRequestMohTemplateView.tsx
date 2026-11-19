@@ -2287,14 +2287,6 @@ Authorized Directorate Desk`;
                         Transmits official quota dossier to Ministry of Health and records incoming entry in Sub-step 2.1 (DSP Received from EPSS).
                       </div>
 
-                      {(!dspName.trim() || !manualSignatoryName.trim() || !manualSignatoryRole.trim()) && (
-                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-bold space-y-0.5">
-                          <div>Mandatory fields missing:</div>
-                          {!dspName.trim() && <div>• DSP Project Name</div>}
-                          {(!manualSignatoryName.trim() || !manualSignatoryRole.trim()) && <div>• Authorized Person & Role</div>}
-                        </div>
-                      )}
-
                       <div className="flex items-center gap-2 pt-1">
                         <button
                           type="button"
@@ -2306,12 +2298,7 @@ Authorized Directorate Desk`;
                         <button
                           type="button"
                           onClick={handleTransmitDspRequest}
-                          disabled={!dspName.trim() || !manualSignatoryName.trim() || !manualSignatoryRole.trim()}
-                          className={`flex-2 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md ${
-                            dspName.trim() && manualSignatoryName.trim() && manualSignatoryRole.trim()
-                              ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer' 
-                              : 'bg-slate-800 text-slate-500 cursor-not-allowed grayscale'
-                          }`}
+                          className="flex-2 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Confirm Transmittal</span>

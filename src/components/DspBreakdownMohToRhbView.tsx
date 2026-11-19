@@ -1001,14 +1001,14 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </span>
             </div>
             <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
+              <div className="hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-400/30 font-black">
                   2. MOH DSP Management • 2.2 DSP Request to RHB
                 </span>
                 <span>MOH PMD Directorate | Regional Health Bureaus</span>
                 <span className="text-emerald-400 font-mono font-bold">• All 15 Ethiopian Regions Active</span>
               </div>
-              <div className="text-xs font-semibold text-slate-200 mt-0.5">
+              <div className="hidden text-xs font-semibold text-slate-200 mt-0.5">
                 Official Quota Breakdown Matrix Template (Sub-step 2.2 — Isolated MOH Tier)
               </div>
             </div>
@@ -1152,7 +1152,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
           <div className="p-2.5 rounded-xl bg-amber-500 text-slate-950 shrink-0 shadow-xs">
             <FileText className="w-5 h-5" />
           </div>
-          <div>
+          <div className="hidden">
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
                 BREAKDOWN REQUEST SOURCE DATA
@@ -1928,18 +1928,18 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="hidden">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
                       Confirm & Submit DSP Breakdown to RHBs
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-200">
                       Sub-step 2.2 ➔ 3.1
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-100 text-teal-900 border border-teal-200">
+                    <span className="hidden">
                       Full Columns Confirmation Active
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium">
+                  <p className="hidden">
                     Review and confirm full equipment columns, allocated quota units, and authorized Regional Health Bureaus
                   </p>
                 </div>
@@ -1976,7 +1976,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             </div>
 
             {/* Security Verification Protocol Banner */}
-            <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-2">
+            <div className="hidden">
               <div className="flex items-center justify-between font-bold text-xs uppercase tracking-tight">
                 <span className="flex items-center gap-1.5 text-indigo-900">
                   <Lock className="w-4 h-4 text-indigo-600" />
@@ -1999,15 +1999,15 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                     <FileSpreadsheet className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    <div className="hidden">
+                      <h4 className="hidden">
                         Full Columns Data for Confirmation (What I Send)
                       </h4>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-600 text-white font-mono">
                         MOH ➔ RHB Transmitted Payload
                       </span>
                     </div>
-                    <p className="text-[11px] text-teal-950 font-medium mt-0.5">
+                    <p className="hidden">
                       Verify complete equipment columns, regional distribution quantities, and financial allocations before official transmittal.
                     </p>
                   </div>
@@ -2031,11 +2031,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                     <button
                       type="button"
                       onClick={() => setConfirmTabMode('schema')}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
-                        confirmTabMode === 'schema'
-                          ? 'bg-teal-700 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
+                      className="hidden"
                     >
                       <FileText className="w-3 h-3" />
                       <span>10-Column Schema</span>
@@ -2056,20 +2052,20 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </div>
 
               {/* KPI Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+              <div className="hidden">
+                <div className="hidden">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">EQUIPMENT COLUMNS</span>
                   <span className="text-sm font-black text-slate-900">{columns.length} Materials</span>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                <div className="hidden">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">TOTAL ALLOCATED UNITS</span>
                   <span className="text-sm font-black text-cyan-800">{formatNumber(confirmApprovedUnits)} Units</span>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                <div className="hidden">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">TARGETED REGIONS</span>
                   <span className="text-sm font-black text-emerald-700">{confirmApprovedRows.length} of 15 Approved</span>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-teal-200/80 shadow-3xs">
+                <div className="hidden">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight block">CUMULATIVE VALUATION</span>
                   <span className="text-sm font-black text-indigo-900">{formatCurrency(confirmApprovedValuation)}</span>
                 </div>
@@ -2407,11 +2403,11 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                       ETHIOPIAN_REGIONS.forEach(r => { all[r] = true; });
                       setApprovedRegions(all);
                     }}
-                    className="text-emerald-700 font-bold hover:underline cursor-pointer"
+                    className="hidden"
                   >
                     Select All 15
                   </button>
-                  <span>•</span>
+                  <span className="hidden">•</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -2420,11 +2416,11 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                       ETHIOPIAN_REGIONS.forEach(r => { filtered[r] = activeInTable.has(r.toLowerCase()); });
                       setApprovedRegions(filtered);
                     }}
-                    className="text-cyan-700 font-bold hover:underline cursor-pointer"
+                    className="hidden"
                   >
                     Only Table Rows ({rows.length})
                   </button>
-                  <span>•</span>
+                  <span className="hidden">•</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -2440,7 +2436,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </div>
 
               {/* ONE-BY-ONE SELECTED REGIONS BADGES BAR */}
-              <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+              <div className="hidden">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-black text-emerald-950 uppercase tracking-tight flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
