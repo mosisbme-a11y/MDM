@@ -653,18 +653,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
             <span>All Facilities Matrix ({facilityRows.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('dossiers')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-              viewMode === 'dossiers'
-                ? 'bg-[#0B1527] text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5 text-emerald-400" />
-            <span>RHB Dossiers ({submissions.length})</span>
-          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

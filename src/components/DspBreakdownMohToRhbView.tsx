@@ -2376,21 +2376,26 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </div>
               </div>
 
-              {/* DSP Name Input */}
+              {/* DSP Name Input (Locked & Auto-Filled from EPSS) */}
               <div className="space-y-1 pt-1 border-t border-amber-200/60">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
-                    DSP Project Name
+                  <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    DSP Project Name (Auto-Filled & Locked from EPSS)
                   </label>
-                  <span className="text-[10px] text-slate-500">Stored in master ledger and displayed in 8-column tables</span>
+                  <span className="text-[10px] text-emerald-700 font-bold">Non-Editable Link</span>
                 </div>
                 <input
                   type="text"
                   value={manualDspName}
-                  onChange={(e) => setManualDspName(e.target.value)}
-                  placeholder="e.g. SDG Breakdown, Global Breakdown, World Bank BkD"
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                  disabled
+                  readOnly
+                  placeholder="Auto-filled from selected EPSS source dossier"
+                  className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 cursor-not-allowed shadow-2xs"
                 />
+                <p className="text-[10px] text-slate-500 italic">
+                  Created by EPSS and automatically inherited across all downstream DSP hierarchies. Cannot be changed.
+                </p>
               </div>
             </div>
 
