@@ -462,6 +462,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [stageFilter, setStageFilter] = useState('all');
   const [inspectStageInfo, setInspectStageInfo] = useState<{ stageKey: string; stageTitle: string } | null>(null);
   const [showHeadOfficeSummaryMatrix, setShowHeadOfficeSummaryMatrix] = useState(false);
+  const [showStageSummaryMatrix, setShowStageSummaryMatrix] = useState(false);
   const [selectedStageKey, setSelectedStageKey] = useState<string>('head-office-dsp');
 
 
@@ -2559,43 +2560,56 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           ) : (
             <>
               <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-                    <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
-                      Summary: {currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} ({filteredRecords.length} Documents)
-                    </span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStageSummaryMatrix(!showStageSummaryMatrix)}
+                  className="flex items-center gap-2 flex-wrap text-left cursor-pointer hover:opacity-80 transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
+                    Summary: {currentStage === 'all' ? 'All Workflow Dossiers' : stagesList.find(s => s.stageKey === currentStage)?.label} ({filteredRecords.length} Documents)
+                  </span>
+                </button>
 
                 <div className="flex items-center gap-2">
+                  {showStageSummaryMatrix && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csv = filteredRecords.map((r, idx) => {
+                          const dspInfo = getDossierDisplayInfo(r, idx);
+                          return {
+                            'S/N': idx + 1,
+                            'Date': r.dateSubmitted,
+                            'DSP Name': dspInfo.dspName,
+                            'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
+                            'Authorized person': dspInfo.authorizedPerson,
+                            'Organazation': dspInfo.organization,
+                            'Role': dspInfo.role,
+                            'Status': dspInfo.status,
+                            'Reference': r.dspRefNumber
+                          };
+                        });
+                        downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
+                      }}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export Summary CSV</span>
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => {
-                      const csv = filteredRecords.map((r, idx) => {
-                        const dspInfo = getDossierDisplayInfo(r, idx);
-                        return {
-                          'S/N': idx + 1,
-                          'Date': r.dateSubmitted,
-                          'DSP Name': dspInfo.dspName,
-                          'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
-                          'Authorized person': dspInfo.authorizedPerson,
-                          'Organazation': dspInfo.organization,
-                          'Role': dspInfo.role,
-                          'Status': dspInfo.status,
-                          'Reference': r.dspRefNumber
-                        };
-                      });
-                      downloadCSV(`dossier-summary-${Date.now()}.csv`, csv);
-                    }}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    onClick={() => setShowStageSummaryMatrix(!showStageSummaryMatrix)}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export Summary CSV</span>
+                    <span>{showStageSummaryMatrix ? 'Hide' : 'Show'}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStageSummaryMatrix ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
               </div>
 
+              {showStageSummaryMatrix && (
               <div className="overflow-x-auto">
                 {/* User-Requested Summary Template */}
                 <table className="w-full text-left text-xs border-collapse">
@@ -2677,6 +2691,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   </tbody>
                 </table>
               </div>
+              )}
             </>
           )}
         </div>
