@@ -1695,7 +1695,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             </div>
           </div>
 
-          <div className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+          <div className="hidden">
             Two-tier Header: Region / Zone / Woreda / Name of health facility / List of Packeges / Equipment
           </div>
         </div>
@@ -1814,15 +1814,15 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           enableRhbMultiAutoPopulate={true}
           breakdownRequests={rhbScopedRecords}
           allowedTier="rhb-breakdown-management"
-          allowedSubStages={['3.1', '3.2']}
-          hierarchyScopeTitle="3. RHB Breakdown Management (3.1 & 3.2 Only)"
+          allowedSubStages={['3.2']}
+          hierarchyScopeTitle="3. RHB Breakdown Management (3.2 Submit Breakdown to MOH Only)"
           selectedBreakdownRequestId={
-            (selectedRecord && isDossierInTier(selectedRecord, 'rhb-breakdown-management')
+            (selectedRecord &&
+            isDossierInTier(selectedRecord, 'rhb-breakdown-management') &&
+            canonicalizeSubStage(selectedRecord.subStage, selectedRecord.stage) === '3.2'
               ? selectedRecord.id
               : rhbScopedRecords.find(
-                  r =>
-                    canonicalizeSubStage(r.subStage, r.stage) === '3.2' ||
-                    canonicalizeSubStage(r.subStage, r.stage) === '3.1'
+                  r => canonicalizeSubStage(r.subStage, r.stage) === '3.2'
                 )?.id) || ''
           }
           onSelectBreakdownRequest={(reqId) => {

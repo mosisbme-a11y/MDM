@@ -223,7 +223,7 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
   const handleSelectBreakdownRequestSource = (reqId: string) => {
     setSelectedBreakdownRequestId(reqId);
     if (!reqId) return;
-    const req = mohReceivedEpssDossiers.find(r => r.id === reqId);
+    const req = mohBreakdownToRhbDossiers.find(r => r.id === reqId) || (records || []).find(r => r.id === reqId);
     if (req) {
       const dspInfo = getDossierDisplayInfo(req);
       if (dspInfo.dspName) setManualDspName(dspInfo.dspName);
@@ -288,6 +288,16 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
           Array.isArray(r.itemsIncluded) &&
           r.itemsIncluded.length > 0
         );
+      })
+      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
+  }, [records]);
+
+  // Strictly isolated to MOH DSP Management (Sub-step 2.2: Breakdown Request to RHB)
+  const mohBreakdownToRhbDossiers = useMemo(() => {
+    return (records || [])
+      .filter(r => {
+        const sub = canonicalizeSubStage(r.subStage, r.stage);
+        return isDossierInTier(r, 'moh-osp-management') && sub === '2.2';
       })
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records]);
@@ -1178,12 +1188,12 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               <span>
                 {selectedBreakdownRequestId
                   ? (() => {
-                      const sel = mohReceivedEpssDossiers.find(r => r.id === selectedBreakdownRequestId);
-                      if (!sel) return '-- Select MOH 2.1 Dossier --';
+                      const sel = mohBreakdownToRhbDossiers.find(r => r.id === selectedBreakdownRequestId);
+                      if (!sel) return '-- Select Breakdown Request to RHB --';
                       const info = getDossierDisplayInfo(sel);
-                      return `[2.1] ${info.dspName || sel.dspName || sel.dspRefNumber}`;
+                      return `[2.2] ${info.dspName || sel.dspName || sel.dspRefNumber}`;
                     })()
-                  : '-- Select MOH 2.1 Received EPSS Dossier --'}
+                  : '-- Select Breakdown Request to RHB --'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
@@ -2771,13 +2781,13 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-black text-slate-900">Select MOH 2.1 Received Dossier</h3>
+                    <h3 className="text-base font-black text-slate-900">Select Breakdown Request to RHB</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-50 text-teal-800 border border-teal-200">
-                      Isolated: 2. MOH DSP Management (2.1 Only)
+                      Isolated: 2. MOH DSP Management (2.2 Breakdown Request to RHB Only)
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Strictly isolated to MOH DSP Management (Sub-step 2.1 DSP Received from EPSS). EPSS HO (1.x), RHB (3.x), and Branch (4.x) dossiers are excluded.
+                    Strictly isolated to MOH DSP Management (Sub-step 2.2 Breakdown Request to RHB). Other tiers and sub-steps are excluded.
                   </p>
                 </div>
               </div>
@@ -2828,14 +2838,14 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
-                  {mohReceivedEpssDossiers.length === 0 ? (
+                  {mohBreakdownToRhbDossiers.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-400 font-medium italic">
-                        No MOH 2.1 dossiers available yet. Receive a DSP Request from EPSS HO into Sub-step 2.1 first.
+                        No Breakdown Request to RHB (Sub-step 2.2) dossiers available yet.
                       </td>
                     </tr>
                   ) : (
-                    mohReceivedEpssDossiers.map((rec, idx) => {
+                    mohBreakdownToRhbDossiers.map((rec, idx) => {
                       const dspInfo = getDossierDisplayInfo(rec, idx);
                       const isSelected = selectedBreakdownRequestId === rec.id;
                       return (
@@ -2901,7 +2911,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 shrink-0">
               <span className="text-xs text-slate-500">
-                MOH 2.1 Dossiers Available: <strong className="text-slate-800">{mohReceivedEpssDossiers.length}</strong>
+                Breakdown Request to RHB Dossiers Available: <strong className="text-slate-800">{mohBreakdownToRhbDossiers.length}</strong>
               </span>
               <div className="flex items-center gap-2">
                 <button
