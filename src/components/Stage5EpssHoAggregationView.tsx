@@ -1085,42 +1085,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       {viewTab === 'order-process' && (
         <div className="space-y-4">
           {/* SAP STO Context Callout */}
-          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 text-white shadow-sm border border-blue-700/40 space-y-3">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-                  <Truck className="w-5 h-5 text-blue-300" />
-                </div>
-                <div>
-                  <h3 className="font-black text-white text-base flex items-center gap-2">
-                    EPSS SAP Stock Transport Order (STO) Process
-                    <span className="text-[10px] font-mono font-bold bg-blue-500/30 text-blue-200 px-2 py-0.5 rounded-full border border-blue-400/30">
-                      ME21N Format
-                    </span>
-                  </h3>
-                  <p className="text-xs text-blue-200/90 mt-0.5">
-                    Order lines summarized by <strong>Plant (Mapped HUB)</strong> and <strong>Material (Item Code)</strong> from the aggregated health facility breakdown.
-                  </p>
-                </div>
-              </div>
-
-              {/* SAP Rule Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-                <span className="bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
-                  <strong className="text-blue-300">I:</strong> U (Stock Transfer)
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
-                  <strong className="text-blue-300">PGr:</strong> HP4
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
-                  <strong className="text-blue-300">SPlt:</strong> HO01
-                </span>
-                <span className="bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
-                  <strong className="text-blue-300">POrg:</strong> HP02
-                </span>
-              </div>
-            </div>
-          </div>
+          <div className="hidden"></div>
 
           {/* Order Process Toolbar */}
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
@@ -1209,7 +1174,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
                 <span className="font-bold text-slate-900">SAP Stock Transport Order Table</span>
                 <span className="text-[11px] text-slate-500">• 8 Standard Columns Required</span>
               </div>
-              <div className="text-[11px] text-slate-600 font-mono">
+              <div className="hidden">
                 Showing <strong>{filteredOrderProcessItems.length}</strong> Order Lines ({formatNumber(filteredOrderProcessItems.reduce((acc, i) => acc + i.quantity, 0))} Units)
               </div>
             </div>

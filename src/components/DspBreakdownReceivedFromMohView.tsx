@@ -539,7 +539,7 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
       ) : (
         <div className="space-y-4">
           {/* Dossiers Table matching requested format */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+          <div className="hidden bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-amber-600" />
@@ -659,7 +659,7 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
           </div>
 
           {/* Selected Dossier Exact MOH-to-RHB Matrix */}
-          <div className="space-y-4">
+          <div className="hidden space-y-4">
             {selectedDossier && (
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm space-y-4">
                 {/* Transmittal Header Details */}
