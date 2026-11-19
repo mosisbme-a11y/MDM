@@ -375,20 +375,118 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
         </div>
       </div>
 
+      {/* Received from HO EPSS Dossier Table */}
+      <div className="bg-white border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Received from HO EPSS Dossiers ({branchRecords.length})
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+              Select Dossier to Proceed Analysis
+            </span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-300 text-slate-900 font-bold">
+                <th className="py-2.5 px-3 border-r border-slate-300 text-center w-12 italic">S/N</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[105px] italic">Date</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[200px] italic">DSP Name</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[150px] italic">Authorized person</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[140px] italic">Role</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[140px] italic">Hub</th>
+                <th className="py-2.5 px-3 text-center min-w-[190px] italic">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {branchRecords.map((r, idx) => {
+                const isSelected = activeDossier?.id === r.id;
+                const hubNames = Array.from(
+                  new Set(
+                    [
+                      ...(((r as any).branchDispatchData?.allocations || []).map((a: any) => a.hubName || a.hubCode).filter(Boolean)),
+                      ...(r.facilityMatrixData?.rows?.map((row: any) => row.hub).filter(Boolean) || []),
+                      ...(r.itemsIncluded?.map((it: any) => it.plant).filter(Boolean) || [])
+                    ]
+                  )
+                );
+                const hubLabel = hubNames.length > 2
+                  ? `${hubNames.slice(0, 2).join(', ')} (+${hubNames.length - 2})`
+                  : hubNames.length > 0
+                    ? hubNames.join(', ')
+                    : 'All Hubs';
+
+                return (
+                  <tr
+                    key={r.id}
+                    onClick={() => setSelectedDossierId(r.id)}
+                    className={`cursor-pointer transition ${
+                      isSelected ? 'bg-purple-50/80' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-2.5 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-600">
+                      {idx + 1}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-mono text-slate-700 whitespace-nowrap">
+                      {r.dateSubmitted || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-black text-slate-900">
+                      {r.dspName || r.subject || r.dspRefNumber}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 text-slate-800 font-medium">
+                      {r.signatory || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600">
+                      {r.signatoryRole || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-purple-900">
+                      {hubLabel}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDossierId(r.id);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition ${
+                            isSelected
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 hover:bg-purple-100 text-slate-800 border border-slate-300'
+                          }`}
+                        >
+                          {isSelected ? 'Selected' : 'Select'}
+                        </button>
+                        {mode === '4.1' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDossierId(r.id);
+                              onSelectSubTab?.('dsp-branches-4-2');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-[#0B1527] hover:bg-slate-800 text-amber-300 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer transition"
+                          >
+                            <span>Proceed Analysis</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Filters & Dossier Switcher */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <select
-            value={activeDossier?.id || ''}
-            onChange={(e) => setSelectedDossierId(e.target.value)}
-            className="bg-purple-50 border border-purple-200 text-xs font-bold text-purple-950 rounded-lg px-2.5 py-1.5 cursor-pointer"
-          >
-            {branchRecords.map(r => (
-              <option key={r.id} value={r.id}>
-                {r.dspRefNumber} — {r.dspName || r.subject} ({r.dateSubmitted})
-              </option>
-            ))}
-          </select>
 
           <select
             value={selectedHubFilter}

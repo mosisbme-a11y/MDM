@@ -18,7 +18,10 @@ import {
   Upload,
   UserCheck,
   AlertCircle,
-  MapPin
+  MapPin,
+  Mail,
+  MessageCircle,
+  X
 } from 'lucide-react';
 import {
   DspWorkflowRecord,
@@ -66,7 +69,19 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedBranchDossier, setSelectedBranchDossier] = useState<DspWorkflowRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const branchDispatchedDossiers = useMemo(() => {
+    return (records || [])
+      .filter(
+        (r) =>
+          r.stage === 'branches-dsp-management' ||
+          r.subStage === '4.1' ||
+          r.stage === 'epss-to-branch'
+      )
+      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
+  }, [records]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -515,6 +530,104 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
     showToast('Removed RHB dossier from aggregation.');
   };
 
+  const inheritedDspName = useMemo(() => {
+    const names = Array.from(
+      new Set(regionSummaries.flatMap((rs) => rs.dspNames).filter((n) => n && n !== '-'))
+    );
+    return names.length > 0 ? names.join(', ') : 'Aggregated RHB Breakdown';
+  }, [regionSummaries]);
+
+  const handleSendToBranch = () => {
+    if (facilityRows.length === 0) return;
+    const regionsList = regionSummaries.map((rs) => rs.region);
+    const branchRef = `EPSS-BR-4.1-${Date.now().toString().slice(-6)}`;
+    const today = new Date().toISOString().split('T')[0];
+
+    const branchRecord: DspWorkflowRecord = {
+      id: `dsp-branch-${Date.now()}`,
+      dspRefNumber: branchRef,
+      dspName: inheritedDspName,
+      stage: 'branches-dsp-management',
+      subStage: '4.1',
+      stageTitle: '4.1 Breakdown Received from EPSS HO',
+      status: 'Submitted & Pending',
+      totalDevices: unifiedColumns.length,
+      totalQuantity: grandTotalUnits,
+      totalValuationETB: 0,
+      targetedFacilitiesCount: facilityRows.length,
+      subject: `DSP [${inheritedDspName}]: Dispatched to EPSS Branches (${facilityRows.length} Facilities)`,
+      senderOrg: 'Ministry of Health (MOH)',
+      recipientOrg: 'EPSS Regional Branches',
+      targetedRegions: regionsList,
+      dateSubmitted: today,
+      officialLetterRef: `MOH/BR/${Date.now().toString().slice(-4)}`,
+      signatory: 'MOH Aggregation Desk',
+      signatoryRole: 'Medical Equipment Coordinator',
+      itemsIncluded: unifiedColumns.map((c) => ({
+        material: c.code,
+        description: c.name,
+        quantity: facilityRows.reduce((acc, row) => acc + (Number(row.quantities[c.id]) || 0), 0),
+        plant: facilityRows[0]?.hub || 'National Hub'
+      })),
+      facilityMatrixData: {
+        date: latestDate || today,
+        region: regionsList.join(', '),
+        columns: unifiedColumns,
+        rows: facilityRows
+      },
+      notes: `Dispatched directly from Sub-step 2.4 Aggregation to EPSS Branches (Sub-step 4.1). Covers ${regionsList.length} regions, ${facilityRows.length} facilities, ${grandTotalUnits} total units.`
+    };
+
+    setRecords((prev) => [branchRecord, ...prev]);
+    onTriggerCloudSync?.(`Dispatched ${facilityRows.length} facility allocations to EPSS Branches (4.1)`, {
+      type: 'CREATE',
+      title: `Send to Branch (${inheritedDspName})`
+    });
+    showToast(`✓ Sent "${inheritedDspName}" (${facilityRows.length} facilities) to EPSS Branches (4.1)!`);
+  };
+
+  const handleSendViaEmail = () => {
+    if (facilityRows.length === 0) return;
+    handleExportExcel();
+    const regionsList = regionSummaries.map((rs) => rs.region).join(', ');
+    const subject = encodeURIComponent(`DSP Breakdown Dispatch: ${inheritedDspName} (${facilityRows.length} Facilities)`);
+    const body = encodeURIComponent(
+      `Dear EPSS Branch & Logistics Team,\n\n` +
+      `Please find the attached Aggregated RHB Breakdown Excel dossier:\n` +
+      `- DSP Name: ${inheritedDspName}\n` +
+      `- Regions (${regionSummaries.length}): ${regionsList}\n` +
+      `- Total Facilities: ${facilityRows.length}\n` +
+      `- Total Equipment Units: ${formatNumber(grandTotalUnits)}\n` +
+      `- Latest Date: ${latestDate}\n\n` +
+      `Best regards,\nMinistry of Health (MOH)`
+    );
+    const link = document.createElement('a');
+    link.href = `mailto:?subject=${subject}&body=${body}`;
+    link.click();
+    showToast('✓ Opened Email client & downloaded All-Region Excel attachment.');
+  };
+
+  const handleSendViaWhatsApp = () => {
+    if (facilityRows.length === 0) return;
+    handleExportExcel();
+    const regionsList = regionSummaries.map((rs) => rs.region).join(', ');
+    const text = encodeURIComponent(
+      `*Official DSP Breakdown Dispatch*\n` +
+      `• *DSP Name:* ${inheritedDspName}\n` +
+      `• *Regions (${regionSummaries.length}):* ${regionsList}\n` +
+      `• *Total Facilities:* ${facilityRows.length}\n` +
+      `• *Total Units:* ${formatNumber(grandTotalUnits)}\n` +
+      `• *Latest Date:* ${latestDate}\n\n` +
+      `_Excel dossier downloaded for attachment._`
+    );
+    const link = document.createElement('a');
+    link.href = `https://wa.me/?text=${text}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
+    showToast('✓ Opened WhatsApp & downloaded All-Region Excel attachment.');
+  };
+
   return (
     <div className="space-y-5">
       {toastMessage && (
@@ -570,6 +683,36 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Export All-Region Excel</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendToBranch}
+            disabled={facilityRows.length === 0}
+            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Send to Branch</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendViaEmail}
+            disabled={facilityRows.length === 0}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Via Email</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendViaWhatsApp}
+            disabled={facilityRows.length === 0}
+            className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>WhatsApp</span>
           </button>
 
           <button
@@ -1194,6 +1337,195 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Sent to Branch Dossier Archive (Standard 8-Column Format) */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-cyan-700" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Sent to Branch Dossier Archive ({branchDispatchedDossiers.length})
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Official dossiers dispatched to EPSS Regional Branches (Sub-step 4.1)
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200 self-start sm:self-auto">
+            4. Branches DSP Management • 4.1
+          </span>
+        </div>
+
+        {branchDispatchedDossiers.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500">
+            No dossiers have been sent to EPSS Branches yet. Click <strong className="text-cyan-700">Send to Branch</strong> above to generate and archive a Branch dispatch dossier.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-700">
+                  <th className="py-2.5 px-3 border-r border-slate-200 text-center w-12 italic">S/N</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[200px] italic">DSP Management Hierarchy</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[100px] italic">Date</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[180px] italic">DSP Name</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[140px] italic">Authorized person</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[120px] italic">Organization</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[130px] italic">Role</th>
+                  <th className="py-2.5 px-3 border-r border-slate-200 text-center min-w-[110px] italic">Status</th>
+                  <th className="py-2.5 px-3 text-center min-w-[110px] italic">View</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {branchDispatchedDossiers.map((rec, idx) => (
+                  <tr key={rec.id} className="hover:bg-cyan-50/40 transition">
+                    <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono font-bold text-slate-500">
+                      {idx + 1}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-900 border border-cyan-200 text-[11px] font-bold leading-snug">
+                        4. Branches DSP Management • 4.1 Breakdown Received from EPSS HO
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-700 whitespace-nowrap">
+                      {rec.dateSubmitted || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 font-black text-slate-900">
+                      {rec.dspName || rec.subject || rec.dspRefNumber}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium">
+                      {rec.signatory || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-800">
+                      {rec.senderOrg || 'MOH'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 text-slate-600">
+                      {rec.signatoryRole || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-100 text-center">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        {rec.status === 'Submitted & Pending' ? 'Pending' : rec.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBranchDossier(rec)}
+                          className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer shadow-2xs transition"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>VIEW</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDossier(rec.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition"
+                          title="Delete dossier"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Branch Dossier Detail Modal */}
+      {selectedBranchDossier && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-4 bg-[#0B1527] text-white flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                  4. Branches DSP Management • 4.1 Dispatched Dossier
+                </div>
+                <h3 className="text-sm font-black mt-0.5">
+                  {selectedBranchDossier.dspName || selectedBranchDossier.subject}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBranchDossier(null)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Ref Number</div>
+                  <div className="font-mono font-bold text-slate-900 mt-0.5">{selectedBranchDossier.dspRefNumber}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Date</div>
+                  <div className="font-mono font-bold text-slate-900 mt-0.5">{selectedBranchDossier.dateSubmitted}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Authorized Person</div>
+                  <div className="font-bold text-slate-900 mt-0.5">{selectedBranchDossier.signatory}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Total Units / Facilities</div>
+                  <div className="font-mono font-bold text-emerald-700 mt-0.5">
+                    {formatNumber(selectedBranchDossier.totalQuantity)} Units • {selectedBranchDossier.targetedFacilitiesCount} HFs
+                  </div>
+                </div>
+              </div>
+
+              {selectedBranchDossier.itemsIncluded && selectedBranchDossier.itemsIncluded.length > 0 && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase">
+                        <th className="py-2 px-3 border-r border-slate-200 w-10 text-center">#</th>
+                        <th className="py-2 px-3 border-r border-slate-200">Material Code</th>
+                        <th className="py-2 px-3 border-r border-slate-200">Equipment Description</th>
+                        <th className="py-2 px-3 text-right">Total Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedBranchDossier.itemsIncluded.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-2 px-3 border-r border-slate-100 text-center font-mono text-slate-500">{idx + 1}</td>
+                          <td className="py-2 px-3 border-r border-slate-100 font-mono font-bold text-slate-700">{item.material}</td>
+                          <td className="py-2 px-3 border-r border-slate-100 font-medium text-slate-900">{item.description}</td>
+                          <td className="py-2 px-3 text-right font-mono font-black text-emerald-700">{formatNumber(item.quantity)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Export Excel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedBranchDossier(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
