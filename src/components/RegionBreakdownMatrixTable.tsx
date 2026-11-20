@@ -2284,34 +2284,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                 </th>
               </tr>
 
-              {/* Header Row 0: Date */}
-              <tr className="bg-slate-100/90 text-slate-700 text-[11px] font-bold border-b border-slate-300">
-                <th colSpan={1} className="p-2 border-r border-slate-300">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                    <span className="text-[10px] text-slate-400 uppercase font-mono">Date:</span>
-                    {isEditingMode ? (
-                      <input
-                        type="date"
-                        value={internalDate}
-                        onChange={(e) => {
-                          setInternalDate(e.target.value);
-                          notifyChange(e.target.value, columns, rows);
-                        }}
-                        className="p-1 border border-slate-300 rounded text-xs font-mono font-bold"
-                      />
-                    ) : (
-                      <span className="font-mono text-slate-700 font-medium text-[11px]">{internalDate}</span>
-                    )}
-                  </div>
-                </th>
-                <th 
-                  colSpan={matrixTemplateFormat === 'item' ? 4 : columns.length + 4} 
-                  className="p-2.5 bg-slate-50 text-right text-[11px] font-mono text-slate-400 font-normal pr-4"
-                >
-                  Regional Health Bureau | MOH PMD Medical Device Distribution Matrix ({selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter})
-                </th>
-              </tr>
+
 
               {/* Header Row 1: Matching exact attachment structure */}
               <tr className="border-b border-slate-300 text-xs font-medium">

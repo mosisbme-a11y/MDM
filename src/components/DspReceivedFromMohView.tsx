@@ -644,10 +644,10 @@ Attachment: ${folder.letterFileName}`;
       )}
 
       {/* Top Banner Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+      <div className="hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#0B1527] text-white shadow-md border border-slate-800">
+            <div className="hidden">
               <span className="hidden" />
               <span className="text-xs md:text-sm font-black tracking-wide uppercase text-white">
                 {is21 ? 'RECEIVED FROM EPSS' : 'RECEIVED FROM MOH'}
@@ -698,7 +698,7 @@ Attachment: ${folder.letterFileName}`;
               type="button"
               disabled={!hasExportableData}
               onClick={handleDownloadExcel}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border-b-4 border-emerald-800 shadow-[0_4px_0_rgb(6,95,70)] active:border-b-0 active:translate-y-[4px]"
+              className="hidden"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="uppercase font-black">Excel</span>
@@ -713,7 +713,7 @@ Attachment: ${folder.letterFileName}`;
                   onSelectSubTab?.(is21 ? 'dsp-moh-2-2' : 'dsp-ho-1-3-1');
                 }
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-[#0B1527] hover:bg-[#111f38] text-amber-300 text-xs font-black flex items-center gap-1.5 transition cursor-pointer border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] active:border-b-0 active:translate-y-[4px]"
+              className="hidden"
             >
               <span className="uppercase font-black">
                 Proceed to {is21 ? '2.2 Request to RHB' : '1.3.1 Map HF to Hub'}

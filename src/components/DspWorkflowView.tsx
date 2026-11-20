@@ -1744,9 +1744,9 @@ _Official Dossier Resend Protocol_`;
         </div>
       )}
 
-      {/* Stage 3 Format Switcher */}
+      {/* Stage 3 Format Switcher — Hidden per user request */}
       {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && (
-        <div className={(currentSubStep === '3.1' || currentSubTab === 'dsp-rhb-3-1') ? 'hidden' : 'flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2'}>
+        <div className="hidden">
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-800">RHB Breakdown Display Format:</span>
             <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
@@ -2550,19 +2550,17 @@ _Official Dossier Resend Protocol_`;
                         <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
                           <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[210px] italic">DSP Management Hierarchy</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[140px] italic">Region</th>
+                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[180px] italic">DSP Name</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
                           <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
                           <th className="py-2.5 px-3 text-center w-20 italic">View</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
                         {filteredRecords.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="py-12 text-center bg-slate-50/30">
+                            <td colSpan={7} className="py-12 text-center bg-slate-50/30">
                               <div className="flex flex-col items-center gap-2">
                                 <FileText className="w-8 h-8 text-slate-200" />
                                 <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2572,6 +2570,7 @@ _Official Dossier Resend Protocol_`;
                         ) : (
                           filteredRecords.map((rec, idx) => {
                             const dspInfo = getDossierDisplayInfo(rec, idx);
+                            const regionText = rec.targetedRegions?.length ? rec.targetedRegions.join(', ') : (rec.recipientOrg || 'National');
                             return (
                               <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
                                 <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
@@ -2580,31 +2579,17 @@ _Official Dossier Resend Protocol_`;
                                 <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
                                   {rec.dateSubmitted}
                                 </td>
+                                <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs truncate max-w-[180px]" title={regionText}>
+                                  {regionText}
+                                </td>
                                 <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
                                   {dspInfo.dspName}
-                                </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${dspInfo.hierarchyBadgeClasses}`}>
-                                    {dspInfo.hierarchyBadgeText}
-                                  </span>
                                 </td>
                                 <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
                                   {dspInfo.authorizedPerson}
                                 </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                                  {dspInfo.organization}
-                                </td>
                                 <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
-                                  {dspInfo.role}
-                                </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 text-center">
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                    dspInfo.status === 'Approved' 
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                                  }`}>
-                                    {dspInfo.status}
-                                  </span>
+                                  {rec.signatoryRole || dspInfo.role || 'Official Lead'}
                                 </td>
                                 <td className="py-2.5 px-3 text-center">
                                   <button
