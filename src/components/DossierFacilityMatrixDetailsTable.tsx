@@ -8,7 +8,9 @@ import {
   Layers,
   MapPin,
   CheckCircle2,
-  Filter
+  Filter,
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord } from '../types';
@@ -19,13 +21,17 @@ interface DossierFacilityMatrixDetailsTableProps {
   record: DspWorkflowRecord;
   title?: string;
   subtitle?: string;
+  onResendEmail?: (record: DspWorkflowRecord) => void;
+  onResendWhatsApp?: (record: DspWorkflowRecord) => void;
 }
 
 export const DossierFacilityMatrixDetailsTable: React.FC<DossierFacilityMatrixDetailsTableProps> = ({
   data,
   record,
   title = 'Exact Sent Health Facility Breakdown Matrix',
-  subtitle = 'Official two-tier equipment allocation matrix as transmitted (RHB / MOH Format)'
+  subtitle = 'Official two-tier equipment allocation matrix as transmitted (RHB / MOH Format)',
+  onResendEmail,
+  onResendWhatsApp
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegionFilter, setSelectedRegionFilter] = useState('all');
@@ -273,8 +279,32 @@ export const DossierFacilityMatrixDetailsTable: React.FC<DossierFacilityMatrixDe
           </div>
         </div>
 
-        {/* Read-Only Export Actions */}
+        {/* Read-Only Export Actions & Resend Options */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onResendEmail && (
+            <button
+              type="button"
+              onClick={() => onResendEmail(record)}
+              className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Resend official dossier via Email"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Resend via Email</span>
+            </button>
+          )}
+
+          {onResendWhatsApp && (
+            <button
+              type="button"
+              onClick={() => onResendWhatsApp(record)}
+              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              title="Resend official dossier via WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>Resend via WhatsApp</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleExportExcel}

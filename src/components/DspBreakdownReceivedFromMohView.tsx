@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Zap,
   Inbox,
-  Eye
+  Eye,
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -410,6 +412,59 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
     showToast(`✓ Downloaded MOH-to-RHB Breakdown Dossier (${dossier.dspRefNumber})!`);
   };
 
+  const handleResendDossierEmail = (dossier: DspWorkflowRecord) => {
+    handleExportDossierExcel(dossier);
+    const dspTitle = dossier.dspName || dossier.subject;
+    const targetScope = dossier.targetedRegions?.join(', ') || 'Regional Health Bureaus';
+    const subject = encodeURIComponent(`[RESEND DOSSIER] MOH to RHB Regional Breakdown: ${dspTitle} [Ref: ${dossier.dspRefNumber}]`);
+    const body = encodeURIComponent(
+      `Dear Regional Health Bureau Logistics Leadership,\n\n` +
+      `OFFICIAL MEDICAL EQUIPMENT REGIONAL BREAKDOWN DOSSIER RESEND\n` +
+      `============================================================\n` +
+      `Stage: 3. RHB Breakdown Management • 3.1 Received from MOH\n` +
+      `Dossier: ${dspTitle}\n` +
+      `Reference: ${dossier.dspRefNumber}\n` +
+      `Official Letter: ${dossier.officialLetterRef || 'N/A'}\n` +
+      `Dispatch Date: ${dossier.dateSubmitted}\n` +
+      `Sender: ${dossier.senderOrg || 'Ministry of Health (PMD Directorate)'}\n` +
+      `Target Regions: ${targetScope}\n` +
+      `Total Equipment Units: ${formatNumber(displayedTotalUnits)}\n` +
+      `Authorized Signatory: ${dossier.signatory} (${dossier.signatoryRole || 'Lead'})\n\n` +
+      `Please proceed to complete the Health Facility Matrix allocation in Stage 3.2.\n\n` +
+      `Best regards,\nMinistry of Health (MOH) Ethiopia`
+    );
+    const link = document.createElement('a');
+    link.href = `mailto:?subject=${subject}&body=${body}`;
+    link.click();
+    showToast(`✓ Opened Email Composer to Resend Dossier [${dossier.dspRefNumber}]`);
+  };
+
+  const handleResendDossierWhatsApp = (dossier: DspWorkflowRecord) => {
+    handleExportDossierExcel(dossier);
+    const dspTitle = dossier.dspName || dossier.subject;
+    const targetScope = dossier.targetedRegions?.join(', ') || 'Regional Health Bureaus';
+    const text = encodeURIComponent(
+      `*FEDERAL DEMOCRATIC REPUBLIC OF ETHIOPIA*\n` +
+      `*MINISTRY OF HEALTH (MOH) — PMD DIRECTORATE*\n` +
+      `*OFFICIAL DOSSIER RESEND: MOH TO RHB BREAKDOWN*\n\n` +
+      `• *Dossier:* ${dspTitle}\n` +
+      `• *Reference:* ${dossier.dspRefNumber}\n` +
+      `• *Official Letter:* ${dossier.officialLetterRef || 'N/A'}\n` +
+      `• *Date:* ${dossier.dateSubmitted}\n` +
+      `• *Sender:* ${dossier.senderOrg || 'MOH'}\n` +
+      `• *Target Regions:* ${targetScope}\n` +
+      `• *Total Units:* ${formatNumber(displayedTotalUnits)}\n` +
+      `• *Signatory:* ${dossier.signatory} (${dossier.signatoryRole || 'Lead'})\n\n` +
+      `_Protocol: Official Institutional Resend via WhatsApp_`
+    );
+    const link = document.createElement('a');
+    link.href = `https://wa.me/?text=${text}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
+    showToast(`✓ Opened WhatsApp to Resend Dossier [${dossier.dspRefNumber}]`);
+  };
+
   return (
     <div className="space-y-4">
       {/* Toast Notification */}
@@ -678,7 +733,25 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
                       </h2>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleResendDossierEmail(selectedDossier)}
+                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+                        title="Resend this dossier via Email"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>Resend via Email</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResendDossierWhatsApp(selectedDossier)}
+                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+                        title="Resend this dossier via WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Resend via WhatsApp</span>
+                      </button>
                       <button
                         onClick={() => handleBreakItemForFacility(selectedDossier)}
                         className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black flex items-center gap-1.5 shadow-md transition active:scale-95 cursor-pointer"

@@ -628,6 +628,53 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
     showToast('✓ Opened WhatsApp & downloaded All-Region Excel attachment.');
   };
 
+  const handleResendBranchDossierEmail = (dossier: DspWorkflowRecord) => {
+    handleExportExcel();
+    const dspTitle = dossier.dspName || dossier.subject;
+    const subject = encodeURIComponent(`[RESEND DOSSIER] EPSS Branch Dispatch: ${dspTitle} [Ref: ${dossier.dspRefNumber}]`);
+    const body = encodeURIComponent(
+      `Dear EPSS Branch & Logistics Team,\n\n` +
+      `OFFICIAL MEDICAL EQUIPMENT DOSSIER RESEND\n` +
+      `Stage: 4. Branches DSP Management • 4.1 Dispatched Dossier\n` +
+      `Dossier: ${dspTitle}\n` +
+      `Ref Number: ${dossier.dspRefNumber}\n` +
+      `Official Letter: ${dossier.officialLetterRef || 'N/A'}\n` +
+      `Dispatch Date: ${dossier.dateSubmitted}\n` +
+      `Total Units: ${formatNumber(dossier.totalQuantity)}\n` +
+      `Target Facilities: ${dossier.targetedFacilitiesCount} Health Facilities\n` +
+      `Signatory: ${dossier.signatory}\n\n` +
+      `Note: Complete dossier allocation breakdown is attached.\n\n` +
+      `Best regards,\nMinistry of Health (MOH) / EPSS`
+    );
+    const link = document.createElement('a');
+    link.href = `mailto:?subject=${subject}&body=${body}`;
+    link.click();
+    showToast(`✓ Opened Email Composer to Resend Dossier [${dossier.dspRefNumber}]`);
+  };
+
+  const handleResendBranchDossierWhatsApp = (dossier: DspWorkflowRecord) => {
+    handleExportExcel();
+    const dspTitle = dossier.dspName || dossier.subject;
+    const text = encodeURIComponent(
+      `*FEDERAL DEMOCRATIC REPUBLIC OF ETHIOPIA*\n` +
+      `*OFFICIAL DOSSIER RESEND (EPSS BRANCH DISPATCH)*\n\n` +
+      `• *Dossier:* ${dspTitle}\n` +
+      `• *Ref:* ${dossier.dspRefNumber}\n` +
+      `• *Letter:* ${dossier.officialLetterRef || 'N/A'}\n` +
+      `• *Date:* ${dossier.dateSubmitted}\n` +
+      `• *Units:* ${formatNumber(dossier.totalQuantity)}\n` +
+      `• *Facilities:* ${dossier.targetedFacilitiesCount} HFs\n` +
+      `• *Signatory:* ${dossier.signatory}\n\n` +
+      `_Official EPSS Branch Dispatch Record_`
+    );
+    const link = document.createElement('a');
+    link.href = `https://wa.me/?text=${text}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
+    showToast(`✓ Opened WhatsApp to Resend Dossier [${dossier.dspRefNumber}]`);
+  };
+
   return (
     <div className="space-y-5">
       {toastMessage && (
@@ -1453,13 +1500,33 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
                   {selectedBranchDossier.dspName || selectedBranchDossier.subject}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedBranchDossier(null)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleResendBranchDossierEmail(selectedBranchDossier)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Resend this dossier via Email"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Resend via Email</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResendBranchDossierWhatsApp(selectedBranchDossier)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Resend this dossier via WhatsApp"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Resend via WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBranchDossier(null)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
@@ -1508,7 +1575,23 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
                 </div>
               )}
             </div>
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => handleResendBranchDossierEmail(selectedBranchDossier)}
+                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Resend via Email</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleResendBranchDossierWhatsApp(selectedBranchDossier)}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Resend via WhatsApp</span>
+              </button>
               <button
                 type="button"
                 onClick={handleExportExcel}

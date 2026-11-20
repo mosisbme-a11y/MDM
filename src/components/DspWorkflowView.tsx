@@ -478,7 +478,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const [actionFormRegions, setActionFormRegions] = useState<string[]>([]);
   const [actionFeedbackToast, setActionFeedbackToast] = useState<string | null>(null);
 
-  // Quick WhatsApp Dispatch Modal State for Stage 2 Breakdown Dossiers
+  // Quick WhatsApp Dispatch Modal State for DSP Dossiers
   const [quickWhatsAppModal, setQuickWhatsAppModal] = useState<{
     record: DspWorkflowRecord;
     phone: string;
@@ -486,45 +486,119 @@ const ALL_ETHIOPIAN_REGIONS = [
     copied: boolean;
   } | null>(null);
 
-  const handleOpenBreakdownEmail = (rec: DspWorkflowRecord) => {
-    const targetRegs = rec.targetedRegions?.length > 0 ? rec.targetedRegions.join(', ') : 'Regional Health Bureaus';
-    const subject = `Official Regional Breakdown Request - ${targetRegs} (${rec.dateSubmitted}) [Ref: ${rec.dspRefNumber}]`;
-    const deviceList = rec.itemsIncluded.map((it, idx) => `${idx + 1}. ${it.description} (${it.material}) — ${it.quantity} Units`).join('\n');
-    const body = `Dear Regional Health Bureau Leadership,\n\nOfficial Medical Equipment Allocation Breakdown Request from Ministry of Health (MOH) Pharmaceuticals & Medical Devices Directorate.\n\nSummary:\n- Reference: ${rec.dspRefNumber}\n- Official Letter: ${rec.officialLetterRef}\n- Date: ${rec.dateSubmitted}\n- Target Regions: ${targetRegs}\n- Total Allocated Units: ${rec.totalQuantity.toLocaleString()} Units\n- Valuation: ${formatCurrency(rec.totalValuationETB)}\n\nAllocated Equipment Groups:\n${deviceList}\n\nPlease proceed to submit your Health Facility Allocation Matrix (Stage 3).\n\nAuthorized Signatory: ${rec.signatory} (${rec.signatoryRole})`;
+  const handleResendDossierEmail = (rec: DspWorkflowRecord) => {
+    const hInfo = getDspHierarchyInfo(rec);
+    const dspTitle = rec.dspName || rec.subject?.match(/DSP \[(.*?)\]/)?.[1] || rec.subject || 'Medical Equipment Allocation Dossier';
+    const stageHeader = hInfo.badgeText || rec.stageTitle || 'DSP Workflow Dossier';
+    const targetScope = rec.targetedRegions && rec.targetedRegions.length > 0 
+      ? rec.targetedRegions.join(', ') 
+      : (rec.recipientOrg || 'Designated Stakeholders / Regional Health Bureaus');
 
-    const mailto = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent('rhb.logistics@moh.gov.et')}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const subject = `[OFFICIAL DOSSIER RESEND] ${stageHeader} - ${dspTitle} [Ref: ${rec.dspRefNumber}]`;
+
+    // Extract line items
+    let itemsText = '';
+    if (rec.itemsIncluded && rec.itemsIncluded.length > 0) {
+      itemsText = rec.itemsIncluded
+        .map((it, idx) => `${idx + 1}. ${it.description || it.material} (${it.material || 'N/A'}) — ${Number(it.quantity || 0).toLocaleString()} Units`)
+        .join('\n');
+    } else if (rec.facilityMatrixData?.columns && rec.facilityMatrixData.columns.length > 0) {
+      itemsText = rec.facilityMatrixData.columns
+        .map((c: any, idx: number) => `${idx + 1}. ${c.header || c.name || c.description || 'Equipment Item'}`)
+        .join('\n');
+    } else {
+      itemsText = 'See attached official allocation breakdown matrix.';
+    }
+
+    const facilityCount = rec.targetedFacilitiesCount || rec.facilityMatrixData?.rows?.length || 0;
+    const facilityLine = facilityCount > 0 ? `\n- Allocated Health Facilities: ${facilityCount} Facilities` : '';
+    const valuationLine = rec.totalValuationETB > 0 ? `\n- Valuation: ${formatCurrency(rec.totalValuationETB)}` : '';
+
+    const body = `Dear Stakeholder / Health Directorate Leadership,\n\n` +
+      `OFFICIAL MEDICAL EQUIPMENT DOSSIER TRANSMITTAL RESEND\n` +
+      `===================================================\n` +
+      `Workflow Stage: ${stageHeader}\n` +
+      `Dossier Project: ${dspTitle}\n\n` +
+      `Dossier Summary:\n` +
+      `- Reference Number: ${rec.dspRefNumber}\n` +
+      `- Official Letter: ${rec.officialLetterRef || 'N/A'}\n` +
+      `- Transmission Date: ${rec.dateSubmitted}\n` +
+      `- Originating Entity: ${rec.senderOrg || 'Ministry of Health (MOH)'}\n` +
+      `- Recipient Entity: ${rec.recipientOrg || targetScope}\n` +
+      `- Targeted Scope: ${targetScope}${facilityLine}\n` +
+      `- Total Allocated Units: ${Number(rec.totalQuantity || 0).toLocaleString()} Units${valuationLine}\n` +
+      `- Status: ${rec.status || 'Active'}\n\n` +
+      `Allocated Medical Equipment / Line Items:\n` +
+      `${itemsText}\n\n` +
+      (rec.notes ? `Official Notes & Remarks:\n${rec.notes}\n\n` : '') +
+      `Authorized Signatory: ${rec.signatory || 'Authorized Officer'} (${rec.signatoryRole || 'Official Lead'})\n\n` +
+      `Notice: This transmission serves as an official resend of the verified medical equipment distribution dossier record.`;
+
+    const recipientEmail = rec.recipientOrg?.toLowerCase().includes('rhb') || (rec.targetedRegions && rec.targetedRegions.length > 0)
+      ? 'rhb.logistics@moh.gov.et'
+      : (rec.recipientOrg?.toLowerCase().includes('epss') ? 'distribution.epss@epss.gov.et' : 'logistics.moh@moh.gov.et');
+
+    const mailto = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailto, '_blank');
-    setActionFeedbackToast(`✓ Opened Gmail Composer for Breakdown Request ${rec.dspRefNumber}!`);
+    setActionFeedbackToast(`✓ Opened Gmail Composer to Resend Dossier ${rec.dspRefNumber}!`);
     setTimeout(() => setActionFeedbackToast(null), 3500);
   };
 
-  const handleOpenBreakdownWhatsApp = (rec: DspWorkflowRecord) => {
-    const phone = '+251911234567';
-    const targetRegs = rec.targetedRegions?.length > 0 ? rec.targetedRegions.join(', ') : 'Regional Health Bureaus';
-    const deviceList = rec.itemsIncluded.map((it, idx) => `• ${it.description} (${it.material}): ${it.quantity} Units`).join('\n');
-    const message = `*MINISTRY OF HEALTH (MOH) — ETHIOPIA*
-*OFFICIAL REGIONAL MEDICAL EQUIPMENT BREAKDOWN REQUEST*
+  const handleResendDossierWhatsApp = (rec: DspWorkflowRecord) => {
+    const hInfo = getDspHierarchyInfo(rec);
+    const dspTitle = rec.dspName || rec.subject?.match(/DSP \[(.*?)\]/)?.[1] || rec.subject || 'Medical Equipment Allocation Dossier';
+    const stageHeader = hInfo.badgeText || rec.stageTitle || 'DSP WORKFLOW';
+    const targetScope = rec.targetedRegions && rec.targetedRegions.length > 0 
+      ? rec.targetedRegions.join(', ') 
+      : (rec.recipientOrg || 'Designated Stakeholders / Regional Health Bureaus');
 
-*Breakdown Ref:* ${rec.dspRefNumber}
-*Official Letter:* ${rec.officialLetterRef}
-*Date:* ${rec.dateSubmitted}
-*Target Regions:* ${targetRegs}
-*Total Units:* ${rec.totalQuantity.toLocaleString()} Units
-*Valuation:* ${formatCurrency(rec.totalValuationETB)}
+    let itemsText = '';
+    if (rec.itemsIncluded && rec.itemsIncluded.length > 0) {
+      itemsText = rec.itemsIncluded
+        .map((it, idx) => `• ${it.description || it.material}: ${Number(it.quantity || 0).toLocaleString()} Units`)
+        .join('\n');
+    } else if (rec.facilityMatrixData?.columns && rec.facilityMatrixData.columns.length > 0) {
+      itemsText = rec.facilityMatrixData.columns
+        .map((c: any) => `• ${c.header || c.name || 'Equipment Item'}`)
+        .join('\n');
+    } else {
+      itemsText = '• Detailed allocation breakdown attached.';
+    }
 
-*ALLOCATED MEDICAL DEVICES (${rec.itemsIncluded.length}):*
-${deviceList}
+    const facilityCount = rec.targetedFacilitiesCount || rec.facilityMatrixData?.rows?.length || 0;
+    const facilityLine = facilityCount > 0 ? `\n*Health Facilities:* ${facilityCount} Facilities` : '';
+    const valuationLine = rec.totalValuationETB > 0 ? `\n*Valuation:* ${formatCurrency(rec.totalValuationETB)}` : '';
 
-*Signatory:* ${rec.signatory} (${rec.signatoryRole})
-_Protocol: Official Institutional Dispatch via WhatsApp_`;
+    const message = `*FEDERAL DEMOCRATIC REPUBLIC OF ETHIOPIA*
+*OFFICIAL MEDICAL EQUIPMENT DOSSIER RESEND*
+*Workflow Stage:* ${stageHeader}
+
+*Dossier:* ${dspTitle}
+*Reference:* ${rec.dspRefNumber}
+*Official Letter:* ${rec.officialLetterRef || 'N/A'}
+*Transmission Date:* ${rec.dateSubmitted}
+*Originating Entity:* ${rec.senderOrg || 'Ministry of Health (MOH)'}
+*Recipient Entity:* ${rec.recipientOrg || targetScope}
+*Target Scope:* ${targetScope}${facilityLine}
+*Total Allocated Units:* ${Number(rec.totalQuantity || 0).toLocaleString()} Units${valuationLine}
+*Status:* ${rec.status || 'Active'}
+
+*ALLOCATED EQUIPMENT LIST:*
+${itemsText}
+
+*Authorized Signatory:* ${rec.signatory || 'Authorized Officer'} (${rec.signatoryRole || 'Official Lead'})
+_Official Dossier Resend Protocol_`;
 
     setQuickWhatsAppModal({
       record: rec,
-      phone,
+      phone: '+251911234567',
       messageText: message,
       copied: false
     });
   };
+
+  const handleOpenBreakdownEmail = handleResendDossierEmail;
+  const handleOpenBreakdownWhatsApp = handleResendDossierWhatsApp;
 
   const handleOpenActionModal = (rec: DspWorkflowRecord) => {
     setActionTargetRecord(rec);
@@ -2716,12 +2790,34 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   {selectedRecord.dspName || selectedRecord.subject.match(/DSP \[(.*?)\]/)?.[1] || selectedRecord.subject}
                 </h3>
               </div>
-              <button
-                onClick={() => setIsDossierDetailModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleResendDossierEmail(selectedRecord)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Resend this dossier via Email"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Resend via Email</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResendDossierWhatsApp(selectedRecord)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Resend this dossier via WhatsApp"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Resend via WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDossierDetailModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer transition-colors hover:bg-slate-100"
+                  title="Close dossier"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Official Letter Routing Card */}
@@ -2957,6 +3053,8 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                       record={selectedRecord}
                       title="Exact Sent Health Facility Breakdown Matrix"
                       subtitle="Official two-tier equipment allocation matrix as transmitted (Full Columns Dossier)"
+                      onResendEmail={handleResendDossierEmail}
+                      onResendWhatsApp={handleResendDossierWhatsApp}
                     />
                   </div>
                 );
@@ -3184,7 +3282,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
               {selectedRecord.stage === 'moh-to-epss' && (
                 <button
                   onClick={() => handleOpenActionModal(selectedRecord)}
@@ -3194,25 +3292,26 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <span>{selectedRecord.actionTakenDate || selectedRecord.status === 'Endorsed & Approved' ? 'Update MOH Action' : 'Take Action on Request'}</span>
                 </button>
               )}
-              {selectedRecord.stage === 'moh-to-rhb' && (
-                <>
-                  <button
-                    onClick={() => handleOpenBreakdownEmail(selectedRecord)}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Send via Email</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenBreakdownWhatsApp(selectedRecord)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>Send via WhatsApp</span>
-                  </button>
-                </>
-              )}
               <button
+                type="button"
+                onClick={() => handleResendDossierEmail(selectedRecord)}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                title="Resend this dossier via Email"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Resend via Email</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleResendDossierWhatsApp(selectedRecord)}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+                title="Resend this dossier via WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Resend via WhatsApp</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsDossierDetailModalOpen(false)}
                 className="px-4 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition cursor-pointer border border-slate-200 shadow-sm"
               >
@@ -3509,7 +3608,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
         </div>
       )}
 
-      {/* Quick WhatsApp Dispatch Modal for Stage 2 Breakdown Request */}
+      {/* Quick WhatsApp Dispatch Modal for DSP Dossiers */}
       {quickWhatsAppModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
@@ -3519,9 +3618,10 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                   <MessageCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">WhatsApp Regional Breakdown Dispatch</h3>
+                  <h3 className="text-sm font-bold text-slate-900">WhatsApp Dossier Dispatch Resend</h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    {quickWhatsAppModal.record.targetedRegions.join(', ')}
+                    {quickWhatsAppModal.record.dspName || quickWhatsAppModal.record.dspRefNumber}
+                    {quickWhatsAppModal.record.targetedRegions?.length > 0 ? ` • ${quickWhatsAppModal.record.targetedRegions.join(', ')}` : ''}
                   </p>
                 </div>
               </div>
@@ -3587,7 +3687,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 onClick={() => {
                   const waUrl = `https://wa.me/${quickWhatsAppModal.phone.replace(/\D/g, '')}?text=${encodeURIComponent(quickWhatsAppModal.messageText)}`;
                   window.open(waUrl, '_blank');
-                  setActionFeedbackToast(`✓ Dispatched Breakdown Request ${quickWhatsAppModal.record.dspRefNumber} to WhatsApp!`);
+                  setActionFeedbackToast(`✓ Dispatched Dossier ${quickWhatsAppModal.record.dspRefNumber} to WhatsApp!`);
                   setTimeout(() => setActionFeedbackToast(null), 3500);
                   setQuickWhatsAppModal(null);
                 }}
