@@ -741,7 +741,7 @@ if (!IS_VERCEL) {
     const vitePkg = 'vite';
     const { createServer } = await import(/* @vite-ignore */ vitePkg);
     const vite = await createServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa'
     });
     app.use(vite.middlewares);

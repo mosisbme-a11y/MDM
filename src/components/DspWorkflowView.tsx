@@ -447,6 +447,7 @@ const ALL_ETHIOPIAN_REGIONS = [
   const records = dspRecords;
   const setRecords = setDspRecords || (() => {});
   const [selectedRecord, setSelectedRecord] = useState<DspWorkflowRecord | null>(null);
+  const [isDossierDetailModalOpen, setIsDossierDetailModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [agingFilter, setAgingFilter] = useState<'all' | 'pending' | 'overdue' | 'completed'>('all');
@@ -1555,7 +1556,12 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           return (
             <button
               key={sub.id}
-              onClick={() => onSelectSubTab?.(sub.subTab)}
+              onClick={() => {
+                if (sub.subTab === 'dsp-rhb-3-2') {
+                  setStage3ViewMode('matrix');
+                }
+                onSelectSubTab?.(sub.subTab);
+              }}
               className={`group relative px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center gap-2 border-b-4 active:border-b-0 active:translate-y-[4px] ${
                 isSubSelected
                   ? 'bg-[#0B1527] text-white border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]'
@@ -1666,7 +1672,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
       {/* Stage 3 Format Switcher */}
       {(currentStage === 'rhb-to-moh' || currentStage === 'rhb-breakdown-management' || currentSubStep === '3.2' || currentSubTab === 'dsp-rhb-3-2') && (
-        <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2">
+        <div className={(currentSubStep === '3.1' || currentSubTab === 'dsp-rhb-3-1') ? 'hidden' : 'flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm gap-2'}>
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-800">RHB Breakdown Display Format:</span>
             <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
@@ -1680,17 +1686,6 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Facility Breakdown Matrix (Official Format)</span>
-              </button>
-              <button
-                onClick={() => setStage3ViewMode('ledger')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  stage3ViewMode === 'ledger'
-                    ? 'bg-amber-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Dossiers Ledger</span>
               </button>
             </div>
           </div>
@@ -1785,6 +1780,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
           onSelectSubTab={onSelectSubTab}
           onSelectRecordForBreakdown={(rec) => {
             setSelectedRecord(rec);
+            setStage3ViewMode('matrix');
           }}
           onTriggerCloudSync={onTriggerCloudSync}
         />
@@ -2421,7 +2417,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
 
       {/* Mechanism 1: Request Items & Order Process Master Table */}
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className={currentStage === 'moh-osp-management' ? 'hidden' : 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm'}>
           {currentStage === 'head-office-dsp' ? (
             <>
               <button
@@ -2539,7 +2535,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                                 <td className="py-2.5 px-3 text-center">
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedRecord(rec)}
+                                    onClick={() => { setSelectedRecord(rec); setIsDossierDetailModalOpen(true); }}
                                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
                                     title="View dossier details"
                                   >
@@ -2559,7 +2555,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
             </>
           ) : (
             <>
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className={currentStage === 'moh-osp-management' ? 'hidden' : 'p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3'}>
                 <button
                   type="button"
                   onClick={() => setShowStageSummaryMatrix(!showStageSummaryMatrix)}
@@ -2676,7 +2672,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                             <td className="py-2.5 px-3 text-center">
                               <button
                                 type="button"
-                                onClick={() => setSelectedRecord(rec)}
+                                onClick={() => { setSelectedRecord(rec); setIsDossierDetailModalOpen(true); }}
                                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
                                 title="View dossier details"
                               >
@@ -2700,7 +2696,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
       )}
 
       {/* Detailed DSP Dossier Modal */}
-      {selectedRecord && (
+      {isDossierDetailModalOpen && selectedRecord && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4">
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
@@ -2721,7 +2717,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 </h3>
               </div>
               <button
-                onClick={() => setSelectedRecord(null)}
+                onClick={() => setIsDossierDetailModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition-colors"
               >
                 ✕
@@ -3217,7 +3213,7 @@ _Protocol: Official Institutional Dispatch via WhatsApp_`;
                 </>
               )}
               <button
-                onClick={() => setSelectedRecord(null)}
+                onClick={() => setIsDossierDetailModalOpen(false)}
                 className="px-4 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition cursor-pointer border border-slate-200 shadow-sm"
               >
                 Close Dossier

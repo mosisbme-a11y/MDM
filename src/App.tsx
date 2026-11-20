@@ -1283,7 +1283,7 @@ export function App() {
     });
     broadcastAdminUpdate('Material Master', updated.length, currentUser?.name || currentUser?.email || 'Inventory Administrator');
     triggerCloudSyncToast(
-      `✓ Successfully saved ${newItems.length} records into Material Master (${mode === 'append' ? 'Appended & Merged' : 'Fresh Master'}, Total: ${updated.length} Materials). Synced to Supabase.`,
+      `✓ Successfully saved ${newItems.length} records into Material Master (${mode === 'append' ? 'Appended & Merged' : 'Fresh Master'}, Total: ${updated.length} Materials). Up to date.`,
       {
         type: 'CREATE',
         title: `Upload ${newItems.length} Material Master Records`,
@@ -1434,7 +1434,7 @@ export function App() {
       updateKind: `Multiple Stock (${mode === 'append' ? 'Appended' : 'Fresh Ledger'}, Total ${updated.length})`
     });
     triggerCloudSyncToast(
-      `✓ Auto-Saved: ${newItems.length} records safely stored across all plants (${mode === 'append' ? 'Appended & Merged' : 'Fresh Ledger'}, Total: ${updated.length} Records). Synced to Supabase.`,
+      `✓ Auto-Saved: ${newItems.length} records safely stored across all plants (${mode === 'append' ? 'Appended & Merged' : 'Fresh Ledger'}, Total: ${updated.length} Records). Up to date.`,
       {
         type: 'CREATE',
         title: `Upload ${newItems.length} Multiple Stock Records`,

@@ -49,7 +49,7 @@ export const SupabaseSyncBadge: React.FC = () => {
           ))}
         </div>
         <span>
-          Syncing to Supabase...
+          Updating...
           {status.progress && status.progress.total > 0 ? ` ${status.progress.done}/${status.progress.total} chunks` : ''}
           {status.pending > 1 ? ` (${status.pending} uploads)` : ''}
         </span>
@@ -62,7 +62,7 @@ export const SupabaseSyncBadge: React.FC = () => {
       <div className={`${base} bg-slate-900 text-emerald-300 border-emerald-500/40`} role="status">
         <CheckCircle2 className="w-4 h-4" />
         <span>
-          Synced to Supabase{status.version ? ` (v${status.version})` : ''}
+          Up to date{status.version ? ` (v${status.version})` : ''}
         </span>
       </div>
     );
