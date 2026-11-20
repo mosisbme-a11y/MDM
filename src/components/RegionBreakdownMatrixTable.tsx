@@ -2111,7 +2111,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               <div className="text-[11px] font-bold text-slate-700">
                 1. Pick Regions (Check 2 or more regions to combine them in one):
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-white rounded-lg border border-emerald-200">
+              <div className="flex flex-col gap-1 max-h-52 overflow-y-auto p-1.5 bg-white rounded-lg border border-emerald-200">
                 {uniqueRegions.map(reg => {
                   const isChecked = selectedAutoRegions.some(r => r.toLowerCase() === reg.toLowerCase());
                   const count = regionFacilityCounts[reg] || 0;
