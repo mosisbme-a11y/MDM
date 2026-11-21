@@ -2497,7 +2497,7 @@ _Official Dossier Resend Protocol_`;
               <button
                 type="button"
                 onClick={() => setShowHeadOfficeSummaryMatrix(!showHeadOfficeSummaryMatrix)}
-                className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer"
+                className="hidden w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer"
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <FileSpreadsheet className="w-4 h-4 text-amber-600" />
@@ -2776,24 +2776,6 @@ _Official Dossier Resend Protocol_`;
                 </h3>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleResendDossierEmail(selectedRecord)}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                  title="Resend this dossier via Email"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Resend via Email</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResendDossierWhatsApp(selectedRecord)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                  title="Resend this dossier via WhatsApp"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>Resend via WhatsApp</span>
-                </button>
                 <button
                   type="button"
                   onClick={() => setIsDossierDetailModalOpen(false)}

@@ -340,6 +340,15 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
             </div>
             <p className="text-xs text-slate-500">
               {activeDossier?.dspName || activeDossier?.dspRefNumber} • Dispatched: {activeDossier?.dateSubmitted}
+              {(activeDossier?.authorizedPerson || activeDossier?.signatory) && (
+                <> • Authorized: <strong className="text-slate-700">{activeDossier?.authorizedPerson || activeDossier?.signatory}</strong></>
+              )}
+              {(activeDossier?.role || activeDossier?.signatoryRole) && (
+                <> ({activeDossier?.role || activeDossier?.signatoryRole})</>
+              )}
+              {(activeDossier?.organization || activeDossier?.senderOrg) && (
+                <> • Org: <strong className="text-slate-700">{activeDossier?.organization || activeDossier?.senderOrg}</strong></>
+              )}
             </p>
           </div>
         </div>
@@ -396,6 +405,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                 <th className="py-2.5 px-3 border-r border-slate-300 min-w-[200px] italic">DSP Name</th>
                 <th className="py-2.5 px-3 border-r border-slate-300 min-w-[150px] italic">Authorized person</th>
                 <th className="py-2.5 px-3 border-r border-slate-300 min-w-[140px] italic">Role</th>
+                <th className="py-2.5 px-3 border-r border-slate-300 min-w-[150px] italic">Organization</th>
                 <th className="py-2.5 px-3 border-r border-slate-300 min-w-[140px] italic">Hub</th>
                 <th className="py-2.5 px-3 text-center min-w-[190px] italic">Action</th>
               </tr>
@@ -436,10 +446,13 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                       {r.dspName || r.subject || r.dspRefNumber}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-slate-800 font-medium">
-                      {r.signatory || '-'}
+                      {r.authorizedPerson || r.signatory || '-'}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600">
-                      {r.signatoryRole || '-'}
+                      {r.role || r.signatoryRole || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 border-r border-slate-200 text-slate-700 font-medium">
+                      {r.organization || r.senderOrg || '-'}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-purple-900">
                       {hubLabel}

@@ -8,7 +8,14 @@ import {
   Send,
   Warehouse,
   Table,
-  ArrowRight
+  ArrowRight,
+  UserCheck,
+  Briefcase,
+  Building2,
+  ShieldCheck,
+  X,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, HealthFacilityRecord } from '../types';
@@ -60,6 +67,25 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
   const currentDossier = useMemo(() => {
     return stage5Records.find(r => r.id === selectedDossierId) || stage5Records[0] || null;
   }, [stage5Records, selectedDossierId]);
+
+  // Send to Branch authorization & transmittal fields
+  const [isSendToBranchModalOpen, setIsSendToBranchModalOpen] = useState(false);
+  const [authorizedPerson, setAuthorizedPerson] = useState('');
+  const [role, setRole] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [customDspName, setCustomDspName] = useState('');
+  const [officialLetterRef, setOfficialLetterRef] = useState('');
+  const [dispatchNotes, setDispatchNotes] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentDossier) {
+      setCustomDspName(currentDossier.dspName || currentDossier.dspRefNumber || '');
+      if (currentDossier.officialLetterRef && !officialLetterRef) {
+        setOfficialLetterRef(currentDossier.officialLetterRef);
+      }
+    }
+  }, [currentDossier?.id]);
 
   // Equipment columns
   const equipmentColumns = useMemo(() => {
@@ -131,32 +157,66 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
     });
   }, [allocations, searchQuery, selectedHubFilter]);
 
-  // Dispatch exact mapped allocations to Branches (Sub-step 4.1 Received DSP)
-  const handleDispatchToBranches = () => {
+  const hubsSet = useMemo(
+    () => Array.from(new Set<string>(filteredAllocations.map((a: any) => String(a.hubCode || '')).filter(Boolean))),
+    [filteredAllocations]
+  );
+  const regionsSet = useMemo(
+    () => Array.from(new Set<string>(filteredAllocations.map((a: any) => String(a.region || '')).filter(Boolean))),
+    [filteredAllocations]
+  );
+  const totalFilteredUnits = useMemo(
+    () => filteredAllocations.reduce((sum: number, a: any) => sum + (Number(a.totalQty) || 0), 0),
+    [filteredAllocations]
+  );
+
+  // Open Send to Branch modal
+  const handleOpenSendToBranchModal = () => {
     if (!currentDossier || filteredAllocations.length === 0) {
-      setNotification({ type: 'warning', message: 'No mapped facility allocations to dispatch to branches.' });
+      setNotification({ type: 'warning', message: 'No mapped facility allocations to send to branch.' });
       setTimeout(() => setNotification(null), 3500);
+      return;
+    }
+    setFormError(null);
+    setIsSendToBranchModalOpen(true);
+  };
+
+  // Dispatch exact mapped allocations to Branches (Sub-step 4.1 Received DSP)
+  const handleConfirmSendToBranch = () => {
+    if (!currentDossier || filteredAllocations.length === 0) {
+      setFormError('No mapped facility allocations available to send to branch.');
+      return;
+    }
+
+    const cleanAuthorizedPerson = authorizedPerson.trim();
+    const cleanRole = role.trim();
+    const cleanOrganization = organization.trim();
+
+    if (!cleanAuthorizedPerson || !cleanRole || !cleanOrganization) {
+      setFormError('Please fill in Authorized person, Role, and Organization before sending to Branch.');
       return;
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const hubsSet = Array.from(new Set<string>(filteredAllocations.map((a: any) => String(a.hubCode || '')).filter(Boolean)));
-    const regionsSet = Array.from(new Set<string>(filteredAllocations.map((a: any) => String(a.region || '')).filter(Boolean)));
-    const totalUnits = filteredAllocations.reduce((sum: number, a: any) => sum + (Number(a.totalQty) || 0), 0);
+    const totalUnits = totalFilteredUnits;
     const refNum = `EPSS/BR-DSP/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
+    const baseDspName = customDspName.trim() || currentDossier.dspName || currentDossier.dspRefNumber;
+    const cleanLetterRef = officialLetterRef.trim() || `EPSS/HO-BR/${Date.now().toString().slice(-4)}`;
+    const cleanNotes = dispatchNotes.trim();
 
     const branchRecord: DspWorkflowRecord = {
       id: `dsp-branch-4-1-${Date.now()}`,
       dspRefNumber: refNum,
-      dspName: `${currentDossier.dspName || currentDossier.dspRefNumber} (${selectedHubFilter === 'all' ? 'All Hubs' : selectedHubFilter})`,
+      dspName: `${baseDspName}${selectedHubFilter === 'all' ? '' : ` (${selectedHubFilter})`}`,
       stage: 'branches-dsp-management',
       subStage: '4.1',
       stageTitle: 'Branches DSP Management',
-      senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
+      senderOrg: cleanOrganization,
+      organization: cleanOrganization,
       recipientOrg: selectedHubFilter === 'all'
         ? `EPSS Branches (${hubsSet.join(', ')})`
         : `EPSS Branch ${selectedHubFilter}`,
-      subject: `Dispatched DSP to Branches (${filteredAllocations.length} Facilities, ${totalUnits} Units)`,
+      subject: `Sent DSP to Branch (${filteredAllocations.length} Facilities, ${totalUnits} Units)`,
       status: 'Dispatched to Plants',
       dateSubmitted: today,
       totalDevices: equipmentColumns.length,
@@ -164,9 +224,11 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
       totalValuationETB: currentDossier.totalValuationETB || 0,
       targetedRegions: regionsSet,
       targetedFacilitiesCount: filteredAllocations.length,
-      officialLetterRef: `EPSS/HO-BR/${Date.now().toString().slice(-4)}`,
-      signatory: 'EPSS HO Supply Planner',
-      signatoryRole: 'Medical Equipment Directorate',
+      officialLetterRef: cleanLetterRef,
+      signatory: cleanAuthorizedPerson,
+      authorizedPerson: cleanAuthorizedPerson,
+      signatoryRole: cleanRole,
+      role: cleanRole,
       itemsIncluded: equipmentColumns.map((col: any) => ({
         material: col.code,
         description: col.name,
@@ -214,28 +276,30 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
           totalQty: Number(a.totalQty) || 0
         }))
       },
-      notes: `Exact hub-mapped DSP matrix dispatched from EPSS Head Office (1.3.2) to Branches (4.1). Source: ${currentDossier.dspRefNumber}.`
+      notes: `${cleanNotes ? `${cleanNotes} — ` : ''}Sent to Branch by ${cleanAuthorizedPerson} (${cleanRole}, ${cleanOrganization}) from 1.3.2 Send DSP to Hub to Branches (4.1). Source: ${currentDossier.dspRefNumber}.`
     };
 
     setRecords(prev => [branchRecord, ...prev]);
 
     onTriggerCloudSync?.(
-      `Dispatched DSP ${refNum} (${filteredAllocations.length} facilities, ${totalUnits} units) to Branches (4.1)`,
+      `Sent DSP ${refNum} (${filteredAllocations.length} facilities, ${totalUnits} units) to Branch (4.1) by ${cleanAuthorizedPerson}`,
       {
         type: 'CREATE',
-        title: `Dispatched DSP to Branches: ${refNum}`,
+        title: `Send to Branch: ${baseDspName} (${refNum})`,
         payload: branchRecord
       }
     );
 
+    setIsSendToBranchModalOpen(false);
+    setFormError(null);
     setNotification({
       type: 'success',
-      message: `✓ Dispatched ${filteredAllocations.length} facilities (${totalUnits} units) to Branches (4.1 Received DSP)!`
+      message: `✓ Sent "${baseDspName}" (${filteredAllocations.length} facilities, ${totalUnits} units) to Branch (4.1 Received DSP) — Authorized by ${cleanAuthorizedPerson} (${cleanRole}, ${cleanOrganization})!`
     });
     setTimeout(() => {
       setNotification(null);
       onSelectSubTab?.('dsp-branches-4-1');
-    }, 800);
+    }, 900);
   };
 
   // Export Excel
@@ -284,18 +348,33 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
   };
 
   const handleDispatchEmail = () => {
-    const subject = `EPSS HO to Branch Dispatched Matrix (${filteredAllocations.length} Health Facilities)`;
-    const totalUnits = filteredAllocations.reduce((acc: number, a: any) => acc + (Number(a.totalQty) || 0), 0);
-    const body = `Dear EPSS Regional Branch Management,\n\nPlease find the official MOH to EPSS Hub-Mapped Equipment Breakdown Matrix dispatched from Head Office.\n\nTotal Facilities: ${filteredAllocations.length}\nTotal Units: ${totalUnits.toLocaleString()}\n\nEPSS Head Office Logistics`;
-    window.open(`mailto:branches@epss.gov.et?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+    const dspTitle = customDspName.trim() || currentDossier?.dspName || currentDossier?.dspRefNumber || 'DSP Breakdown';
+    const subject = `Send to Branch: ${dspTitle} (${filteredAllocations.length} Health Facilities)`;
+    const authLine = authorizedPerson.trim() ? `\nAuthorized Person: ${authorizedPerson.trim()}` : '';
+    const roleLine = role.trim() ? `\nRole: ${role.trim()}` : '';
+    const orgLine = organization.trim() ? `\nOrganization: ${organization.trim()}` : '';
+    const letterLine = officialLetterRef.trim() ? `\nOfficial Letter Ref: ${officialLetterRef.trim()}` : '';
+    const body = `Dear EPSS Regional Branch Management,\n\nPlease find the official Hub-Mapped Equipment Breakdown Matrix dispatched to Branch.\n\nDSP Name: ${dspTitle}${letterLine}\nTotal Facilities: ${filteredAllocations.length}\nTotal Units: ${totalFilteredUnits.toLocaleString()}${authLine}${roleLine}${orgLine}\n\n${organization.trim() || 'EPSS Head Office Logistics'}`;
+    const link = document.createElement('a');
+    link.href = `mailto:branches@epss.gov.et?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    link.click();
     setNotification({ type: 'success', message: 'Opened email client for branch dispatch!' });
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleDispatchWhatsApp = () => {
-    const totalUnits = filteredAllocations.reduce((acc: number, a: any) => acc + (Number(a.totalQty) || 0), 0);
-    const text = `EPSS HO Dispatched Matrix: ${filteredAllocations.length} Health Facilities with ${totalUnits.toLocaleString()} total units ready for branch delivery.`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    const dspTitle = customDspName.trim() || currentDossier?.dspName || currentDossier?.dspRefNumber || 'DSP Breakdown';
+    const authParts = [
+      authorizedPerson.trim() ? `• *Authorized Person:* ${authorizedPerson.trim()}` : '',
+      role.trim() ? `• *Role:* ${role.trim()}` : '',
+      organization.trim() ? `• *Organization:* ${organization.trim()}` : ''
+    ].filter(Boolean).join('\n');
+    const text = `*Send to Branch — ${dspTitle}*\n• *Facilities:* ${filteredAllocations.length}\n• *Total Units:* ${totalFilteredUnits.toLocaleString()}${authParts ? `\n${authParts}` : ''}`;
+    const link = document.createElement('a');
+    link.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
     setNotification({ type: 'success', message: 'Opened WhatsApp for branch dispatch!' });
     setTimeout(() => setNotification(null), 3000);
   };
@@ -303,12 +382,16 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
   return (
     <div className="space-y-4">
       {notification && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-center justify-between shadow-sm">
+        <div className={`p-3 rounded-xl flex items-center justify-between shadow-sm border ${
+          notification.type === 'warning'
+            ? 'bg-amber-50 border-amber-200 text-amber-900'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        }`}>
           <div className="flex items-center gap-2 text-xs font-bold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className={`w-4 h-4 ${notification.type === 'warning' ? 'text-amber-600' : 'text-emerald-600'}`} />
             <span>{notification.message}</span>
           </div>
-          <button type="button" onClick={() => setNotification(null)} className="text-emerald-700 font-bold text-xs cursor-pointer">✕</button>
+          <button type="button" onClick={() => setNotification(null)} className="font-bold text-xs cursor-pointer">✕</button>
         </div>
       )}
 
@@ -327,7 +410,7 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
                 </span>
               </div>
               <p className="text-xs text-rose-200/90 mt-0.5">
-                Dispatch exact hub-mapped health facility equipment allocations from EPSS Head Office to regional branches (Sub-step 4.1).
+                Fill Authorized person, Role &amp; Organization and send exact hub-mapped facility allocations directly to EPSS Branches (4.1).
               </p>
             </div>
           </div>
@@ -335,12 +418,12 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleDispatchToBranches}
+              onClick={handleOpenSendToBranchModal}
               disabled={filteredAllocations.length === 0}
               className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-slate-950 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Dispatch to Branches (4.1)</span>
+              <span>Send to Branch</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
@@ -370,6 +453,106 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
               <MessageCircle className="w-3.5 h-3.5" />
               <span>WhatsApp</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Inline Send to Branch Authorization & Metadata Form */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-rose-600" />
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Send to Branch — Authorized Person, Role &amp; Organization
+            </h4>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Quick Org:</span>
+            {['EPSS Head Office', 'EPSS', 'MOH'].map(preset => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setOrganization(preset)}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                  organization === preset
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-rose-50 hover:border-rose-300'
+                }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <FileText className="w-3 h-3 text-slate-400" />
+              <span>DSP Name</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Enter DSP Name..."
+              value={customDspName}
+              onChange={(e) => setCustomDspName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <UserCheck className="w-3 h-3 text-rose-500" />
+              <span>Authorized person *</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Authorized person..."
+              value={authorizedPerson}
+              onChange={(e) => setAuthorizedPerson(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Briefcase className="w-3 h-3 text-rose-500" />
+              <span>Role *</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Role / Title..."
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-rose-500" />
+              <span>Organization *</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Organization..."
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              Official Letter Ref
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. EPSS/HO-BR/2026..."
+              value={officialLetterRef}
+              onChange={(e) => setOfficialLetterRef(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+            />
           </div>
         </div>
       </div>
@@ -533,6 +716,196 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
           </table>
         </div>
       </div>
+
+      {/* Send to Branch Confirmation & Authorization Modal */}
+      {isSendToBranchModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-rose-900 via-pink-900 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-300/30 flex items-center justify-center">
+                  <Send className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wide">Send to Branch</h3>
+                  <p className="text-[11px] text-rose-200">
+                    Transmit Hub-Mapped DSP Breakdown to Branches (4.1 Received DSP)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSendToBranchModalOpen(false)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-xs font-bold text-rose-800">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Dispatch Payload Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Target Hubs</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">
+                    {selectedHubFilter === 'all' ? `${hubsSet.length} Hubs` : selectedHubFilter}
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Facilities</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">{filteredAllocations.length}</div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Equipment Items</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">{equipmentColumns.length}</div>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
+                  <div className="text-[10px] font-bold text-emerald-700 uppercase">Total Units</div>
+                  <div className="text-sm font-black text-emerald-900 mt-0.5">{totalFilteredUnits.toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* DSP Name & Official Letter Ref */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">DSP Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter DSP Name..."
+                    value={customDspName}
+                    onChange={(e) => setCustomDspName(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Official Letter Ref</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. EPSS/HO-BR/2026..."
+                    value={officialLetterRef}
+                    onChange={(e) => setOfficialLetterRef(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:border-rose-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Authorized Person, Role & Organization */}
+              <div className="p-4 bg-rose-50/50 border border-rose-200 rounded-2xl space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-rose-600" />
+                    <h4 className="text-[11px] font-black text-slate-900 uppercase">
+                      Authorized person, Role &amp; Organization
+                    </h4>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {['EPSS Head Office', 'EPSS', 'MOH'].map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setOrganization(preset)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                          organization === preset
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      Authorized person *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Full name..."
+                      value={authorizedPerson}
+                      onChange={(e) => {
+                        setAuthorizedPerson(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      Role *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Official role / title..."
+                      value={role}
+                      onChange={(e) => {
+                        setRole(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      Organization *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Organization name..."
+                      value={organization}
+                      onChange={(e) => {
+                        setOrganization(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  Dispatch Notes (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Optional instructions for EPSS Regional Branches..."
+                  value={dispatchNotes}
+                  onChange={(e) => setDispatchNotes(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:border-rose-500 outline-none resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSendToBranchModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSendToBranch}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-amber-400 text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-400" />
+                <span>Send to Branch</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
