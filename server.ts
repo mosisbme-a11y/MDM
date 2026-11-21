@@ -267,6 +267,7 @@ app.get('/api/active-app-data', asyncRoute(async (_req: AuthedRequest, res: Resp
       distributionDataRecords: masterData.distributionDataRecords || [],
       healthFacilityList: masterData.hfListItems || [],
       programMdRecords: masterData.programMdRecords || [],
+      agreementProcurementRecords: masterData.agreementProcurementRecords || [],
       supplyPlanRecords: masterData.supplyPlanRecords || [],
       noBkdItems: masterData.noBkdItems || [],
       categoryThresholds: masterData.categoryThresholds || {},

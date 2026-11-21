@@ -32,6 +32,7 @@ export interface CentralMasterDataCounts {
   dspWorkflows?: number;
   agreements?: number;
   uploadedAgreementBatches?: number;
+  agreementProcurement?: number;
 }
 
 export interface CentralMasterData {
