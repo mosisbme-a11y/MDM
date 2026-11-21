@@ -15,9 +15,23 @@ import {
   Coins,
   Building2,
   FileText,
-  Filter
+  Filter,
+  ArrowUpRight,
+  BarChart3,
+  Layers
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from 'recharts';
 import { AgreementProcurementRecord } from '../types';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 
 interface AgreementProcurementStatusViewProps {
   records: AgreementProcurementRecord[];
@@ -95,6 +109,7 @@ export const AgreementProcurementStatusView: React.FC<AgreementProcurementStatus
   const [searchQuery, setSearchQuery] = useState('');
   const [yearFilter, setYearFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [chartType, setChartType] = useState<'stacked' | 'grouped' | 'linesOnly' | 'valueOnly'>('stacked');
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadTab, setUploadTab] = useState<'file' | 'paste'>('file');
@@ -152,33 +167,169 @@ export const AgreementProcurementStatusView: React.FC<AgreementProcurementStatus
     });
   }, [records, yearFilter, statusFilter, searchQuery]);
 
-  const totals = useMemo(() => {
-    let totalContract = 0;
-    let totalAdvance = 0;
-    let totalAmount = 0;
-    let deliveredCount = 0;
-    let notDeliveredCount = 0;
-
-    filteredRecords.forEach((r) => {
-      totalContract += Number(r.totalContractValue) || 0;
-      totalAdvance += Number(r.advancePayment) || 0;
-      totalAmount += Number(r.amount) || 0;
-      const st = (r.fulfillmentStatus || '').trim().toLowerCase();
-      if (st === 'delivered') {
-        deliveredCount += 1;
-      } else if (st) {
-        notDeliveredCount += 1;
-      }
-    });
-
-    return {
-      totalContract,
-      totalAdvance,
-      totalAmount,
-      deliveredCount,
-      notDeliveredCount
+    const isRecordDelivered = (statusRaw: string): boolean => {
+      const st = (statusRaw || '').trim().toLowerCase();
+      if (!st) return false;
+      const isNegative = /\b(not\s+delivered|undelivered|pending|cancelled|canceled|in\s+transit)\b/.test(st);
+      if (isNegative) return false;
+      return st === 'delivered' || /\b(delivered|completed|received|fulfilled)\b/.test(st);
     };
-  }, [filteredRecords]);
+
+    const extractRecordYear = (rec: AgreementProcurementRecord): string => {
+      const yrRaw = (rec.agreementYear || '').trim();
+      const yrMatch = yrRaw.match(/\b(20\d\d|19\d\d)\b/);
+      if (yrMatch) return yrMatch[1];
+      if (yrRaw) return yrRaw;
+      const execRaw = (rec.executionDate || '').trim();
+      const execMatch = execRaw.match(/\b(20\d\d|19\d\d)\b/);
+      if (execMatch) return execMatch[1];
+      return 'Unspecified';
+    };
+
+    const getDeliveredValueForRecord = (rec: AgreementProcurementRecord): number => {
+      if (rec.totalContractValue !== null && rec.totalContractValue !== undefined) {
+        return Number(rec.totalContractValue) || 0;
+      }
+      if (rec.advancePayment !== null && rec.advancePayment !== undefined) {
+        return Number(rec.advancePayment) || 0;
+      }
+      return Number(rec.amount) || 0;
+    };
+
+    const totals = useMemo(() => {
+      let totalContract = 0;
+      let totalAdvance = 0;
+      let totalAmount = 0;
+      let deliveredValue = 0;
+      let deliveredCount = 0;
+      let notDeliveredCount = 0;
+      const facilitiesSet = new Set<string>();
+
+      filteredRecords.forEach((r) => {
+        totalContract += Number(r.totalContractValue) || 0;
+        totalAdvance += Number(r.advancePayment) || 0;
+        totalAmount += Number(r.amount) || 0;
+        if (r.facilityName && r.facilityName.trim()) {
+          facilitiesSet.add(r.facilityName.trim());
+        }
+        if (isRecordDelivered(r.fulfillmentStatus)) {
+          deliveredCount += 1;
+          deliveredValue += getDeliveredValueForRecord(r);
+        } else {
+          notDeliveredCount += 1;
+        }
+      });
+
+      const totalLines = filteredRecords.length;
+      const deliveryRate = totalLines > 0 ? Math.round((deliveredCount / totalLines) * 100) : 0;
+
+      return {
+        totalContract,
+        totalAdvance,
+        totalAmount,
+        deliveredValue,
+        deliveredCount,
+        notDeliveredCount,
+        totalLines,
+        deliveryRate,
+        facilitiesCount: facilitiesSet.size
+      };
+    }, [filteredRecords]);
+
+    const annualChartData = useMemo(() => {
+      const q = searchQuery.toLowerCase().trim();
+      const baseRecords = records.filter((rec) => {
+        if (statusFilter !== 'all' && rec.fulfillmentStatus.trim() !== statusFilter) return false;
+        if (q) {
+          const hay = [
+            rec.agreementYear,
+            rec.executionDate,
+            rec.facilityName,
+            rec.deliveryDate,
+            rec.fulfillmentStatus
+          ]
+            .join(' ')
+            .toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const grouped: Record<
+        string,
+        {
+          deliveredValue: number;
+          totalContractValue: number;
+          advancePayment: number;
+          deliveredLines: number;
+          totalLines: number;
+          pendingLines: number;
+          facilities: Set<string>;
+        }
+      > = {};
+
+      baseRecords.forEach((rec) => {
+        const year = extractRecordYear(rec);
+        if (!grouped[year]) {
+          grouped[year] = {
+            deliveredValue: 0,
+            totalContractValue: 0,
+            advancePayment: 0,
+            deliveredLines: 0,
+            totalLines: 0,
+            pendingLines: 0,
+            facilities: new Set<string>()
+          };
+        }
+
+        grouped[year].totalLines += 1;
+        grouped[year].totalContractValue += Number(rec.totalContractValue) || 0;
+        grouped[year].advancePayment += Number(rec.advancePayment) || 0;
+
+        if (isRecordDelivered(rec.fulfillmentStatus)) {
+          grouped[year].deliveredLines += 1;
+          grouped[year].deliveredValue += getDeliveredValueForRecord(rec);
+        } else {
+          grouped[year].pendingLines += 1;
+        }
+
+        if (rec.facilityName && rec.facilityName.trim()) {
+          grouped[year].facilities.add(rec.facilityName.trim());
+        }
+      });
+
+      return Object.entries(grouped)
+        .map(([year, d]) => {
+          const pendingLines = Math.max(0, d.totalLines - d.deliveredLines);
+          const deliveryRate = d.totalLines > 0 ? Math.round((d.deliveredLines / d.totalLines) * 100) : 0;
+          return {
+            year,
+            deliveredValue: d.deliveredValue,
+            totalContractValue: d.totalContractValue,
+            advancePayment: d.advancePayment,
+            deliveredLines: d.deliveredLines,
+            pendingLines,
+            totalLines: d.totalLines,
+            deliveryRate,
+            facilitiesCount: d.facilities.size,
+            facilitiesList: Array.from(d.facilities).slice(0, 6).join(', ')
+          };
+        })
+        .sort((a, b) => {
+          const na = Number(a.year);
+          const nb = Number(b.year);
+          if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+          return a.year.localeCompare(b.year);
+        });
+    }, [records, searchQuery, statusFilter]);
+
+    const formatYAxisValue = (value: number) => {
+      if (value === 0) return '0';
+      if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+      if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+      if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+      return value.toString();
+    };
 
   const parseRawRowsToRecords = (rows: Record<string, unknown>[], sourceName: string): AgreementProcurementRecord[] => {
     const nowIso = new Date().toISOString();
@@ -524,57 +675,460 @@ export const AgreementProcurementStatusView: React.FC<AgreementProcurementStatus
         </div>
       </div>
 
-      {/* 4 Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider">Facilities Listed</span>
-            <span className="p-1.5 bg-amber-50 rounded-lg text-amber-600">
-              <Building2 className="w-4 h-4" />
-            </span>
+      {/* KPI Cards & Dual-Axis Annual Stacked Performance Chart */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 shadow-2xs">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                Agreement Procurement Performance
+              </h4>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase tracking-wider font-mono">
+                Stacked Performance
+              </span>
+              {yearFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setYearFilter('all')}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200 transition cursor-pointer flex items-center gap-1"
+                  title="Clear year filter"
+                >
+                  <span>Year: {yearFilter}</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              Annual Analysis: Total Contract Value, Total Advanced Payment &amp; Total Line of Facility per Agreement Year.
+            </p>
           </div>
-          <div className="text-2xl font-black text-slate-900 font-mono">{filteredRecords.length}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Uploaded procurement rows</div>
+
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setChartType('stacked')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
+                chartType === 'stacked'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-indigo-600'
+              }`}
+              title="Stacked Graph: Stacks delivered and pending facility lines to equal Total Line of Facility, alongside Contract Value & Advanced Payment"
+            >
+              <Layers className="w-3 h-3" />
+              <span>Stacked</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setChartType('grouped')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                chartType === 'grouped'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-indigo-600'
+              }`}
+            >
+              Grouped
+            </button>
+            <button
+              type="button"
+              onClick={() => setChartType('linesOnly')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                chartType === 'linesOnly'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-indigo-600'
+              }`}
+            >
+              Facility Lines
+            </button>
+            <button
+              type="button"
+              onClick={() => setChartType('valueOnly')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                chartType === 'valueOnly'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-emerald-600'
+              }`}
+            >
+              Value Only
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Contract Value</span>
-            <span className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
-              <Coins className="w-4 h-4" />
-            </span>
+        {/* 4 Summary KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div
+            onClick={() => {
+              setYearFilter('all');
+              setStatusFilter('all');
+            }}
+            className="bg-gradient-to-br from-indigo-50/80 to-white p-4 rounded-2xl border border-indigo-100 shadow-xs flex items-center gap-3.5 cursor-pointer hover:border-indigo-300 hover:shadow-md transition active:scale-[0.99] group"
+            title="Show all uploaded facility lines"
+          >
+            <div className="p-3 rounded-xl bg-indigo-600 text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Line of Facility</p>
+                <ArrowUpRight className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <p className="text-lg font-black text-slate-900 tabular-nums truncate">
+                  {formatNumber(totals.totalLines)}
+                </p>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  {formatNumber(totals.facilitiesCount)} Facilities
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-xl font-black text-slate-900 font-mono truncate" title={formatAmountCell(totals.totalContract)}>
-            {formatAmountCell(totals.totalContract)}
+
+          <div
+            onClick={() => {
+              const deliveredOpt = uniqueStatuses.find((s) => s.trim().toLowerCase() === 'delivered');
+              if (deliveredOpt) {
+                setStatusFilter((prev) => (prev === deliveredOpt ? 'all' : deliveredOpt));
+              }
+            }}
+            className="bg-gradient-to-br from-sky-50/80 to-white p-4 rounded-2xl border border-sky-100 shadow-xs flex items-center gap-3.5 cursor-pointer hover:border-sky-300 hover:shadow-md transition active:scale-[0.99] group"
+            title="Filter table to Delivered lines"
+          >
+            <div className="p-3 rounded-xl bg-sky-600 text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Delivered of Facility</p>
+                <ArrowUpRight className="w-3 h-3 text-sky-400 group-hover:text-sky-600 transition-colors" />
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <p className="text-lg font-black text-sky-900 tabular-nums truncate">
+                  {formatNumber(totals.deliveredCount)}
+                </p>
+                <span className="text-[10px] font-bold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  {totals.deliveryRate}% Delivered
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">Sum of Total Contract Value</div>
+
+          <div
+            className="bg-gradient-to-br from-emerald-50/80 to-white p-4 rounded-2xl border border-emerald-100 shadow-xs flex items-center gap-3.5 hover:border-emerald-300 hover:shadow-md transition group"
+            title={`Exact Total Contract Value: ${formatAmountCell(totals.totalContract)}`}
+          >
+            <div className="p-3 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <Coins className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Contract Value</p>
+                <ArrowUpRight className="w-3 h-3 text-emerald-400 group-hover:text-emerald-600 transition-colors" />
+              </div>
+              <p className="text-lg font-black text-emerald-900 mt-0.5 tabular-nums truncate">
+                {formatCurrency(totals.totalContract, true)}
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="bg-gradient-to-br from-teal-50/80 to-white p-4 rounded-2xl border border-teal-100 shadow-xs flex items-center gap-3.5 hover:border-teal-300 hover:shadow-md transition group"
+            title={`Exact Total Advanced Payment: ${formatAmountCell(totals.totalAdvance)}`}
+          >
+            <div className="p-3 rounded-xl bg-teal-600 text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Advanced Payment</p>
+                <ArrowUpRight className="w-3 h-3 text-teal-400 group-hover:text-teal-600 transition-colors" />
+              </div>
+              <p className="text-lg font-black text-teal-900 mt-0.5 tabular-nums truncate">
+                {formatCurrency(totals.totalAdvance, true)}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider">Advance Payment</span>
-            <span className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
-              <FileText className="w-4 h-4" />
-            </span>
-          </div>
-          <div className="text-xl font-black text-indigo-700 font-mono truncate" title={formatAmountCell(totals.totalAdvance)}>
-            {formatAmountCell(totals.totalAdvance)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Sum of Advance Payment</div>
-        </div>
+        {/* Stacked Combo Chart Container */}
+        <div className="h-80 sm:h-96 w-full bg-slate-50/30 rounded-2xl p-4 border border-slate-100/80 shadow-inner relative overflow-hidden flex flex-col justify-between">
+          <div
+            className="absolute inset-0 opacity-[0.03] pointer-events-none"
+            style={{ backgroundImage: 'radial-gradient(#6366f1 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+          />
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider">Fulfillment Status</span>
-            <span className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
-              <CheckCircle2 className="w-4 h-4" />
-            </span>
+          {/* Legend Bar */}
+          <div className="relative z-10 flex items-center gap-3 sm:gap-4 text-[10px] font-bold text-slate-600 uppercase tracking-wider bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs flex-wrap mb-2">
+            {chartType !== 'linesOnly' && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-emerald-500 shadow-2xs" />
+                  <span className="text-emerald-900 font-extrabold">Total Contract Value</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-teal-500 shadow-2xs" />
+                  <span className="text-teal-900 font-extrabold">Total Advanced Payment</span>
+                </div>
+              </>
+            )}
+            {chartType !== 'valueOnly' && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-sky-600 shadow-2xs" />
+                  <span className="text-sky-900 font-extrabold">Delivered of Facility</span>
+                </div>
+                {chartType === 'stacked' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm bg-sky-300 shadow-2xs" />
+                    <span className="text-slate-600">Pending Lines (Stacked to Total)</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-0.5 bg-indigo-600 border-t-2 border-indigo-600 border-dashed" />
+                  <span className="text-indigo-900 font-extrabold">Total Line of Facility</span>
+                </div>
+              </>
+            )}
           </div>
-          <div className="flex items-baseline gap-3">
-            <span className="text-xl font-black text-emerald-700 font-mono">{totals.deliveredCount} Delivered</span>
-            <span className="text-xs font-bold text-rose-600 font-mono">{totals.notDeliveredCount} Pending</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Remaining Amount: {formatAmountCell(totals.totalAmount)}</div>
+
+          {annualChartData.length === 0 ? (
+            <div className="flex-1 w-full flex flex-col items-center justify-center p-6 text-center bg-white/70 rounded-xl border border-dashed border-slate-300">
+              <FileSpreadsheet className="w-7 h-7 text-amber-500 mb-2" />
+              <p className="text-xs font-bold text-slate-700">Upload Excel / CSV to populate Annual Procurement Performance</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Chart automatically groups your records by Agreement Year, Total Contract Value, Total Advanced Payment &amp; Total Line of Facility.
+              </p>
+            </div>
+          ) : (
+            <div className="flex-1 w-full min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={annualChartData}
+                  margin={{ top: 15, right: 15, left: 15, bottom: 5 }}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(state: any) => {
+                    const clickedYear = state?.activePayload?.[0]?.payload?.year || state?.activeLabel;
+                    if (clickedYear && clickedYear !== 'Unspecified') {
+                      setYearFilter((prev) => (prev === String(clickedYear) ? 'all' : String(clickedYear)));
+                    }
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.6} />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickLine={false}
+                  />
+                  {chartType !== 'linesOnly' && (
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fontSize: 10, fill: '#059669', fontWeight: 800 }}
+                      tickFormatter={(val) => formatYAxisValue(Number(val) || 0)}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                  )}
+                  {chartType !== 'valueOnly' && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: '#0284c7', fontWeight: 800 }}
+                      tickFormatter={(val) => formatNumber(Number(val) || 0)}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                  )}
+                  <Tooltip
+                    cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white p-3.5 rounded-2xl shadow-xl border border-slate-200 text-xs space-y-2.5 min-w-[270px]">
+                          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-1.5">
+                            <span className="font-black text-slate-900 text-sm">Year {label} Performance</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {d.deliveryRate}% Delivered
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                              <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 shrink-0" />
+                                <span>Total Contract Value:</span>
+                              </span>
+                              <span className="text-emerald-800 font-black text-xs font-mono">
+                                {formatCurrency(d.totalContractValue, true)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-teal-50/70 border border-teal-100">
+                              <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-teal-500 shrink-0" />
+                                <span>Total Advanced Payment:</span>
+                              </span>
+                              <span className="text-teal-800 font-black text-xs font-mono">
+                                {formatCurrency(d.advancePayment, true)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                              <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-indigo-600 shrink-0" />
+                                <span>Total Line of Facility:</span>
+                              </span>
+                              <span className="text-indigo-900 font-black text-xs font-mono">
+                                {formatNumber(d.totalLines)} Lines ({formatNumber(d.facilitiesCount)} Facilities)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-sky-50/70 border border-sky-100">
+                              <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-sky-600 shrink-0" />
+                                <span>Delivered of Facility:</span>
+                              </span>
+                              <span className="text-sky-800 font-black text-xs font-mono">
+                                {formatNumber(d.deliveredLines)} Lines
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-slate-50 border border-slate-200">
+                              <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-sky-300 shrink-0" />
+                                <span>Pending Lines:</span>
+                              </span>
+                              <span className="text-slate-800 font-black text-xs font-mono">
+                                {formatNumber(d.pendingLines)} Lines
+                              </span>
+                            </div>
+
+                            <div className="pt-1">
+                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-sky-500 to-indigo-600 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, Math.max(0, d.deliveryRate))}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {d.facilitiesList && (
+                            <div className="pt-1 border-t border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Facilities ({d.facilitiesCount}):
+                              </span>
+                              <p className="text-[11px] font-medium text-slate-700 truncate max-w-[245px]" title={d.facilitiesList}>
+                                {d.facilitiesList}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+
+                  {chartType !== 'linesOnly' && (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="totalContractValue"
+                      name="Total Contract Value"
+                      fill="#10b981"
+                      radius={[6, 6, 0, 0]}
+                      barSize={chartType === 'stacked' ? 24 : 22}
+                      onClick={(data: any) => {
+                        const y = data?.payload?.year || data?.year;
+                        if (y && y !== 'Unspecified') setYearFilter((prev) => (prev === String(y) ? 'all' : String(y)));
+                      }}
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+
+                  {chartType !== 'linesOnly' && (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="advancePayment"
+                      name="Total Advanced Payment"
+                      fill="#14b8a6"
+                      radius={[6, 6, 0, 0]}
+                      barSize={chartType === 'stacked' ? 24 : 22}
+                      onClick={(data: any) => {
+                        const y = data?.payload?.year || data?.year;
+                        if (y && y !== 'Unspecified') setYearFilter((prev) => (prev === String(y) ? 'all' : String(y)));
+                      }}
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+
+                  {chartType !== 'valueOnly' && (
+                    <Bar
+                      yAxisId={chartType === 'linesOnly' ? 'left' : 'right'}
+                      dataKey="deliveredLines"
+                      name="Delivered of Facility"
+                      fill="#0284c7"
+                      radius={chartType === 'stacked' ? [0, 0, 0, 0] : [6, 6, 0, 0]}
+                      barSize={chartType === 'stacked' ? 30 : 22}
+                      stackId={chartType === 'stacked' ? 'lines' : undefined}
+                      onClick={(data: any) => {
+                        const y = data?.payload?.year || data?.year;
+                        if (y && y !== 'Unspecified') setYearFilter((prev) => (prev === String(y) ? 'all' : String(y)));
+                      }}
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+
+                  {chartType === 'stacked' && (
+                    <Bar
+                      yAxisId="right"
+                      dataKey="pendingLines"
+                      name="Pending Lines (Stacked to Total)"
+                      fill="#93c5fd"
+                      radius={[6, 6, 0, 0]}
+                      barSize={30}
+                      stackId="lines"
+                      onClick={(data: any) => {
+                        const y = data?.payload?.year || data?.year;
+                        if (y && y !== 'Unspecified') setYearFilter((prev) => (prev === String(y) ? 'all' : String(y)));
+                      }}
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+
+                  {chartType === 'grouped' && (
+                    <Bar
+                      yAxisId="right"
+                      dataKey="totalLines"
+                      name="Total Line of Facility"
+                      fill="#6366f1"
+                      radius={[6, 6, 0, 0]}
+                      barSize={22}
+                      onClick={(data: any) => {
+                        const y = data?.payload?.year || data?.year;
+                        if (y && y !== 'Unspecified') setYearFilter((prev) => (prev === String(y) ? 'all' : String(y)));
+                      }}
+                      className="cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+
+                  {chartType !== 'valueOnly' && (
+                    <Line
+                      yAxisId={chartType === 'linesOnly' ? 'left' : 'right'}
+                      type="monotone"
+                      dataKey="totalLines"
+                      name="Total Line of Facility"
+                      stroke="#4f46e5"
+                      strokeWidth={3}
+                      strokeDasharray="4 4"
+                      dot={{ r: 5, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
+                      activeDot={{ r: 7, strokeWidth: 3, stroke: '#fff' }}
+                    />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
 
