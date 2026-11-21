@@ -63,9 +63,9 @@ export async function signInWithPassword(
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error || !data.user) {
-      if (isSupabasePausedError(error)) {
+      if (isSupabasePausedError(error) || error?.message?.toLowerCase().includes('fetch') || error?.message?.toLowerCase().includes('network')) {
         return {
-          error: 'The connected Supabase database is currently paused or waking up. Click "Resume project" in Supabase Dashboard (or verify VITE_SUPABASE_URL) and try again in 1–2 minutes.'
+          error: 'Network error. Try again'
         };
       }
       return { error: 'Invalid email or password.' };
@@ -84,12 +84,12 @@ export async function signInWithPassword(
     }
     return { user: profile };
   } catch (err: any) {
-    if (isSupabasePausedError(err)) {
+    if (isSupabasePausedError(err) || err?.message?.toLowerCase().includes('fetch') || err?.message?.toLowerCase().includes('network')) {
       return {
-        error: 'The connected Supabase database is paused or unreachable. Click "Resume project" in your Supabase Dashboard and retry in 1–2 minutes.'
+        error: 'Network error. Try again'
       };
     }
-    return { error: err?.message || 'Sign in failed.' };
+    return { error: err?.message || 'Network error. Try again' };
   }
 }
 

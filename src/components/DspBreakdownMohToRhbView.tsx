@@ -2125,7 +2125,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
 
               {/* Data Table: Mode 1: Full Two-Tier Regional Matrix Table */}
               {confirmTabMode === 'matrix' ? (
-                <div className="border-2 border-slate-900 rounded-xl overflow-x-auto shadow-md bg-white max-h-80 overflow-y-auto">
+                <div className="border-2 border-slate-900 rounded-xl overflow-x-auto shadow-md bg-white w-full">
                   <table className="w-full border-collapse text-xs select-text min-w-[700px]">
                     <thead>
                       {/* Tier 1 Header: Material Descriptions */}
