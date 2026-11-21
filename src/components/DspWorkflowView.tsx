@@ -223,7 +223,7 @@ export function computeDateCount(
   }
 }
 
-import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
+import { getDossierDisplayInfo, resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 export { getDossierDisplayInfo };
 export type { DossierDisplayInfo } from '../utils/dspDisplayUtils';
 
@@ -878,7 +878,9 @@ _Official Dossier Resend Protocol_`;
     }));
     const convertedFacilityMatrix = convertStage4ToFacilityMatrix(cleanMatrixData);
     const dossierTitle =
-      metadata.dspName || `MOH to EPSS Health Facility Matrix (${regionsList.join(', ') || 'National'})`;
+      resolveCanonicalEpssDspName(records, selectedRecord) ||
+      metadata.dspName ||
+      `MOH to EPSS Health Facility Matrix (${regionsList.join(', ') || 'National'})`;
 
     // 1. Incoming dossier in EPSS 1.2 (DSP Received from MOH) with full columns & all rows
     const received12Record: DspWorkflowRecord = {
@@ -2208,16 +2210,20 @@ _Official Dossier Resend Protocol_`;
       ) : (currentStage === 'epss-to-branch' || currentSubStep === '4.1' || currentSubTab === 'dsp-branches-4-1') ? (
         <BranchReceivedDspView
           records={records}
+          setRecords={setRecords}
           multipleStockItems={multipleStockItems}
           mode="4.1"
           onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '4.2' || currentSubTab === 'dsp-branches-4-2') ? (
         <BranchReceivedDspView
           records={records}
+          setRecords={setRecords}
           multipleStockItems={multipleStockItems}
           mode="4.2"
           onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
         />
       ) : (currentSubStep === '2.1' || currentSubTab === 'dsp-moh-2-1') ? (
         <DspReceivedFromMohView
@@ -2270,7 +2276,9 @@ _Official Dossier Resend Protocol_`;
               stageTitle: '2.5 DSP Aggr. Submitted to EPSS',
               senderOrg: 'Ministry of Health (PMD Directorate)',
               recipientOrg: 'EPSS Head Office',
-              dspName: `Consolidated RHB Aggregation (${summary.regions.length} Region${summary.regions.length !== 1 ? 's' : ''})`,
+              dspName:
+                resolveCanonicalEpssDspName(records) ||
+                `Consolidated RHB Aggregation (${summary.regions.length} Region${summary.regions.length !== 1 ? 's' : ''})`,
               subject: `DSP Aggregated RHB Submissions Ready for EPSS (${summary.regions.join(', ') || 'All Regions'} — ${summary.facilityCount} Facilities)`,
               status: 'Submitted & Pending',
               dateSubmitted: summary.latestDate,
@@ -2398,6 +2406,7 @@ _Official Dossier Resend Protocol_`;
               const newRec: DspWorkflowRecord = {
                 id: 'dsp-moh-aggr-2-5',
                 dspRefNumber: `MOH/EPSS-AGGR/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+                dspName: resolveCanonicalEpssDspName(prev) || undefined,
                 stage: 'moh-osp-management',
                 subStage: '2.5',
                 stageTitle: '2.5 DSP Aggr. Submitted to EPSS',

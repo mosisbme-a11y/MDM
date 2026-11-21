@@ -32,6 +32,7 @@ import {
 import { Stage4MatrixData, Stage4Row } from './Stage4MohSubmittedMatrixTable';
 import { formatNumber } from '../utils/formatters';
 import { aggregateRhbSubmissionsToMoh } from '../utils/rhbAggregation';
+import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 interface RhbBreakdownAggregationViewProps {
   records: DspWorkflowRecord[];
@@ -483,7 +484,7 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
           stageTitle: '3.2 Submit Breakdown to MOH',
           senderOrg: `${primaryRegion} Regional Health Bureau`,
           recipientOrg: 'Ministry of Health (PMD Directorate)',
-          dspName: `${primaryRegion} RHB Submitted Breakdown`,
+          dspName: resolveCanonicalEpssDspName(records) || `${primaryRegion} RHB Submitted Breakdown`,
           subject: `${primaryRegion} RHB Facility Breakdown Submitted to MOH (${file.name})`,
           status: 'Submitted & Pending',
           dateSubmitted: rowDate,
@@ -531,11 +532,13 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
   };
 
   const inheritedDspName = useMemo(() => {
+    const canonical = resolveCanonicalEpssDspName(records);
+    if (canonical) return canonical;
     const names = Array.from(
       new Set(regionSummaries.flatMap((rs) => rs.dspNames).filter((n) => n && n !== '-'))
     );
     return names.length > 0 ? names.join(', ') : 'Aggregated RHB Breakdown';
-  }, [regionSummaries]);
+  }, [records, regionSummaries]);
 
   const handleSendToBranch = () => {
     if (facilityRows.length === 0) return;

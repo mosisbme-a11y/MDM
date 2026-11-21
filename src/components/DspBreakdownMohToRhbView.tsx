@@ -44,7 +44,7 @@ import { pushCentralMasterData } from '../utils/centralSyncService';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { getAccessToken } from '../utils/googleWorkspace';
-import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
+import { getDossierDisplayInfo, resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 const TODAY_ISO_DATE = new Date().toISOString().split('T')[0];
 
@@ -226,10 +226,11 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
     const req = mohBreakdownToRhbDossiers.find(r => r.id === reqId) || (records || []).find(r => r.id === reqId);
     if (req) {
       const dspInfo = getDossierDisplayInfo(req);
-      if (dspInfo.dspName) setManualDspName(dspInfo.dspName);
+      const canonicalName = resolveCanonicalEpssDspName(records, req);
+      if (canonicalName || dspInfo.dspName) setManualDspName(canonicalName || dspInfo.dspName);
       if (dspInfo.authorizedPerson) setManualSignatoryName(dspInfo.authorizedPerson);
       if (dspInfo.role) setManualSignatoryRole(dspInfo.role);
-      if (dspInfo.organization) setManualOrganization(dspInfo.organization);
+      setManualOrganization('MOH');
 
       if (Array.isArray(req.itemsIncluded) && req.itemsIncluded.length > 0) {
         const newCols: MatrixColumn[] = req.itemsIncluded.map((it: any, idx: number) => ({
@@ -301,6 +302,18 @@ export const DspBreakdownMohToRhbView: React.FC<Props> = ({
       })
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records]);
+
+  // Always auto-display the canonical DSP Name created by the EPSS team during 1.1 DSP Request to MOH
+  useEffect(() => {
+    const selectedRec = selectedBreakdownRequestId
+      ? records.find(r => r.id === selectedBreakdownRequestId)
+      : undefined;
+    const targetRec = selectedRec || mohReceivedEpssDossiers[0] || mohBreakdownToRhbDossiers[0] || null;
+    const canonicalName = resolveCanonicalEpssDspName(records, targetRec);
+    if (canonicalName) {
+      setManualDspName(canonicalName);
+    }
+  }, [records, selectedBreakdownRequestId, mohReceivedEpssDossiers, mohBreakdownToRhbDossiers]);
 
   // Extract EXACT items transmitted from EPSS to MOH (strictly MOH Stage 2.1)
   const exactTransmittedItems = useMemo(() => {
@@ -891,7 +904,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
     const finalRole = manualSignatoryRole.trim() || 'Team Leader';
     const finalOrg = manualOrganization.trim() || 'MOH';
     const sourceRecord = selectedBreakdownRequestId ? records.find(r => r.id === selectedBreakdownRequestId) : undefined;
-    const finalDspName = manualDspName.trim() || sourceRecord?.dspName || 'Regional Allocation Breakdown';
+    const finalDspName = resolveCanonicalEpssDspName(records, sourceRecord) || manualDspName.trim() || 'Regional Allocation Breakdown';
 
     const exactMatrixData = {
       date: approvedRows[0]?.date || TODAY_ISO_DATE,
@@ -1001,7 +1014,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       <div className="bg-[#0B1527] border border-[#0B1527] rounded-2xl p-4 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#1E3A5F] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)]">
+            <div className="hidden">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
                 DSP Request to RHB
@@ -1043,11 +1056,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => letterInputRef.current?.click()}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border ${
-                uploadedLetter 
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 font-black' 
-                  : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-              }`}
+              className="hidden"
               title="Upload signed Official Breakdown Request Letter (PDF / DOC)"
             >
               <Paperclip className="w-3.5 h-3.5 text-amber-400" />
@@ -1058,7 +1067,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsEmailModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="hidden"
               title="Send DSP Breakdown Request via email to RHBs"
             >
               <Mail className="w-3.5 h-3.5" />
@@ -1069,7 +1078,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsWhatsAppModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="hidden"
               title="Send DSP Breakdown Request via WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5" />
@@ -1080,7 +1089,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsImportItemsModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="hidden"
               title="Import equipment items from received payload or stock as matrix columns"
             >
               <PackagePlus className="w-3.5 h-3.5" />
@@ -1101,7 +1110,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsEpssDossierModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-slate-700"
+              className="hidden"
               title="View the original 10-column allocation dossier received from EPSS HO"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -1112,7 +1121,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
             <button
               type="button"
               onClick={() => setIsTransmitModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-teal-500"
+              className="hidden"
               title="View full columns data and regional allocations for confirmation before submitting to RHBs"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -1197,6 +1206,14 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
+          </div>
+
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 shadow-2xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="text-[11px] font-bold text-emerald-800">DSP Project Name:</span>
+            <span className="text-xs font-black text-slate-900">
+              {manualDspName || resolveCanonicalEpssDspName(records) || 'Auto-Filled from EPSS'}
+            </span>
           </div>
 
           <button
@@ -1447,7 +1464,7 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
       </div>
 
       {/* Footer Instructions */}
-      <div className="bg-slate-100 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 flex items-center justify-between gap-2">
+      <div className="hidden">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
@@ -2352,25 +2369,39 @@ ${uploadedLetter ? `• Attached Covering Letter: *${uploadedLetter.name}*\n` : 
                     <input
                       type="text"
                       value={manualOrganization}
-                      onChange={(e) => setManualOrganization(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const upper = val.trim().toUpperCase();
+                        if (upper === 'EPSS' || upper === 'RHB') return;
+                        setManualOrganization(val);
+                      }}
                       placeholder="e.g. MOH"
                       className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
                     />
                     <div className="flex gap-1 shrink-0">
-                      {['MOH', 'EPSS', 'RHB'].map((org) => (
-                        <button
-                          key={org}
-                          type="button"
-                          onClick={() => setManualOrganization(org)}
-                          className={`px-1.5 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
-                            manualOrganization === org
-                              ? 'bg-amber-500 text-slate-950 border-amber-600 font-extrabold'
-                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {org}
-                        </button>
-                      ))}
+                      {(['MOH', 'EPSS', 'RHB'] as const).map((org) => {
+                        const isInactive = org === 'EPSS' || org === 'RHB';
+                        return (
+                          <button
+                            key={org}
+                            type="button"
+                            disabled={isInactive}
+                            onClick={() => {
+                              if (!isInactive) setManualOrganization(org);
+                            }}
+                            title={isInactive ? `${org} is Inactive in MOH Section` : `Select ${org}`}
+                            className={`px-1.5 py-1 text-[10px] font-black rounded-lg border transition ${
+                              isInactive
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                                : manualOrganization === org
+                                  ? 'bg-amber-500 text-slate-950 border-amber-600 font-extrabold cursor-pointer'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                          >
+                            {org}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

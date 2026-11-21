@@ -27,6 +27,7 @@ import {
 import * as XLSX from 'xlsx';
 import { formatNumber } from '../utils/formatters';
 import { HealthFacilityRecord } from '../types';
+import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 export interface Stage4Column {
   id: string;
@@ -149,8 +150,10 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
   const [isTransmitModalOpen, setIsTransmitModalOpen] = useState(false);
   const [signatoryName, setSignatoryName] = useState('');
   const [signatoryRole, setSignatoryRole] = useState('PMD Director');
-  const [signatoryOrg, setSignatoryOrg] = useState('Ministry of Health (PMD Directorate)');
-  const [dspProjectTitle, setDspProjectTitle] = useState('National Health Facility Allocation Matrix');
+  const [signatoryOrg, setSignatoryOrg] = useState('MOH');
+  const [dspProjectTitle, setDspProjectTitle] = useState(() =>
+    resolveCanonicalEpssDspName(dossiers, dossiers.find(d => d.id === selectedDossierId) || dossiers[0] || null)
+  );
 
   const handleBatchApplyQtyToAllRows = (colId: string, customQty?: number) => {
     const valToApply = customQty !== undefined ? customQty : (Number(batchQtyInputs[colId]) || 0);
@@ -350,11 +353,12 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
     }
   }, [data]);
 
-  // Sync default DSP Project title with selected dossier when available
+  // Sync default DSP Project title with canonical EPSS-created DSP Name when available
   useEffect(() => {
-    const activeDossier = dossiers.find(d => d.id === selectedDossierId);
-    if (activeDossier?.dspName) {
-      setDspProjectTitle(activeDossier.dspName);
+    const activeDossier = dossiers.find(d => d.id === selectedDossierId) || dossiers[0] || null;
+    const canonical = resolveCanonicalEpssDspName(dossiers, activeDossier);
+    if (canonical) {
+      setDspProjectTitle(canonical);
     }
   }, [selectedDossierId, dossiers]);
 
@@ -1630,18 +1634,24 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-              {/* DSP PROJECT / MATRIX REFERENCE TITLE */}
-              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-amber-700" />
-                  <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">DSP Project / Matrix Reference Title</span>
+              {/* DSP PROJECT NAME (AUTO-FILLED FROM EPSS) */}
+              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-amber-700" />
+                    <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">DSP Project Name</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                    Auto-Filled &amp; Locked from EPSS
+                  </span>
                 </div>
                 <input
                   type="text"
-                  placeholder="e.g. National Health Facility Allocation Matrix"
+                  placeholder="Auto-filled from EPSS DSP Request to MOH"
                   value={dspProjectTitle}
-                  onChange={(e) => setDspProjectTitle(e.target.value)}
-                  className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:border-amber-500 outline-none transition shadow-sm"
+                  readOnly
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-300 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 cursor-not-allowed shadow-sm"
                 />
               </div>
 
@@ -1819,14 +1829,14 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 </div>
               </div>
 
-              {/* AUTHORIZED MOH SIGNATORY */}
+              {/* AUTHORIZED MOH SIGNATORY & INSTITUTIONAL PROFILE */}
               <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-sm">
                 <div className="flex items-center gap-2 text-indigo-900 font-black uppercase text-[11px] tracking-wider">
                   <UserCheck className="w-5 h-5 text-indigo-600" />
-                  <span>Authorized MOH Signatory</span>
+                  <span>Authorized MOH Signatory &amp; Institutional Profile</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Authorized Person *</label>
                     <input
@@ -1838,7 +1848,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Official Role</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Official Role *</label>
                     <input
                       type="text"
                       placeholder="Title"
@@ -1846,6 +1856,48 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                       onChange={(e) => setSignatoryRole(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition shadow-2xs"
                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Organization *</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="MOH"
+                        value={signatoryOrg}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const upper = val.trim().toUpperCase();
+                          if (upper === 'EPSS' || upper === 'RHB') return;
+                          setSignatoryOrg(val);
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white outline-none transition shadow-2xs"
+                      />
+                      <div className="flex gap-1 shrink-0">
+                        {(['MOH', 'EPSS', 'RHB'] as const).map((org) => {
+                          const isInactive = org === 'EPSS' || org === 'RHB';
+                          return (
+                            <button
+                              key={org}
+                              type="button"
+                              disabled={isInactive}
+                              onClick={() => {
+                                if (!isInactive) setSignatoryOrg(org);
+                              }}
+                              title={isInactive ? `${org} is Inactive in MOH Section` : `Select ${org}`}
+                              className={`px-1.5 py-1 text-[10px] font-black rounded-lg border transition ${
+                                isInactive
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                                  : signatoryOrg === org
+                                    ? 'bg-amber-500 text-slate-950 border-amber-600 cursor-pointer'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                              }`}
+                            >
+                              {org}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

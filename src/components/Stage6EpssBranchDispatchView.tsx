@@ -21,6 +21,7 @@ import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, HealthFacilityRecord } from '../types';
 import { EPSS_HUBS_REGISTRY, getHubByCode } from '../data/epssHubs';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
+import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 interface Stage6EpssBranchDispatchViewProps {
   records: DspWorkflowRecord[];
@@ -68,24 +69,31 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
     return stage5Records.find(r => r.id === selectedDossierId) || stage5Records[0] || null;
   }, [stage5Records, selectedDossierId]);
 
+  const canonicalDspName = useMemo(
+    () => resolveCanonicalEpssDspName(records, currentDossier),
+    [records, currentDossier]
+  );
+
   // Send to Branch authorization & transmittal fields
   const [isSendToBranchModalOpen, setIsSendToBranchModalOpen] = useState(false);
   const [authorizedPerson, setAuthorizedPerson] = useState('');
   const [role, setRole] = useState('');
-  const [organization, setOrganization] = useState('');
+  const [organization, setOrganization] = useState('EPSS Branch');
   const [customDspName, setCustomDspName] = useState('');
   const [officialLetterRef, setOfficialLetterRef] = useState('');
   const [dispatchNotes, setDispatchNotes] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (currentDossier) {
+    if (canonicalDspName) {
+      setCustomDspName(canonicalDspName);
+    } else if (currentDossier) {
       setCustomDspName(currentDossier.dspName || currentDossier.dspRefNumber || '');
-      if (currentDossier.officialLetterRef && !officialLetterRef) {
-        setOfficialLetterRef(currentDossier.officialLetterRef);
-      }
     }
-  }, [currentDossier?.id]);
+    if (currentDossier?.officialLetterRef && !officialLetterRef) {
+      setOfficialLetterRef(currentDossier.officialLetterRef);
+    }
+  }, [currentDossier?.id, canonicalDspName]);
 
   // Equipment columns
   const equipmentColumns = useMemo(() => {
@@ -197,17 +205,22 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
       return;
     }
 
+    if (cleanOrganization.toUpperCase() === 'MOH' || cleanOrganization.toUpperCase() === 'RHB') {
+      setFormError('MOH and RHB Organizations are inactive in Branch Management / EPSS Dispatch. Use EPSS Branch or EPSS.');
+      return;
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const totalUnits = totalFilteredUnits;
     const refNum = `EPSS/BR-DSP/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
-    const baseDspName = customDspName.trim() || currentDossier.dspName || currentDossier.dspRefNumber;
+    const baseDspName = canonicalDspName || customDspName.trim() || currentDossier.dspName || currentDossier.dspRefNumber;
     const cleanLetterRef = officialLetterRef.trim() || `EPSS/HO-BR/${Date.now().toString().slice(-4)}`;
     const cleanNotes = dispatchNotes.trim();
 
     const branchRecord: DspWorkflowRecord = {
       id: `dsp-branch-4-1-${Date.now()}`,
       dspRefNumber: refNum,
-      dspName: `${baseDspName}${selectedHubFilter === 'all' ? '' : ` (${selectedHubFilter})`}`,
+      dspName: baseDspName,
       stage: 'branches-dsp-management',
       subStage: '4.1',
       stageTitle: 'Branches DSP Management',
@@ -468,35 +481,42 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Quick Org:</span>
-            {['EPSS Head Office', 'EPSS', 'MOH'].map(preset => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setOrganization(preset)}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                  organization === preset
-                    ? 'bg-rose-600 text-white border-rose-600'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-rose-50 hover:border-rose-300'
-                }`}
-              >
-                {preset}
-              </button>
-            ))}
+            {['EPSS Branch', 'EPSS Head Office', 'EPSS', 'RHB', 'MOH'].map(preset => {
+              const isInactive = preset === 'RHB' || preset === 'MOH';
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  disabled={isInactive}
+                  title={isInactive ? `${preset} Organization is inactive in Branch Management / EPSS Dispatch` : undefined}
+                  onClick={() => !isInactive && setOrganization(preset)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition ${
+                    isInactive
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                      : organization === preset
+                      ? 'bg-rose-600 text-white border-rose-600 cursor-pointer'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-rose-50 hover:border-rose-300 cursor-pointer'
+                  }`}
+                >
+                  {preset}{isInactive ? ' (Inactive)' : ''}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <FileText className="w-3 h-3 text-slate-400" />
-              <span>DSP Name</span>
+              <FileText className="w-3 h-3 text-amber-500" />
+              <span>DSP Project Name (From EPSS)</span>
             </label>
             <input
               type="text"
-              placeholder="Enter DSP Name..."
-              value={customDspName}
-              onChange={(e) => setCustomDspName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
+              readOnly
+              placeholder="Auto-filled from EPSS..."
+              value={canonicalDspName || customDspName}
+              className="w-full bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-2 text-xs font-black text-slate-900 cursor-not-allowed outline-none"
             />
           </div>
 
@@ -537,7 +557,11 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
               type="text"
               placeholder="Enter Organization..."
               value={organization}
-              onChange={(e) => setOrganization(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v.trim().toUpperCase() === 'MOH' || v.trim().toUpperCase() === 'RHB') return;
+                setOrganization(v);
+              }}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-rose-500 outline-none transition"
             />
           </div>
@@ -568,7 +592,7 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
             >
               {stage5Records.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.dspName || d.dspRefNumber} ({d.dateSubmitted})
+                  {resolveCanonicalEpssDspName(records, d) || d.dspName || d.dspRefNumber} ({d.dateSubmitted})
                 </option>
               ))}
             </select>
@@ -772,16 +796,16 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
                 </div>
               </div>
 
-              {/* DSP Name & Official Letter Ref */}
+              {/* DSP Project Name & Official Letter Ref */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">DSP Name</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">DSP Project Name (Auto-Filled from EPSS)</label>
                   <input
                     type="text"
-                    placeholder="Enter DSP Name..."
-                    value={customDspName}
-                    onChange={(e) => setCustomDspName(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"
+                    readOnly
+                    placeholder="Auto-filled from EPSS..."
+                    value={canonicalDspName || customDspName}
+                    className="w-full bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-2 text-xs font-black text-slate-900 cursor-not-allowed outline-none"
                   />
                 </div>
                 <div className="space-y-1">
@@ -806,20 +830,27 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
                     </h4>
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
-                    {['EPSS Head Office', 'EPSS', 'MOH'].map(preset => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setOrganization(preset)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
-                          organization === preset
-                            ? 'bg-rose-600 text-white border-rose-600'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50'
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ))}
+                    {['EPSS Branch', 'EPSS Head Office', 'EPSS', 'RHB', 'MOH'].map(preset => {
+                      const isInactive = preset === 'RHB' || preset === 'MOH';
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={isInactive}
+                          title={isInactive ? `${preset} Organization is inactive in Branch Management / EPSS Dispatch` : undefined}
+                          onClick={() => !isInactive && setOrganization(preset)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                            isInactive
+                              ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                              : organization === preset
+                              ? 'bg-rose-600 text-white border-rose-600 cursor-pointer'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50 cursor-pointer'
+                          }`}
+                        >
+                          {preset}{isInactive ? ' (Inactive)' : ''}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -863,7 +894,9 @@ export const Stage6EpssBranchDispatchView: React.FC<Stage6EpssBranchDispatchView
                       placeholder="Organization name..."
                       value={organization}
                       onChange={(e) => {
-                        setOrganization(e.target.value);
+                        const v = e.target.value;
+                        if (v.trim().toUpperCase() === 'MOH' || v.trim().toUpperCase() === 'RHB') return;
+                        setOrganization(v);
                         if (formError) setFormError(null);
                       }}
                       className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:border-rose-500 outline-none"

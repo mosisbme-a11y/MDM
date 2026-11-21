@@ -39,6 +39,7 @@ import {
 } from '../data/epssHubs';
 import { formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
+import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 export interface Stage5AllocationItem {
   id: string;
@@ -721,14 +722,16 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
   const handleAdvanceToStage6 = () => {
     if (!currentDossier) return;
 
+    const canonicalDspName = resolveCanonicalEpssDspName(records, currentDossier) || currentDossier.dspName || currentDossier.dspRefNumber;
     const newStage6Dossier: DspWorkflowRecord = {
       id: `dsp-stage6-${Date.now()}`,
       dspRefNumber: currentDossier.dspRefNumber.replace('HO-AGG', 'BRANCH-DISP').replace('MOH', 'EPSS-DISP'),
+      dspName: canonicalDspName,
       stage: 'epss-to-branch',
       stageTitle: '6. DSP Dispatched to EPSS Branch',
       senderOrg: 'EPSS Head Office (Central Logistics Directorate)',
       recipientOrg: `EPSS Branch Hubs (${hubSummaries.map(h => h.hub.name).slice(0, 3).join(', ')}${hubSummaries.length > 3 ? '...' : ''})`,
-      subject: `Branch Dispatch Packing & Transport Order - ${currentDossier.subject}`,
+      subject: `Branch Dispatch Packing & Transport Order - ${canonicalDspName}`,
       status: 'Submitted & Pending',
       dateSubmitted: new Date().toISOString().split('T')[0],
       totalDevices: equipmentColumns.length,
@@ -790,7 +793,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
       {/* Control Bar: Dossier Selector + Format Switcher */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-3 px-4 shadow-sm">
         {/* Dossier Picker */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-bold text-slate-700 flex-shrink-0">Stage 5 Dossier:</span>
           {stage5Dossiers.length > 0 ? (
             <select
@@ -800,7 +803,7 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             >
               {stage5Dossiers.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.dspRefNumber} - {d.subject.slice(0, 45)}... ({d.targetedFacilitiesCount} HFs)
+                  {resolveCanonicalEpssDspName(records, d) || d.dspRefNumber} ({d.targetedFacilitiesCount} HFs)
                 </option>
               ))}
             </select>
@@ -808,6 +811,12 @@ export const Stage5EpssHoAggregationView: React.FC<Stage5EpssHoAggregationViewPr
             <span className="text-xs text-amber-700 font-semibold bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
               No mapped data from 1.3.1 Map HF to Hub yet.
             </span>
+          )}
+          {currentDossier && resolveCanonicalEpssDspName(records, currentDossier) && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[11px]">
+              <span className="font-bold text-amber-700">DSP Project Name:</span>
+              <span className="font-black text-slate-900">{resolveCanonicalEpssDspName(records, currentDossier)}</span>
+            </div>
           )}
         </div>
 

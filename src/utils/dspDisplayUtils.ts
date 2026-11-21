@@ -182,3 +182,79 @@ export const getDossierDisplayInfo = (rec: DspWorkflowRecord, idx: number = 0): 
     hierarchyBadgeClasses: hierarchy.badgeClasses,
   };
 };
+
+const GENERIC_PLACEHOLDER_DSP_NAMES = new Set([
+  'regional health facility allocation matrix',
+  'regional allocation breakdown',
+  'national health facility allocation matrix',
+  'moh to epss health facility matrix',
+  'aggregated rhb breakdown',
+  'regional health facility breakdown matrix',
+  'medical equipment allocation dossier'
+]);
+
+const isRealDspName = (name?: string | null): boolean => {
+  if (!name) return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (GENERIC_PLACEHOLDER_DSP_NAMES.has(lower)) return false;
+  if (lower.startsWith('consolidated rhb aggregation')) return false;
+  if (lower.startsWith('dsp project ')) return false;
+  return true;
+};
+
+/**
+ * Resolves the canonical DSP Name created by the EPSS team during 1.1 DSP Request to MOH,
+ * so every downstream section (MOH, RHB, EPSS HO, Branches) auto-displays the exact same name.
+ */
+export const resolveCanonicalEpssDspName = (
+  records: DspWorkflowRecord[],
+  preferredRecord?: DspWorkflowRecord | null
+): string => {
+  if (preferredRecord && isRealDspName(preferredRecord.dspName)) {
+    return preferredRecord.dspName!.trim();
+  }
+
+  if (preferredRecord?.subject) {
+    const match = preferredRecord.subject.match(/DSP\s*\[(.*?)\]/i);
+    if (match?.[1] && isRealDspName(match[1])) {
+      return match[1].trim();
+    }
+  }
+
+  // Prefer EPSS 1.1 (DSP Request to MOH) records sorted newest first
+  const epss11 = [...(records || [])]
+    .filter(r => (r.subStage === '1.1' || r.stage === 'head-office-dsp') && isRealDspName(r.dspName))
+    .sort((a, b) => new Date(b.dateSubmitted || 0).getTime() - new Date(a.dateSubmitted || 0).getTime());
+
+  if (epss11.length > 0 && epss11[0].dspName) {
+    return epss11[0].dspName.trim();
+  }
+
+  // Next check MOH 2.1 (DSP Received from EPSS) records
+  const moh21 = [...(records || [])]
+    .filter(r => (r.subStage === '2.1' || r.stage === 'moh-osp-management') && isRealDspName(r.dspName))
+    .sort((a, b) => new Date(b.dateSubmitted || 0).getTime() - new Date(a.dateSubmitted || 0).getTime());
+
+  if (moh21.length > 0 && moh21[0].dspName) {
+    return moh21[0].dspName.trim();
+  }
+
+  // Next check any record with a real dspName
+  const anyReal = (records || []).find(r => isRealDspName(r.dspName));
+  if (anyReal?.dspName) {
+    return anyReal.dspName.trim();
+  }
+
+  try {
+    const cached = localStorage.getItem('epss_latest_created_dsp_name');
+    if (cached && isRealDspName(cached)) return cached.trim();
+  } catch {}
+
+  if (preferredRecord) {
+    return getDossierDisplayInfo(preferredRecord).dspName;
+  }
+  return '';
+};
+

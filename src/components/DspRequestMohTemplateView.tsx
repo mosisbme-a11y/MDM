@@ -910,6 +910,12 @@ Authorized Directorate Desk`;
       totalValuation: itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0)
     };
 
+    try {
+      if (dspName.trim()) {
+        localStorage.setItem('epss_latest_created_dsp_name', dspName.trim());
+      }
+    } catch {}
+
     // 1. Outgoing DSP Request record (Sub-step 1.1)
     const newRecord11: DspWorkflowRecord = {
       id: `dsp-dossier-${Date.now()}`,
@@ -2253,24 +2259,38 @@ Authorized Directorate Desk`;
                               type="text"
                               placeholder="e.g. EPSS"
                               value={manualOrganization}
-                              onChange={(e) => setManualOrganization(e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const upper = val.trim().toUpperCase();
+                                if (upper === 'MOH' || upper === 'RHB') return;
+                                setManualOrganization(val);
+                              }}
                               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition shadow-xs"
                             />
                             <div className="flex gap-1 shrink-0">
-                              {['EPSS', 'MOH', 'RHB'].map((org) => (
-                                <button
-                                  key={org}
-                                  type="button"
-                                  onClick={() => setManualOrganization(org)}
-                                  className={`px-2 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
-                                    manualOrganization === org
-                                      ? 'bg-indigo-600 text-white border-indigo-700'
-                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  {org}
-                                </button>
-                              ))}
+                              {(['EPSS', 'MOH', 'RHB'] as const).map((org) => {
+                                const isInactive = org === 'MOH' || org === 'RHB';
+                                return (
+                                  <button
+                                    key={org}
+                                    type="button"
+                                    disabled={isInactive}
+                                    onClick={() => {
+                                      if (!isInactive) setManualOrganization(org);
+                                    }}
+                                    title={isInactive ? `${org} is Inactive in EPSS Section` : `Select ${org}`}
+                                    className={`px-2 py-1 text-[10px] font-black rounded-lg border transition ${
+                                      isInactive
+                                        ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                                        : manualOrganization === org
+                                          ? 'bg-indigo-600 text-white border-indigo-700 cursor-pointer'
+                                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                                    }`}
+                                  >
+                                    {org}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
@@ -2502,24 +2522,38 @@ Authorized Directorate Desk`;
                             type="text"
                             placeholder="e.g. EPSS"
                             value={manualOrganization}
-                            onChange={(e) => setManualOrganization(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const upper = val.trim().toUpperCase();
+                              if (upper === 'MOH' || upper === 'RHB') return;
+                              setManualOrganization(val);
+                            }}
                             className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
                           />
                           <div className="flex gap-1 shrink-0">
-                            {['EPSS', 'MOH', 'RHB'].map((org) => (
-                              <button
-                                key={org}
-                                type="button"
-                                onClick={() => setManualOrganization(org)}
-                                className={`px-1.5 py-1 text-[10px] font-black rounded-lg border cursor-pointer transition ${
-                                  manualOrganization === org
-                                    ? 'bg-indigo-600 text-white border-indigo-700'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                                }`}
-                              >
-                                {org}
-                              </button>
-                            ))}
+                            {(['EPSS', 'MOH', 'RHB'] as const).map((org) => {
+                              const isInactive = org === 'MOH' || org === 'RHB';
+                              return (
+                                <button
+                                  key={org}
+                                  type="button"
+                                  disabled={isInactive}
+                                  onClick={() => {
+                                    if (!isInactive) setManualOrganization(org);
+                                  }}
+                                  title={isInactive ? `${org} is Inactive in EPSS Section` : `Select ${org}`}
+                                  className={`px-1.5 py-1 text-[10px] font-black rounded-lg border transition ${
+                                    isInactive
+                                      ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                                      : manualOrganization === org
+                                        ? 'bg-indigo-600 text-white border-indigo-700 cursor-pointer'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                                  }`}
+                                >
+                                  {org}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

@@ -42,7 +42,7 @@ import * as XLSX from 'xlsx';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { HealthFacilityRecord, DspWorkflowRecord } from '../types';
 import { pushCentralMasterData } from '../utils/centralSyncService';
-import { getDossierDisplayInfo } from '../utils/dspDisplayUtils';
+import { getDossierDisplayInfo, resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 import {
   DspHierarchyTierId,
   canonicalizeSubStage,
@@ -337,7 +337,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     setIsAnalyzing(false);
   };
 
-  const [dspProjectName, setDspProjectName] = useState('Regional Health Facility Allocation Matrix');
+  const [dspProjectName, setDspProjectName] = useState<string>(() =>
+    resolveCanonicalEpssDspName(breakdownRequests || [])
+  );
   const [emailTo, setEmailTo] = useState('moh.pmd@moh.gov.et');
   const [emailCc, setEmailCc] = useState('epss.directorate@epss.gov.et');
   const [emailSubject, setEmailSubject] = useState(`Official Regional Health Facility Breakdown Matrix - ${internalDate}`);
@@ -345,7 +347,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   const [waCopied, setWaCopied] = useState(false);
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [manualSignatoryRole, setManualSignatoryRole] = useState('');
-  const [manualSignatoryOrg, setManualSignatoryOrg] = useState('Regional Health Bureau');
+  const [manualSignatoryOrg, setManualSignatoryOrg] = useState(
+    allowedTier === 'head-office-dsp' ? 'EPSS' : 'RHB'
+  );
   const [transmittalDestination, setTransmittalDestination] = useState<'EPSS' | 'MOH'>('EPSS');
 
   const [selectedRequestId, setSelectedRequestId] = useState<string>(selectedBreakdownRequestId || '');
@@ -482,6 +486,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
   };
 
   useEffect(() => {
+    const allReqs = breakdownRequests || scopedBreakdownRequests || [];
+    const matched = selectedRequestId
+      ? allReqs.find(r => r.id === selectedRequestId)
+      : selectedBreakdownRequestId
+        ? allReqs.find(r => r.id === selectedBreakdownRequestId)
+        : undefined;
+    const resolved = resolveCanonicalEpssDspName(allReqs, matched || null);
+    if (resolved) {
+      setDspProjectName(resolved);
+    }
+  }, [breakdownRequests, scopedBreakdownRequests, selectedRequestId, selectedBreakdownRequestId]);
+
+  useEffect(() => {
     if (selectedBreakdownRequestId) {
       setSelectedRequestId(selectedBreakdownRequestId);
       handleSelectBreakdownRequest(selectedBreakdownRequestId);
@@ -493,6 +510,11 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
     if (!scopedBreakdownRequests) return;
     const matched = scopedBreakdownRequests.find(r => r.id === reqId);
     if (!matched) return;
+
+    const resolvedName = resolveCanonicalEpssDspName(breakdownRequests || scopedBreakdownRequests, matched);
+    if (resolvedName) {
+      setDspProjectName(resolvedName);
+    }
 
     if (onSelectBreakdownRequest) {
       onSelectBreakdownRequest(reqId, matched);
@@ -1756,6 +1778,13 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                   </span>
                   <ChevronDown className="w-3 h-3 text-amber-700 shrink-0" />
                 </button>
+                {dspProjectName && (
+                  <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 text-xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase">DSP Project Name:</span>
+                    <span className="font-black text-slate-900 truncate max-w-[200px]">{dspProjectName}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2803,21 +2832,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
                 <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  DSP Project / Matrix Reference Title {allowedTier && allowedTier !== 'head-office-dsp' && <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-1 font-mono">Auto-Filled by EPSS (Read-Only)</span>}
+                  DSP Project Name <span className="text-[9px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded ml-1 font-mono">Auto-Filled &amp; Locked from EPSS</span>
                 </label>
                 <input 
                   type="text"
                   value={dspProjectName}
-                  onChange={(e) => {
-                    if (allowedTier && allowedTier !== 'head-office-dsp') return;
-                    setDspProjectName(e.target.value);
-                  }}
-                  disabled={Boolean(allowedTier && allowedTier !== 'head-office-dsp')}
-                  className={`w-full px-3 py-2 border rounded-lg text-xs font-bold ${
-                    allowedTier && allowedTier !== 'head-office-dsp'
-                      ? 'bg-slate-100 border-slate-300 text-slate-700 cursor-not-allowed'
-                      : 'bg-white border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900'
-                  }`}
+                  readOnly
+                  disabled
+                  placeholder="Auto-filled from EPSS DSP Request to MOH"
+                  className="w-full px-3 py-2 border rounded-lg text-xs font-bold bg-slate-100 border-slate-300 text-slate-800 cursor-not-allowed"
                 />
               </div>
 
@@ -2970,13 +2993,56 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider ml-1">Organization *</label>
-                      <input 
-                        type="text"
-                        placeholder="e.g. Regional Health Bureau"
-                        value={manualSignatoryOrg}
-                        onChange={(e) => setManualSignatoryOrg(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <input 
+                          type="text"
+                          placeholder={allowedTier === 'head-office-dsp' ? 'e.g. EPSS' : 'e.g. RHB'}
+                          value={manualSignatoryOrg}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const upper = val.trim().toUpperCase();
+                            if (allowedTier === 'head-office-dsp') {
+                              if (upper === 'MOH' || upper === 'RHB') return;
+                            } else {
+                              if (upper === 'EPSS' || upper === 'MOH') return;
+                            }
+                            setManualSignatoryOrg(val);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-indigo-500 outline-none transition"
+                        />
+                        <div className="flex gap-1 shrink-0">
+                          {(allowedTier === 'head-office-dsp'
+                            ? (['EPSS', 'MOH', 'RHB'] as const)
+                            : (['RHB', 'EPSS', 'MOH'] as const)
+                          ).map((org) => {
+                            const isInactive =
+                              allowedTier === 'head-office-dsp'
+                                ? org === 'MOH' || org === 'RHB'
+                                : org === 'EPSS' || org === 'MOH';
+                            const activeScopeLabel = allowedTier === 'head-office-dsp' ? 'EPSS' : 'RHB';
+                            return (
+                              <button
+                                key={org}
+                                type="button"
+                                disabled={isInactive}
+                                onClick={() => {
+                                  if (!isInactive) setManualSignatoryOrg(org);
+                                }}
+                                title={isInactive ? `${org} is Inactive in ${activeScopeLabel} Section` : `Select ${org}`}
+                                className={`px-1.5 py-1 text-[10px] font-black rounded-lg border transition ${
+                                  isInactive
+                                    ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                                    : manualSignatoryOrg === org
+                                      ? 'bg-indigo-600 text-white border-indigo-700 cursor-pointer'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                                }`}
+                              >
+                                {org}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2998,11 +3064,12 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     alert('Please fill in Authorized Person and Role before transmitting.');
                     return;
                   }
-                  const cleanDspName = dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
+                  const cleanDspName = resolveCanonicalEpssDspName(breakdownRequests || scopedBreakdownRequests, scopedBreakdownRequests.find(r => r.id === selectedRequestId)) || dspProjectName || `DSP [${selectedRegionFilter === 'all' ? 'Multi-Region' : selectedRegionFilter} Allocation]`;
                   const year = new Date().getFullYear();
                   const randNum = Math.floor(100 + Math.random() * 900);
                   const brkRef = `RHB/MOH-BRK/${year}/${randNum}`;
                   const targetOrg = 'Ministry of Health (PMD Directorate)';
+                  const cleanOrg = manualSignatoryOrg.trim() || (allowedTier === 'head-office-dsp' ? 'EPSS' : 'RHB');
 
                   const rhbRecord: DspWorkflowRecord = {
                     id: `dsp-rhb-moh-${Date.now()}`,
@@ -3010,7 +3077,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     stage: 'rhb-to-moh',
                     subStage: '3.2',
                     stageTitle: '3.2 Submit Breakdown to MOH',
-                    senderOrg: manualSignatoryOrg || `${selectedRegionFilter === 'all' ? 'All Regions' : selectedRegionFilter} Regional Health Bureau`,
+                    senderOrg: cleanOrg,
+                    organization: cleanOrg,
                     recipientOrg: targetOrg,
                     dspName: cleanDspName,
                     subject: `DSP [${cleanDspName}]: Regional Health Facility Breakdown Transmitted to MOH (${filteredRows.length} Facilities)`,
@@ -3026,7 +3094,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     targetedFacilitiesCount: filteredRows.length,
                     officialLetterRef: `RHB/LET/${year}/${Math.floor(1000 + Math.random() * 9000)}`,
                     signatory: manualSignatoryName,
+                    authorizedPerson: manualSignatoryName,
                     signatoryRole: manualSignatoryRole,
+                    role: manualSignatoryRole,
                     facilityMatrixData: {
                       date: internalDate,
                       region: selectedRegionFilter,

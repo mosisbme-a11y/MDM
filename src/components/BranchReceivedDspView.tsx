@@ -18,12 +18,22 @@ import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
 import { formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { getHubByCode } from '../data/epssHubs';
+import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
 interface BranchReceivedDspViewProps {
   records: DspWorkflowRecord[];
+  setRecords?: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   multipleStockItems?: MultipleStockRecord[];
   mode: '4.1' | '4.2';
   onSelectSubTab?: (tab: EpssSubTab) => void;
+  onTriggerCloudSync?: (
+    successMsg: string,
+    mutation: {
+      type: 'CREATE' | 'UPDATE' | 'STATUS_CHANGE' | 'DELIVERY_UPDATE' | 'DELETE' | 'MAINTENANCE_LOG';
+      title: string;
+      payload?: any;
+    }
+  ) => void;
 }
 
 interface BranchColumn {
@@ -48,9 +58,11 @@ interface BranchAllocationRow {
 
 export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
   records,
+  setRecords,
   multipleStockItems = [],
   mode,
-  onSelectSubTab
+  onSelectSubTab,
+  onTriggerCloudSync
 }) => {
   const branchRecords = useMemo(() => {
     return records
@@ -76,6 +88,60 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
   const activeDossier = useMemo(() => {
     return branchRecords.find(r => r.id === selectedDossierId) || branchRecords[0] || null;
   }, [branchRecords, selectedDossierId]);
+
+  const canonicalDspName = useMemo(
+    () => resolveCanonicalEpssDspName(records, activeDossier),
+    [records, activeDossier]
+  );
+
+  // Branch Institutional Profile state
+  const [branchAuthPerson, setBranchAuthPerson] = useState('');
+  const [branchRole, setBranchRole] = useState('');
+  const [branchOrganization, setBranchOrganization] = useState('EPSS Branch');
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeDossier) {
+      setBranchAuthPerson(activeDossier.authorizedPerson || activeDossier.signatory || '');
+      setBranchRole(activeDossier.role || activeDossier.signatoryRole || '');
+      const rawOrg = (activeDossier.organization || activeDossier.senderOrg || 'EPSS Branch').trim();
+      const upperOrg = rawOrg.toUpperCase();
+      setBranchOrganization(upperOrg === 'RHB' || upperOrg === 'MOH' ? 'EPSS Branch' : rawOrg);
+    }
+  }, [activeDossier?.id]);
+
+  const handleSaveBranchProfile = () => {
+    if (!activeDossier || !setRecords) return;
+    const cleanOrg = branchOrganization.trim() || 'EPSS Branch';
+    if (cleanOrg.toUpperCase() === 'RHB' || cleanOrg.toUpperCase() === 'MOH') {
+      setProfileNotice('RHB and MOH Organizations are inactive in Branch Management.');
+      setTimeout(() => setProfileNotice(null), 3000);
+      return;
+    }
+    const cleanPerson = branchAuthPerson.trim();
+    const cleanRole = branchRole.trim();
+    const cleanDspName = canonicalDspName || activeDossier.dspName || activeDossier.dspRefNumber;
+
+    const updatedRecord: DspWorkflowRecord = {
+      ...activeDossier,
+      dspName: cleanDspName,
+      authorizedPerson: cleanPerson || activeDossier.authorizedPerson,
+      signatory: cleanPerson || activeDossier.signatory,
+      role: cleanRole || activeDossier.role,
+      signatoryRole: cleanRole || activeDossier.signatoryRole,
+      organization: cleanOrg,
+      senderOrg: cleanOrg
+    };
+
+    setRecords(prev => prev.map(r => (r.id === activeDossier.id ? updatedRecord : r)));
+    onTriggerCloudSync?.(`Updated Branch Institutional Profile for ${cleanDspName}`, {
+      type: 'UPDATE',
+      title: `Branch Profile Updated: ${cleanDspName}`,
+      payload: updatedRecord
+    });
+    setProfileNotice(`✓ Saved Branch Institutional Profile (${cleanOrg}) for "${cleanDspName}"`);
+    setTimeout(() => setProfileNotice(null), 3000);
+  };
 
   const columns = useMemo<BranchColumn[]>(() => {
     if (activeDossier?.hubAggregationData?.columns?.length) {
@@ -339,7 +405,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              {activeDossier?.dspName || activeDossier?.dspRefNumber} • Dispatched: {activeDossier?.dateSubmitted}
+              {canonicalDspName || activeDossier?.dspName || activeDossier?.dspRefNumber} • Dispatched: {activeDossier?.dateSubmitted}
               {(activeDossier?.authorizedPerson || activeDossier?.signatory) && (
                 <> • Authorized: <strong className="text-slate-700">{activeDossier?.authorizedPerson || activeDossier?.signatory}</strong></>
               )}
@@ -381,6 +447,112 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
               Back to 4.1 Received DSP
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Branch Institutional Profile & Auto-Displayed EPSS DSP Name */}
+      <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-purple-600" />
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Branch Institutional Profile &amp; DSP Project Name
+            </h4>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Organization:</span>
+            {['EPSS Branch', 'EPSS', 'RHB', 'MOH'].map(preset => {
+              const isInactive = preset === 'RHB' || preset === 'MOH';
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  disabled={isInactive}
+                  title={isInactive ? `${preset} Organization is inactive in Branch Management` : undefined}
+                  onClick={() => !isInactive && setBranchOrganization(preset)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition ${
+                    isInactive
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-45 cursor-not-allowed line-through'
+                      : branchOrganization === preset
+                      ? 'bg-purple-700 text-white border-purple-700 cursor-pointer'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-purple-50 hover:border-purple-300 cursor-pointer'
+                  }`}
+                >
+                  {preset}{isInactive ? ' (Inactive)' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {profileNotice && (
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+            {profileNotice}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              DSP Project Name (From EPSS)
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={canonicalDspName || activeDossier?.dspName || activeDossier?.dspRefNumber || ''}
+              className="w-full bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-2 text-xs font-black text-slate-900 cursor-not-allowed outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              Authorized person
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Authorized person..."
+              value={branchAuthPerson}
+              onChange={(e) => setBranchAuthPerson(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-purple-500 outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              Role
+            </label>
+            <input
+              type="text"
+              placeholder="Enter Role..."
+              value={branchRole}
+              onChange={(e) => setBranchRole(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-purple-500 outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              Organization
+            </label>
+            <input
+              type="text"
+              placeholder="EPSS Branch..."
+              value={branchOrganization}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v.trim().toUpperCase() === 'RHB' || v.trim().toUpperCase() === 'MOH') return;
+                setBranchOrganization(v);
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-purple-500 outline-none"
+            />
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={handleSaveBranchProfile}
+              disabled={!setRecords || !activeDossier}
+              className="w-full px-3.5 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white text-xs font-black transition cursor-pointer"
+            >
+              Save Branch Profile
+            </button>
+          </div>
         </div>
       </div>
 
@@ -443,7 +615,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                       {r.dateSubmitted || '-'}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 font-black text-slate-900">
-                      {r.dspName || r.subject || r.dspRefNumber}
+                      {resolveCanonicalEpssDspName(records, r) || r.dspName || r.subject || r.dspRefNumber}
                     </td>
                     <td className="py-2.5 px-3 border-r border-slate-200 text-slate-800 font-medium">
                       {r.authorizedPerson || r.signatory || '-'}
