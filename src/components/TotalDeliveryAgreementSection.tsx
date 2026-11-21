@@ -54,13 +54,14 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { MedicalDeviceAgreement, MedicalDeviceItem, AgreementStatus, UploadedAgreementBatch, ProgramMdRecord } from '../types';
+import { MedicalDeviceAgreement, MedicalDeviceItem, AgreementStatus, UploadedAgreementBatch, ProgramMdRecord, AgreementProcurementRecord } from '../types';
 import { DEFAULT_MEDICAL_DEVICE_AGREEMENTS } from '../data/defaultAgreements';
 import { formatNumber, formatCurrency, downloadCSV } from '../utils/formatters';
 import { AgreementDetailModal } from './AgreementDetailModal';
 import { AddAgreementModal } from './AddAgreementModal';
 import { AgreementStatusBadge } from './AgreementStatusBadge';
 import { MultipleAgreementUploadModal } from './MultipleAgreementUploadModal';
+import { AgreementProcurementStatusView } from './AgreementProcurementStatusView';
 import { pushCentralMasterData } from '../utils/centralSyncService';
 
 export interface TotalDeliveryAgreementSectionProps {
@@ -78,6 +79,12 @@ export interface TotalDeliveryAgreementSectionProps {
   onAddProgramMdRecord?: (record: ProgramMdRecord) => void;
   onUpdateProgramMdRecord?: (record: ProgramMdRecord) => void;
   onDeleteProgramMdRecord?: (id: string) => void;
+  agreementProcurementRecords?: AgreementProcurementRecord[];
+  onUploadAgreementProcurementData?: (records: AgreementProcurementRecord[], mode?: 'append' | 'replace', files?: { name: string, url: string }[]) => void;
+  onClearAgreementProcurementData?: () => void;
+  onAddAgreementProcurementRecord?: (record: AgreementProcurementRecord) => void;
+  onUpdateAgreementProcurementRecord?: (record: AgreementProcurementRecord) => void;
+  onDeleteAgreementProcurementRecord?: (id: string) => void;
 }
 
 const STATUS_COLORS: Record<AgreementStatus, string> = {
@@ -113,6 +120,12 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   onAddProgramMdRecord,
   onUpdateProgramMdRecord,
   onDeleteProgramMdRecord,
+  agreementProcurementRecords = [],
+  onUploadAgreementProcurementData,
+  onClearAgreementProcurementData,
+  onAddAgreementProcurementRecord,
+  onUpdateAgreementProcurementRecord,
+  onDeleteAgreementProcurementRecord,
   onSelectItem
 }) => {
   // Agreements state - initialized to empty as we strictly use cloud data
@@ -138,7 +151,7 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
   const [customMaxRemains, setCustomMaxRemains] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('default');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'uploaded-10col' | 'cards' | 'table' | 'analytics' | 'letters'>('uploaded-10col');
+  const [viewMode, setViewMode] = useState<'uploaded-10col' | 'cards' | 'table' | 'analytics' | 'letters' | 'procurement-status'>('uploaded-10col');
   const [selectedAgreementForModal, setSelectedAgreementForModal] = useState<MedicalDeviceAgreement | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -499,7 +512,7 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
     } else if (currentSubTab === 'agreement-cards') {
       setViewMode('cards');
     } else if (currentSubTab === 'agreement-procurement-status') {
-      setViewMode('table');
+      setViewMode('procurement-status');
     } else if (currentSubTab === 'agreement-official-letter') {
       setViewMode('letters');
     } else {
@@ -1280,7 +1293,7 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
 
 
       {/* Schedule Health Performance Indicator Filter Bar - Framework Agreements */}
-      {viewMode !== 'uploaded-10col' && (
+      {viewMode !== 'uploaded-10col' && viewMode !== 'procurement-status' && (
         <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
 
           <button
@@ -2605,8 +2618,21 @@ export const TotalDeliveryAgreementSection: React.FC<TotalDeliveryAgreementSecti
         </div>
       )}
 
+      {/* Agreement Procurement Status View */}
+      {viewMode === 'procurement-status' && (
+        <AgreementProcurementStatusView
+          records={agreementProcurementRecords}
+          onUploadData={onUploadAgreementProcurementData}
+          onClearData={onClearAgreementProcurementData}
+          onAddRecord={onAddAgreementProcurementRecord}
+          onUpdateRecord={onUpdateAgreementProcurementRecord}
+          onDeleteRecord={onDeleteAgreementProcurementRecord}
+          isAdmin={isAdmin}
+        />
+      )}
+
       {/* Zero State if Filter Yields Nothing */}
-      {filteredAgreements.length === 0 && viewMode !== 'uploaded-10col' && (
+      {filteredAgreements.length === 0 && viewMode !== 'uploaded-10col' && viewMode !== 'procurement-status' && (
         <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
           <FileText className="w-8 h-8 text-slate-400 mx-auto" />
           <div className="text-sm font-bold text-slate-700">No Medical Device Agreements match your filters</div>

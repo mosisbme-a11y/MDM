@@ -113,7 +113,8 @@ import {
   ProgramMdRecord,
   SupplyPlanRecord,
   MasterDataLog,
-  DspWorkflowRecord
+  DspWorkflowRecord,
+  AgreementProcurementRecord
 } from './types';
 import { DEFAULT_RECEIVING_DATA_RECORDS } from './data/defaultReceivingData';
 import { DEFAULT_DISTRIBUTION_DATA_RECORDS } from './data/defaultDistributionData';
@@ -392,6 +393,7 @@ export function App() {
       if (centralData.confirmedBatches !== undefined) setConfirmedBatches(centralData.confirmedBatches);
       if (centralData.categoryThresholds !== undefined) setCategoryThresholds(centralData.categoryThresholds);
       if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
+      if (centralData.agreementProcurementRecords !== undefined) setAgreementProcurementRecords(centralData.agreementProcurementRecords);
       if (centralData.supplyPlanRecords !== undefined) setSupplyPlanRecords(centralData.supplyPlanRecords);
 
       if (centralData.counts) {
@@ -521,6 +523,14 @@ export function App() {
           });
           return changed ? Array.from(map.values()) : prev;
         });
+      }
+
+      if (remoteData.agreementProcurementRecords !== undefined) {
+        if (remoteData.agreementProcurementRecords.length === 0 && /clear/i.test(remoteData.updateKind || '')) {
+          setAgreementProcurementRecords([]);
+        } else if (remoteData.agreementProcurementRecords.length > 0) {
+          setAgreementProcurementRecords(remoteData.agreementProcurementRecords);
+        }
       }
 
       if (remoteData.supplyPlanRecords !== undefined) {
@@ -928,6 +938,81 @@ export function App() {
     triggerCloudSyncToast(`Deleted Program MD record.`, {
       type: 'DELETE',
       title: `Delete Program MD Record`
+    });
+  };
+
+  // Agreement Procurement Status Dataset (Populated by user Excel/CSV upload or entry)
+  const [agreementProcurementRecords, setAgreementProcurementRecords] = useState<AgreementProcurementRecord[]>([]);
+
+  const handleUploadAgreementProcurementData = (newRecords: AgreementProcurementRecord[], mode: 'append' | 'replace' = 'append') => {
+    const updated = mode === 'replace' ? newRecords : [...newRecords, ...agreementProcurementRecords];
+    setAgreementProcurementRecords(updated);
+    pushCentralMasterData({
+      agreementProcurementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Upload Agreement Procurement (${newRecords.length} Records)`
+    });
+    triggerCloudSyncToast(`✓ Successfully uploaded ${newRecords.length} Agreement Procurement records.`, {
+      type: 'CREATE',
+      title: `Upload Procurement Status (${newRecords.length} Records)`,
+      payload: newRecords
+    });
+  };
+
+  const handleClearAgreementProcurementData = () => {
+    setAgreementProcurementRecords([]);
+    pushCentralMasterData({
+      agreementProcurementRecords: [],
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: 'Clear Agreement Procurement Records'
+    });
+    triggerCloudSyncToast('Cleared Agreement Procurement records.', {
+      type: 'DELETE',
+      title: 'Clear Procurement Records'
+    });
+  };
+
+  const handleAddAgreementProcurementRecord = (record: AgreementProcurementRecord) => {
+    const updated = [record, ...agreementProcurementRecords];
+    setAgreementProcurementRecords(updated);
+    pushCentralMasterData({
+      agreementProcurementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Add Procurement Record: ${record.facilityName}`
+    });
+    triggerCloudSyncToast(`Added Agreement Procurement record for ${record.facilityName}.`, {
+      type: 'CREATE',
+      title: `Add Procurement Record`,
+      payload: record
+    });
+  };
+
+  const handleUpdateAgreementProcurementRecord = (record: AgreementProcurementRecord) => {
+    const updated = agreementProcurementRecords.map(r => r.id === record.id ? record : r);
+    setAgreementProcurementRecords(updated);
+    pushCentralMasterData({
+      agreementProcurementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Update Procurement Record: ${record.facilityName}`
+    });
+    triggerCloudSyncToast(`Updated Agreement Procurement record for ${record.facilityName}.`, {
+      type: 'UPDATE',
+      title: `Update Procurement Record`,
+      payload: record
+    });
+  };
+
+  const handleDeleteAgreementProcurementRecord = (id: string) => {
+    const updated = agreementProcurementRecords.filter(r => r.id !== id);
+    setAgreementProcurementRecords(updated);
+    pushCentralMasterData({
+      agreementProcurementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Delete Procurement Record: ${id}`
+    });
+    triggerCloudSyncToast(`Deleted Agreement Procurement record.`, {
+      type: 'DELETE',
+      title: `Delete Procurement Record`
     });
   };
 
@@ -3233,6 +3318,12 @@ export function App() {
               onAddProgramMdRecord={handleAddProgramMdRecord}
               onUpdateProgramMdRecord={handleUpdateProgramMdRecord}
               onDeleteProgramMdRecord={handleDeleteProgramMdRecord}
+              agreementProcurementRecords={agreementProcurementRecords}
+              onUploadAgreementProcurementData={handleUploadAgreementProcurementData}
+              onClearAgreementProcurementData={handleClearAgreementProcurementData}
+              onAddAgreementProcurementRecord={handleAddAgreementProcurementRecord}
+              onUpdateAgreementProcurementRecord={handleUpdateAgreementProcurementRecord}
+              onDeleteAgreementProcurementRecord={handleDeleteAgreementProcurementRecord}
               isAdmin={isAdmin}
               onSelectItem={(item) => setSelectedDevice(item)}
             />
@@ -3536,6 +3627,12 @@ export function App() {
                 onAddProgramMdRecord={handleAddProgramMdRecord}
                 onUpdateProgramMdRecord={handleUpdateProgramMdRecord}
                 onDeleteProgramMdRecord={handleDeleteProgramMdRecord}
+                agreementProcurementRecords={agreementProcurementRecords}
+                onUploadAgreementProcurementData={handleUploadAgreementProcurementData}
+                onClearAgreementProcurementData={handleClearAgreementProcurementData}
+                onAddAgreementProcurementRecord={handleAddAgreementProcurementRecord}
+                onUpdateAgreementProcurementRecord={handleUpdateAgreementProcurementRecord}
+                onDeleteAgreementProcurementRecord={handleDeleteAgreementProcurementRecord}
               />
             ) : deliverySubTab === 'donation' ? (
               <DonationManagementView

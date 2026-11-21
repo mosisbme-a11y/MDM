@@ -202,6 +202,20 @@ export interface ProgramMdRecord {
   sourceFile?: string;
 }
 
+export interface AgreementProcurementRecord {
+  id: string;
+  agreementYear: string;           // Agreement Year
+  executionDate: string;           // Execution Date
+  facilityName: string;            // Facility Name
+  totalContractValue: number | null;      // Total Contract Value
+  advancePayment: number | null;          // Advance Payment
+  amount: number | null;                  // Amount
+  deliveryDate: string;            // Delivery Date
+  fulfillmentStatus: string;       // Fulfillment Status (e.g. Delivered, Not Delivered)
+  uploadedAt?: string;
+  sourceFile?: string;
+}
+
 export type EpssSubTab =
   | 'master'
   | 'material-master'
