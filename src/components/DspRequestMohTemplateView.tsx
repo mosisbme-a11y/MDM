@@ -1080,9 +1080,9 @@ Authorized Directorate Desk`;
       {/* Top Banner Card featuring EXACT button from user screenshot _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* EXACT PILL BUTTON FROM USER SCREENSHOT _F5CEE97D-E190-4DB3-8E28-46C308C4EDEB__9d85d2b5.png */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0B1527] border-b-4 border-[#050B15] shadow-[0_4px_0_rgb(5,11,21)] ring-1 ring-amber-400/20">
+          <div className="hidden">
+            {/* Hidden from view per user request */}
+            <div className="hidden">
               <span className="hidden w-2.5 h-2.5 rounded-full bg-[#F59E0B] shrink-0 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
               <span className="text-xs md:text-sm font-black text-white tracking-tight uppercase">
                 Request to MOH
@@ -1139,22 +1139,22 @@ Authorized Directorate Desk`;
               <span>{uploadedLetterFile ? 'Letter Attached' : 'Upload Letter'}</span>
             </button>
 
-            {/* Send via Email Button */}
+            {/* Send via Email Button (hidden from view per user request) */}
             <button
               type="button"
               onClick={() => setIsEmailModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="hidden"
               title="Send DSP Request via official email to MOH"
             >
               <Mail className="w-3.5 h-3.5" />
               <span>Send via Email</span>
             </button>
 
-            {/* Send via WhatsApp Button */}
+            {/* Send via WhatsApp Button (hidden from view per user request) */}
             <button
               type="button"
               onClick={() => setIsWhatsAppModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="hidden"
               title="Send DSP Request via WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5" />
