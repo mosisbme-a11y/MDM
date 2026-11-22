@@ -3219,6 +3219,7 @@ export function App() {
               receivingRecords={receivingDataRecords}
               onUploadReceivingData={handleUploadReceivingData}
               programMdRecords={programMdRecords}
+              agreementProcurementRecords={agreementProcurementRecords}
               isSidebarCollapsed={isSidebarCollapsed}
               onNavigateTab={(tab) => {
                 if (tab === 'receiving-data') {
@@ -3231,6 +3232,10 @@ export function App() {
                   setActiveTab('procurement-management');
                   setDeliverySubTab('agreement');
                   setEpssSubTab('agreement-columns');
+                } else if (tab === 'agreement-procurement-status') {
+                  setActiveTab('delivery');
+                  setDeliverySubTab('agreement');
+                  setEpssSubTab('agreement-procurement-status');
                 } else {
                   setActiveTab(tab);
                 }

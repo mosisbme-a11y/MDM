@@ -52,10 +52,11 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { InventorySummary, RegionDistribution, MedicalDeviceItem, AuditLogEntry, DeviceDocument, ConfirmedUploadBatch, MultipleStockRecord, ReceivingDataRecord, MaterialMasterRecord, MedicalDeviceAgreement, UploadedAgreementBatch, ProgramMdRecord } from '../types';
+import { InventorySummary, RegionDistribution, MedicalDeviceItem, AuditLogEntry, DeviceDocument, ConfirmedUploadBatch, MultipleStockRecord, ReceivingDataRecord, MaterialMasterRecord, MedicalDeviceAgreement, UploadedAgreementBatch, ProgramMdRecord, AgreementProcurementRecord } from '../types';
 import { DEFAULT_MEDICAL_DEVICE_AGREEMENTS } from '../data/defaultAgreements';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { TotalDeliveryAgreementSection } from './TotalDeliveryAgreementSection';
+import { AgreementProcurementHudPanel } from './AgreementProcurementHudPanel';
 import { InstallationTaskModal } from './InstallationTaskModal';
 import { MultipleDataUploadModal, UploadedBatchInfo } from './MultipleDataUploadModal';
 import { NonMovingModal } from './NonMovingModal';
@@ -93,6 +94,7 @@ interface DashboardViewProps {
   materialMasterItems: MaterialMasterRecord[];
   onUploadReceivingData?: (records: ReceivingDataRecord[], mode?: 'append' | 'replace') => void;
   programMdRecords?: ProgramMdRecord[];
+  agreementProcurementRecords?: AgreementProcurementRecord[];
   isSidebarCollapsed?: boolean;
   language: Language;
   auditLogs?: AuditLogEntry[];
@@ -135,6 +137,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   materialMasterItems,
   onUploadReceivingData,
   programMdRecords = [],
+  agreementProcurementRecords = [],
   isSidebarCollapsed,
   language,
   auditLogs = [],
@@ -2257,9 +2260,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
  
-      {/* 1. MD Agreement Management Summary Chart - High Visibility Section */}
+      {/* 1. Agreement Procurement Performance Dark HUD & MD Agreement Summary */}
       {(activeLayoutTab === 'analytics' || activeLayoutTab === 'agreements') && (
-        <div className="bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4 mb-2 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="space-y-4 mb-2 animate-in fade-in slide-in-from-top-4 duration-500">
+          <AgreementProcurementHudPanel
+            records={agreementProcurementRecords}
+            onOpenFullView={() => onNavigateTab('agreement-procurement-status')}
+            hideHeaderActions
+          />
+
+          {annualDeliveryMetrics.length > 0 && (
+            <div className="bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -2269,16 +2280,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <h4 className="text-base font-black text-slate-900 tracking-tight">
                   MD Agreement Management
                 </h4>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase tracking-wider font-mono shadow-2xs">
+                <span className="hidden px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase tracking-wider font-mono shadow-2xs">
                   Stacked Performance
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">
+              <p className="hidden text-[11px] text-slate-500 mt-1 font-medium">
                 Annual Stacked Performance Analysis: Total Delivered of Line, Total Line of Item & Total Delivered Value Item per Year.
               </p>
             </div>
             
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden items-center gap-2 flex-wrap">
               {/* Stacked Chart Display Mode Switcher */}
               <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
                 <button
@@ -2709,6 +2720,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             )}
           </div>
+            </div>
+          )}
         </div>
       )}
       
