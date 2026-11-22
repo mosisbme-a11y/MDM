@@ -1069,7 +1069,12 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
           subtitle: 'Granular goods receipt transactional records matching active filters.'
         })}
         title="Double-click graph to view underlying source data records"
-        className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between w-full cursor-pointer hover:border-teal-300 transition-all"
+        className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-2xl flex flex-col justify-between w-full cursor-pointer hover:border-teal-400 transition-all relative overflow-hidden"
+        style={{
+          backgroundImage: `linear-gradient(to bottom right, rgba(255,255,255,0.92), rgba(255,255,255,0.78)), url('/assets/aistudio/image_fd75db22_6b949e16.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
       >
           {/* Bar Graph Header & Mode Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">

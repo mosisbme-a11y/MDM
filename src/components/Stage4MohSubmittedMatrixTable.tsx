@@ -1619,7 +1619,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 tracking-tight uppercase">Send Aggregated Breakdown Matrix to EPSS</h3>
-                  <p className="text-xs text-slate-400 font-medium">
+                  <p className="hidden">
                     Review full Health Facility breakdown columns before storing as an official dossier inside 1.2 DSP Received from MOH
                   </p>
                 </div>
@@ -1817,7 +1817,7 @@ export const Stage4MohSubmittedMatrixTable: React.FC<Stage4MohSubmittedMatrixTab
               </div>
 
               {/* Linked with Health Facility Master Data Info Box */}
-              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex gap-3 shadow-2xs">
+              <div className="hidden">
                 <div className="shrink-0 w-6 h-6 rounded-full bg-white border border-emerald-200 flex items-center justify-center mt-0.5">
                   <CheckCircle2 size={14} className="text-emerald-500" />
                 </div>
