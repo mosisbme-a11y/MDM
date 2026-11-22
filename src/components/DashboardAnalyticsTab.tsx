@@ -602,28 +602,33 @@ export const DashboardAnalyticsTab: React.FC<DashboardAnalyticsTabProps> = ({
         <div 
           onDoubleClick={() => handleOpenInstallationSourceData('all')}
           title="Double-click graph to view underlying source data"
-          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 cursor-pointer hover:border-emerald-300 transition-all group"
+          className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4 cursor-pointer hover:border-emerald-400 transition-all relative overflow-hidden group"
+          style={{
+            backgroundImage: `linear-gradient(to bottom right, rgba(255,255,255,0.98), rgba(255,255,255,0.90)), url('/assets/aistudio/_DBA50BC6-6752-4B0C-80FB-27733FE85400__9fa3846e.png')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
         >
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 bg-white/80 p-3 rounded-xl shadow-2xs">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:scale-105 transition-transform">
                 <Wrench className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">Installation Status</h3>
-                <p className="text-[11px] text-slate-500">Units & Line of Items by commissioning stage (Double-click to view source records)</p>
+                <p className="text-[11px] text-slate-600 font-medium">Units & Line of Items by commissioning stage (Double-click to view source records)</p>
               </div>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); onOpenInstallationModal('all'); }}
-              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
             >
               <span>Audit Hub</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="h-[280px] w-full">
+          <div className="h-[280px] w-full bg-white shadow-md p-4 rounded-xl border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={installationBarData}
@@ -636,8 +641,8 @@ export const DashboardAnalyticsTab: React.FC<DashboardAnalyticsTabProps> = ({
                 onDoubleClick={() => handleOpenInstallationSourceData('all')}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" fontSize={11} tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis fontSize={11} tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" fontSize={11} tick={{ fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                <YAxis fontSize={11} tick={{ fill: '#475569' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomStatusTooltip />} />
                 <Bar dataKey="units" radius={[6, 6, 0, 0]}>
                   {installationBarData.map((entry, index) => (
@@ -662,28 +667,33 @@ export const DashboardAnalyticsTab: React.FC<DashboardAnalyticsTabProps> = ({
         <div 
           onDoubleClick={() => handleOpenDeliverySourceData('all')}
           title="Double-click graph to view underlying source data"
-          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 cursor-pointer hover:border-blue-300 transition-all group"
+          className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-6 shadow-2xl space-y-4 cursor-pointer hover:border-blue-400 transition-all relative overflow-hidden group"
+          style={{
+            backgroundImage: `linear-gradient(to bottom right, rgba(255,255,255,0.98), rgba(255,255,255,0.90)), url('/assets/aistudio/_DBA50BC6-6752-4B0C-80FB-27733FE85400__9fa3846e.png')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
         >
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 bg-white/80 p-3 rounded-xl shadow-2xs">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 group-hover:scale-105 transition-transform">
                 <Truck className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">DSP Delivery Status</h3>
-                <p className="text-[11px] text-slate-500">Units & Line of Items distribution across delivery pipeline (Double-click to view source records)</p>
+                <p className="text-[11px] text-slate-600 font-medium">Units & Line of Items distribution across delivery pipeline (Double-click to view source records)</p>
               </div>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); onNavigateTab('agreements'); }}
-              className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
             >
               <span>View Agreements</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="h-[280px] w-full" onDoubleClick={() => handleOpenDeliverySourceData('all')}>
+          <div className="h-[280px] w-full bg-white shadow-md p-4 rounded-xl border border-slate-200" onDoubleClick={() => handleOpenDeliverySourceData('all')}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
