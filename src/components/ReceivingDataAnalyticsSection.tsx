@@ -1069,15 +1069,15 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
           subtitle: 'Granular goods receipt transactional records matching active filters.'
         })}
         title="Double-click graph to view underlying source data records"
-        className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-2xl flex flex-col justify-between w-full cursor-pointer hover:border-teal-400 transition-all relative overflow-hidden"
+        className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-6 shadow-2xl flex flex-col justify-between w-full cursor-pointer hover:border-teal-400 transition-all relative overflow-hidden"
         style={{
-          backgroundImage: `linear-gradient(to bottom right, rgba(255,255,255,0.92), rgba(255,255,255,0.78)), url('/assets/aistudio/image_fd75db22_6b949e16.jpg')`,
+          backgroundImage: `linear-gradient(to bottom right, rgba(255,255,255,0.98), rgba(255,255,255,0.90)), url('/assets/aistudio/_DBA50BC6-6752-4B0C-80FB-27733FE85400__9fa3846e.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center'
         }}
       >
           {/* Bar Graph Header & Mode Switcher */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 bg-white/80 p-3 rounded-xl shadow-2xs">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-teal-50 text-teal-700 border border-teal-200">
                 <BarChart3 className="w-5 h-5" />
@@ -1091,7 +1091,7 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
                     RDF vs Health Program
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-600 mt-0.5 font-medium">
                   {barChartGrouping === 'plant'
                     ? 'Inbound goods receipt comparison across regional EPSA warehouse plants.'
                     : 'Time-series receiving intake trends categorized by funding mechanism.'}
@@ -1141,7 +1141,7 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
           </div>
 
           {/* Smart Recharts Bar Chart Container */}
-          <div className="h-[460px] w-full mt-4 bg-white p-4 rounded-lg border border-slate-200">
+          <div className="h-[460px] w-full mt-4 bg-white shadow-md p-4 rounded-xl border border-slate-200">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={currentBarData}

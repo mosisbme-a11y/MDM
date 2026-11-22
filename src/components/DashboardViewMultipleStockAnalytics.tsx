@@ -983,9 +983,8 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
       {/* Prominently visible on Dashboard view with interactive donut, metrics,   */}
       {/* and comparative balance stream analysis                                  */}
       {/* ========================================================================= */}
-      {!hiddenChartIds.includes('multiple-stock-rdf-hp-circle-graph') && (
-        <div
-          id="multiple-stock-rdf-hp-circle-graph"
+      <div
+        id="multiple-stock-rdf-hp-circle-graph"
           onDoubleClick={() => handleOpenSourceDataModal({
             title: 'Source Data: Total Value of RDF & HP',
             subtitle: 'Granular Multiple Stock inventory records classified across Revolving Drug Fund (RDF) and Health Program (HP).'
@@ -1324,7 +1323,6 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
           </div>
         </div>
       </div>
-      )}
 
       {/* Visual Analytics Chart Navigation Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
@@ -1410,7 +1408,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
       {/* Visual Analytics Charts Grid (xl:grid-cols-2 ensures stability on collapse and expand) */}
       <div id="multiple-stock-charts-container" className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full min-w-0">
         {/* Chart 1: Valuation by Material Group */}
-        {(activeChartTab === 'all' || activeChartTab === 'group') && !hiddenChartIds.includes('ms-pie-chart-card') && (
+        {(activeChartTab === 'all' || activeChartTab === 'group') && (
           <div
             id="ms-pie-chart-card"
             onDoubleClick={() => handleOpenSourceDataModal({
@@ -1501,7 +1499,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
         )}
 
         {/* Chart 2: Stock Status Distribution */}
-        {(activeChartTab === 'all' || activeChartTab === 'status') && !hiddenChartIds.includes('ms-bar-chart-card') && (
+        {(activeChartTab === 'all' || activeChartTab === 'status') && (
           <div
             id="ms-bar-chart-card"
             onDoubleClick={() => handleOpenSourceDataModal({
@@ -1587,7 +1585,7 @@ export const DashboardViewMultipleStockAnalytics: React.FC<MultipleStockAnalytic
 
         
         {/* Chart 5: Stock Analysis per Plant (Stacked Valuation Bars + Unique Materials Line Overlay) */}
-        {(activeChartTab === 'all' || activeChartTab === 'plant-metrics') && !hiddenChartIds.includes('ms-plant-chart-card') && (
+        {(activeChartTab === 'all' || activeChartTab === 'plant-metrics') && (
           <div 
             id="ms-plant-chart-card"
             onDoubleClick={() => {
