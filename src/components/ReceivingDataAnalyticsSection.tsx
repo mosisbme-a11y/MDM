@@ -364,12 +364,34 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
   const plantBarData: ReceivingBarChartItem[] = useMemo(() => {
     const map: Record<string, ReceivingBarChartItem & { items: ReceivingDataRecord[] }> = {};
 
+    const standardPlants = ['HO01', 'HA01', 'JI01', 'AR01', 'NK01', 'DE01', 'DI01', 'AD01', 'AA02', 'AA01', 'SH01', 'MK01', 'AS01', 'BD01', 'GO01', 'GA01', 'SE01', 'NB01', 'JJ01', 'KD01'];
+    
+    const allPlantsSet = new Set(standardPlants);
+    activeRecords.forEach(r => { if (r.plant) allPlantsSet.add(r.plant); });
+
+    allPlantsSet.forEach(p => {
+      map[p] = {
+        key: p,
+        label: p,
+        plant: p,
+        plantName: EPSS_PLANT_NAMES[p] || `Plant ${p}`,
+        rdfVal: 0,
+        rdfUnits: 0,
+        hpVal: 0,
+        hpUnits: 0,
+        procure101Val: 0,
+        donated501Val: 0,
+        totalVal: 0,
+        totalUnits: 0,
+        consignments: 0,
+        uniqueMaterials: 0,
+        items: []
+      };
+    });
+
     filteredRecords.forEach(rec => {
       const mvt = String(rec.movementType || '').trim();
       if (isMovementType641(mvt)) return;
-      if (mvt && !(mvt === '101' || mvt === '501' || mvt.startsWith('101') || mvt.startsWith('501'))) {
-        return;
-      }
 
       const p = rec.plant || 'Unassigned';
       if (!map[p]) {
@@ -409,10 +431,10 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
         map[p].hpUnits += qty;
       }
 
-      if (mvt === '101') {
-        map[p].procure101Val += val;
-      } else if (mvt === '501' || mvt.toLowerCase().includes('donate') || mvt.toLowerCase().includes('501')) {
+      if (mvt === '501' || mvt.toLowerCase().includes('donate') || mvt.toLowerCase().includes('501')) {
         map[p].donated501Val += val;
+      } else {
+        map[p].procure101Val += val;
       }
     });
 
@@ -421,8 +443,15 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
         ...item,
         uniqueMaterials: new Set(item.items.map(i => i.material || i.materialDescription)).size
       }))
-      .sort((a, b) => b.totalVal - a.totalVal);
-  }, [filteredRecords]);
+      .sort((a, b) => {
+        const idxA = standardPlants.indexOf(String(a.plant || ''));
+        const idxB = standardPlants.indexOf(String(b.plant || ''));
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return b.totalVal - a.totalVal;
+      });
+  }, [filteredRecords, activeRecords]);
 
   // 5. Aggregations By Time Period (For Time-series Bar Graph)
   const timeBarData: ReceivingBarChartItem[] = useMemo(() => {
