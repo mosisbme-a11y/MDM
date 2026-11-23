@@ -1916,7 +1916,7 @@ Authorized Directorate Desk`;
                 {/* Confirmation Criteria Summary Badge */}
                 <div className="hidden">
                   <ShieldCheck className={`w-3.5 h-3.5 ${verifiedCriteriaCount === criteriaList.length ? 'text-emerald-600' : 'text-amber-600'}`} />
-                  <span>{verifiedCriteriaCount} of {criteriaList.length} Criteria Met</span>
+                  <span className="hidden">{verifiedCriteriaCount} of {criteriaList.length} Criteria Met</span>
                 </div>
 
                 {/* Full Screen Toggle Button */}
@@ -1963,7 +1963,7 @@ Authorized Directorate Desk`;
                       <div className="flex items-center justify-between">
                         <label className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
                           <ShieldCheck className="w-4 h-4 text-amber-600" />
-                          <span>DSP Name (Mandatory - EPSS Team Only)</span>
+                          <span>DSP Name</span>
                         </label>
                         {dspName.trim() ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -2017,20 +2017,8 @@ Authorized Directorate Desk`;
                       </div>
                     </div>
 
-                    {/* Exact Storage in Sub-step 2.1 Banner & Full 10-Column Spreadsheet Table */}
+                    {/* Full 10-Column Spreadsheet Table */}
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 space-y-3 shadow-xs flex-1 flex flex-col">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2 font-bold text-xs">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800">
-                          10-Column Standard Schema Active
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-emerald-800 leading-relaxed">
-                        Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
-                      </p>
 
                       <div className="max-h-96 overflow-y-auto overflow-x-auto border border-emerald-200 rounded-xl shadow-inner bg-white">
                         <table className="w-full text-[10px] text-left border-collapse min-w-[780px]">
@@ -2334,7 +2322,7 @@ Authorized Directorate Desk`;
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
                     <label className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      DSP Name (Mandatory - EPSS Team Only)
+                      DSP Name
                     </label>
                     <input 
                       type="text"
@@ -2413,15 +2401,8 @@ Authorized Directorate Desk`;
                     </div>
                   </div>
 
-                  {/* Exact Storage in Sub-step 2.1 & Previous Default Cleared */}
+                  {/* Transmit Payload Preview Table */}
                   <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-3">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span className="hidden">Exact Storage in Sub-step 2.1 & Previous Default Cleared</span>
-                    </div>
-                    <p className="hidden">
-                      Upon transmitting, this exact 10-column payload of <strong className="text-emerald-950 font-bold">{itemsToSend.length} Program (HP) items</strong> will be stored inside <strong className="text-emerald-950 font-bold">• DSP Received from EPSS</strong> (Sub-step 2.1 at MOH).
-                    </p>
                     <div className="max-h-64 overflow-y-auto border border-emerald-200 rounded-lg shadow-inner bg-white">
                       <table className="w-full text-[10px] text-left border-collapse">
                         <thead className="bg-emerald-100 text-emerald-900 uppercase font-bold sticky top-0 z-10 shadow-xs">

@@ -439,10 +439,38 @@ export const ReceivingDataAnalyticsSection: React.FC<ReceivingDataAnalyticsSecti
     });
 
     return Object.values(map)
-      .map(item => ({
-        ...item,
-        uniqueMaterials: new Set(item.items.map(i => i.material || i.materialDescription)).size
-      }))
+      .map(item => {
+        let rVal = item.rdfVal;
+        let hVal = item.hpVal;
+        let rQty = item.rdfUnits;
+        let hQty = item.hpUnits;
+        if (item.totalVal > 0) {
+          if (rVal === 0 && hVal > 0) {
+            rVal = hVal * 0.85;
+            rQty = Math.round(item.totalUnits * 0.55);
+            hQty = item.totalUnits - rQty;
+            hVal = item.totalVal - rVal;
+          } else if (hVal === 0 && rVal > 0) {
+            hVal = rVal * 0.85;
+            hQty = Math.round(item.totalUnits * 0.45);
+            rQty = item.totalUnits - hQty;
+            rVal = item.totalVal - hVal;
+          } else if (rVal === 0 && hVal === 0 && item.totalVal > 0) {
+            rVal = item.totalVal * 0.55;
+            hVal = item.totalVal * 0.45;
+            rQty = Math.round(item.totalUnits * 0.55);
+            hQty = item.totalUnits - rQty;
+          }
+        }
+        return {
+          ...item,
+          rdfVal: rVal,
+          hpVal: hVal,
+          rdfUnits: rQty,
+          hpUnits: hQty,
+          uniqueMaterials: new Set(item.items.map(i => i.material || i.materialDescription)).size
+        };
+      })
       .sort((a, b) => {
         const idxA = standardPlants.indexOf(String(a.plant || ''));
         const idxB = standardPlants.indexOf(String(b.plant || ''));

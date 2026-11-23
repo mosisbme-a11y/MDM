@@ -182,7 +182,7 @@ export const DistributionDataView: React.FC<DistributionDataViewProps> = ({
       } else if (trfDrillDown.key === 'HP') {
         matchesTrfDrill = stream === 'HP';
       } else if (trfDrillDown.key === 'high-value') {
-        matchesTrfDrill = (Number(r.amtInLocCur) || 0) >= 10000000;
+        matchesTrfDrill = Math.abs(Number(r.amtInLocCur) || 0) >= 10000000;
       } else if (trfDrillDown.key === 'high-qty') {
         matchesTrfDrill = (Number(r.quantity) || 1) >= 5;
       }
@@ -199,7 +199,7 @@ export const DistributionDataView: React.FC<DistributionDataViewProps> = ({
       if (trfSortField === 'quantity') {
         cmp = (Number(a.quantity) || 0) - (Number(b.quantity) || 0);
       } else if (trfSortField === 'amt') {
-        cmp = (Number(a.amtInLocCur) || 0) - (Number(b.amtInLocCur) || 0);
+        cmp = Math.abs(Number(a.amtInLocCur) || 0) - Math.abs(Number(b.amtInLocCur) || 0);
       } else if (trfSortField === 'postingDate') {
         const da = a.postingDate || a.entryDate || '';
         const db = b.postingDate || b.entryDate || '';
@@ -230,7 +230,7 @@ export const DistributionDataView: React.FC<DistributionDataViewProps> = ({
     const plantMap: Record<string, { value: number; qty: number; lines: number }> = {};
 
     filteredTrfRecords.forEach(r => {
-      const v = Number(r.amtInLocCur) || 0;
+      const v = Math.abs(Number(r.amtInLocCur) || 0);
       const q = Number(r.quantity) || Number(r.qtyInUnitOfEntry) || 1;
       const stream = getReceivingFundStream(r);
       const p = r.plant || 'Unknown Hub';
@@ -978,7 +978,7 @@ interface DeliveryFocusItem {
                       Movement Type 641 &bull; Routed to Distribution
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="hidden">
                     Analyzes cross-plant Medical Device transfers originating from Goods Receipt ledgers. All metrics broken down by Total Value, Amount (Quantity), Line Items, and RDF vs HP.
                   </p>
                 </div>
@@ -987,7 +987,7 @@ interface DeliveryFocusItem {
             </div>
 
             {/* Quick 641 Notice Card */}
-            <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-900">
+            <div className="hidden">
               <div className="flex items-center gap-2">
                 <Info className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
@@ -1821,13 +1821,13 @@ interface DeliveryFocusItem {
 
                           {/* 7. Quantity */}
                           <td className="py-2.5 px-3.5 text-center font-bold text-slate-900 border-x border-slate-200">
-                            {rec.quantity?.toLocaleString() || 0}
+                            {Math.abs(rec.quantity || 0).toLocaleString()}
                           </td>
 
                           {/* 8. Storage Location */}
                           <td className="py-2.5 px-3.5 whitespace-nowrap text-slate-700 border-x border-slate-200">
-                            <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200">
-                              {rec.storageLocation || 'SL01'}
+                            <span className="px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-200 font-mono">
+                              {rec.storageLocation && rec.storageLocation.trim() !== '' ? rec.storageLocation : 'SL01 (Central SLoc)'}
                             </span>
                           </td>
 
@@ -2892,7 +2892,11 @@ interface DeliveryFocusItem {
                 </div>
                 <div>
                   <span className="text-slate-400 font-semibold block uppercase text-[10px]">Storage Location</span>
-                  <span className="font-bold text-slate-900 text-sm font-mono">{inspectingTransferRecord.storageLocation || 'SL01'}</span>
+                  <span className="font-bold text-slate-900 text-sm font-mono">
+                    {inspectingTransferRecord.storageLocation && inspectingTransferRecord.storageLocation.trim() !== '' 
+                      ? inspectingTransferRecord.storageLocation 
+                      : 'SL01 (Central SLoc)'}
+                  </span>
                 </div>
               </div>
 
