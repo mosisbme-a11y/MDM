@@ -50,6 +50,10 @@ interface DSPRequestModalProps {
     subject: string;
     sender: string;
     body: string;
+    dspName?: string;
+    signatory?: string;
+    signatoryRole?: string;
+    budgetSources?: Record<string, string>;
   }) => void;
 }
 
@@ -80,6 +84,7 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
   const [copiedWaText, setCopiedWaText] = useState(false);
   const [manualSignatoryName, setManualSignatoryName] = useState('');
   const [manualSignatoryRole, setManualSignatoryRole] = useState('');
+  const [dspName, setDspName] = useState('');
 
   // Dedicated Dispatch Receipt & Dialog State
   const [showEmailDataPreview, setShowEmailDataPreview] = useState(false);
@@ -132,6 +137,7 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
       setSendSuccess(false);
       setWaSendSuccess(false);
       setDirectSendSuccess(false);
+      setDspName('');
     }
   }, [isOpen]);
 
@@ -261,21 +267,21 @@ export const DSPRequestModal: React.FC<DSPRequestModalProps> = ({ isOpen, onClos
     }
 
     const rows = selectedItems.map((item, idx) => ({
-      'Sr. No': idx + 1,
+      'S/N': idx + 1,
       'Material': item.material,
       'Material Description': item.materialDescription,
       'Qty': item.unrestrictedStock,
       'Total Amount': item.currentValueOfUnrestrictedStock,
-      'Valuation Type Desc': item.inventoryValuationType || 'Siemens Healthineers',
-      'WBS Element': item.wbsElement || 'SDG-ME-23-001-011',
-      'Budget Source': budgetSources[item.id] || 'WB',
+      'Valuation Type Desc': item.inventoryValuationType || '',
+      'WBS Element': item.wbsElement || '',
+      'Budget Source': budgetSources[item.id] || '',
       'Request Date': currentDate,
       'DSP request to': 'MOH'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows, {
       header: [
-        'Sr. No',
+        'S/N',
         'Material',
         'Material Description',
         'Qty',
@@ -866,14 +872,14 @@ TRANSMISSION METRICS:
     setIsSubmitting(true);
 
     const submissionData = selectedItems.map((item, idx) => ({
-      'Sr. No': idx + 1,
+      'S/N': idx + 1,
       'Material': item.material,
       'Material Description': item.materialDescription,
       'Qty': item.unrestrictedStock,
       'Total Amount': item.currentValueOfUnrestrictedStock,
-      'Valuation Type Desc': item.inventoryValuationType,
-      'WBS Element': item.wbsElement,
-      'Budget Source': budgetSources[item.id] || 'N/A',
+      'Valuation Type Desc': item.inventoryValuationType || '',
+      'WBS Element': item.wbsElement || '',
+      'Budget Source': budgetSources[item.id] || '',
       'Request Date': currentDate,
       'DSP request to': 'MOH'
     }));
@@ -1084,9 +1090,11 @@ TRANSMISSION METRICS:
               subject: emailSubject,
               sender: fromEmail,
               body: emailBody,
+              dspName: dspName.trim() || undefined,
               signatory: manualSignatoryName,
-              signatoryRole: manualSignatoryRole
-            } as any);
+              signatoryRole: manualSignatoryRole,
+              budgetSources
+            });
             setSelectedItems([]);
           }
         }
@@ -1114,7 +1122,11 @@ TRANSMISSION METRICS:
             recipient: officialEmail,
             subject: emailSubject,
             sender: fromEmail,
-            body: emailBody
+            body: emailBody,
+            dspName: dspName.trim() || undefined,
+            signatory: manualSignatoryName,
+            signatoryRole: manualSignatoryRole,
+            budgetSources
           });
         }
       }
@@ -1148,9 +1160,11 @@ TRANSMISSION METRICS:
           subject: emailSubject || 'DSP Official Transmittal to MOH',
           sender: fromEmail || 'EPSS HO Directorate',
           body: emailBody || 'Direct MOH Portal System Transmittal',
+          dspName: dspName.trim() || undefined,
           signatory: manualSignatoryName,
-          signatoryRole: manualSignatoryRole
-        } as any);
+          signatoryRole: manualSignatoryRole,
+          budgetSources
+        });
       }
 
       setSelectedItems([]);
@@ -1183,9 +1197,11 @@ TRANSMISSION METRICS:
           subject: 'WhatsApp Dispatch',
           sender: manualSignatoryName,
           body: whatsAppMessageText,
+          dspName: dspName.trim() || undefined,
           signatory: manualSignatoryName,
-          signatoryRole: manualSignatoryRole
-        } as any);
+          signatoryRole: manualSignatoryRole,
+          budgetSources
+        });
       }
       setSelectedItems([]); // Clear local selection immediately
       
@@ -1572,17 +1588,27 @@ TRANSMISSION METRICS:
                 </table>
               </div>
 
-              {/* Manual Signatory Input Section (Added per user request) */}
+              {/* Manual Signatory & DSP Name Input Section */}
               <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 space-y-4 mb-6">
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h4 className="text-sm font-black text-slate-900 uppercase">Authorized Institutional Signatory</h4>
+                  <h4 className="text-sm font-black text-slate-900 uppercase">DSP Dossier &amp; Authorized Signatory</h4>
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                  Please fill in the details of the official authorizing this DSP transmittal. This data is mandatory for audit compliance.
+                  Please provide the DSP Name and details of the official authorizing this DSP transmittal.
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">DSP Name</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. MCH Support 2026"
+                      value={dspName}
+                      onChange={(e) => setDspName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Authorized Person Name</label>
                     <input 

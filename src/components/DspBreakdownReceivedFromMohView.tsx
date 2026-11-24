@@ -666,74 +666,64 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white shadow-xs">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto bg-white">
+              <table className="w-full text-left border-collapse text-xs border border-slate-900">
                 <thead>
-                  <tr className="bg-slate-100 text-slate-950 font-black border-b border-slate-300">
-                    <th className="p-2.5 border-r border-slate-300 text-center w-12 italic">S/N</th>
-                    <th className="p-2.5 border-r border-slate-300 italic min-w-[100px]">Date</th>
-                    <th className="p-2.5 border-r border-slate-300 italic min-w-[140px]">Region</th>
-                    <th className="p-2.5 border-r border-slate-300 italic min-w-[180px]">DSP Name</th>
-                    <th className="p-2.5 border-r border-slate-300 italic min-w-[150px]">Authorized person</th>
-                    <th className="p-2.5 border-r border-slate-300 italic min-w-[130px]">Role</th>
-                    <th className="p-2.5 border-r border-slate-300 text-center w-24 italic">View</th>
-                    <th className="p-2.5 text-center min-w-[165px] italic">Action</th>
+                  <tr className="bg-white text-slate-950 font-bold italic text-xs select-none">
+                    <th className="py-2 px-3 border border-slate-900 w-14">S/N</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[100px]">Date</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[180px]">DSP Name</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[150px]">Authorized person</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[130px]">Role</th>
+                    <th className="py-2 px-3 border border-slate-900 w-24">View</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[155px]">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 font-medium">
+                <tbody className="font-medium text-slate-900">
                   {filteredDossiers.map((dossier, idx) => {
                     const isSelected = dossier.id === selectedDossier?.id;
-                    const dossierRegions =
-                      dossier.facilityMatrixData?.rows?.map(r => r.region).filter(Boolean) ||
-                      dossier.targetedRegions ||
-                      [];
-                    const regionName =
-                      Array.from(new Set(dossierRegions)).join(', ') || dossier.senderOrg || 'All Regions';
 
                     return (
                       <tr
                         key={dossier.id}
                         onClick={() => setSelectedDossierId(dossier.id)}
-                        className={`cursor-pointer transition-colors hover:bg-amber-50/50 ${
-                          isSelected ? 'bg-amber-50/80 font-bold' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-amber-50/80' : 'bg-white hover:bg-slate-50'
                         }`}
                       >
-                        <td className="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-600">
+                        <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
                           {idx + 1}
                         </td>
-                        <td className="p-2.5 border-r border-slate-200 font-mono text-slate-700 whitespace-nowrap">
+                        <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800 whitespace-nowrap">
                           {dossier.dateSubmitted || '-'}
                         </td>
-                        <td className="p-2.5 border-r border-slate-200 font-black text-slate-900">
-                          {regionName}
-                        </td>
-                        <td className="p-2.5 border-r border-slate-200 font-bold text-amber-900">
+                        <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
                           {dossier.dspName || dossier.subject || dossier.dspRefNumber}
                         </td>
-                        <td className="p-2.5 border-r border-slate-200 text-slate-800 font-semibold">
-                          {dossier.signatory || dossier.senderOrg || 'MOH Coordinator'}
+                        <td className="py-2 px-3 border border-slate-900 text-slate-900">
+                          {dossier.authorizedPerson || dossier.signatory || dossier.senderOrg || 'MOH Coordinator'}
                         </td>
-                        <td className="p-2.5 border-r border-slate-200 text-slate-600">
-                          {dossier.signatoryRole || 'Coordinator'}
+                        <td className="py-2 px-3 border border-slate-900 text-slate-800">
+                          {dossier.role || dossier.signatoryRole || 'Coordinator'}
                         </td>
-                        <td className="p-2.5 border-r border-slate-200 text-center">
+                        <td className="py-2 px-3 border border-slate-900">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedDossierId(dossier.id);
                             }}
-                            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer shadow-2xs transition ${
+                            className={`px-2.5 py-1 rounded font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer transition ${
                               isSelected
-                                ? 'bg-amber-500 text-slate-950'
-                                : 'bg-slate-900 hover:bg-black text-amber-300'
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-slate-900 hover:bg-black text-white'
                             }`}
                           >
                             <Eye className="w-3 h-3" />
                             <span>{isSelected ? 'Viewing' : 'View'}</span>
                           </button>
                         </td>
-                        <td className="p-2.5 text-center">
+                        <td className="py-2 px-3 border border-slate-900">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -741,7 +731,7 @@ export const DspBreakdownReceivedFromMohView: React.FC<Props> = ({
                               setSelectedDossierId(dossier.id);
                               handleBreakItemForFacility(dossier);
                             }}
-                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer shadow-2xs transition"
+                            className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer transition"
                           >
                             <Zap className="w-3 h-3 text-amber-300 fill-amber-300" />
                             <span>Proceed to Facility</span>

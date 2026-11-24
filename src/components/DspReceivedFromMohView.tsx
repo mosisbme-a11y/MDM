@@ -83,17 +83,30 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
 
   // Strictly filter dossiers for ONLY the target institutional hierarchy tier + sub-step (no cross-tier bleed)
   const receivedRecords = useMemo(() => {
+    const getSortTs = (r: DspWorkflowRecord) => {
+      if (r.createdAt) {
+        const ts = new Date(r.createdAt).getTime();
+        if (!Number.isNaN(ts)) return ts;
+      }
+      const idMatch = (r.id || '').match(/(\d{10,})$/);
+      if (idMatch) return Number(idMatch[1]);
+      return new Date(r.dateSubmitted || 0).getTime();
+    };
     return records
       .filter(r => isDossierInTier(r, targetTier) && canonicalizeSubStage(r.subStage, r.stage) === targetSubStage)
-      .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
+      .sort((a, b) => {
+        const dateDiff = new Date(b.dateSubmitted || 0).getTime() - new Date(a.dateSubmitted || 0).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return getSortTs(b) - getSortTs(a);
+      });
   }, [records, targetTier, targetSubStage]);
 
   const [selectedDossierId, setSelectedDossierId] = useState<string>('');
-  const [showArchiveMatrix, setShowArchiveMatrix] = useState(!is21);
+  const [showArchiveMatrix, setShowArchiveMatrix] = useState(true);
   const prevTopDossierIdRef = React.useRef<string>('');
 
   useEffect(() => {
-    setShowArchiveMatrix(!is21);
+    setShowArchiveMatrix(true);
   }, [is21]);
 
   useEffect(() => {
@@ -116,7 +129,7 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   }, [receivedRecords, selectedDossierId]);
 
   // ---------------------------------------------------------------------------
-  // 2.1 (EPSS -> MOH): Exact 10-column rows from activeRecord.itemsIncluded
+  // 2.1 (EPSS -> MOH): Exact column rows from activeRecord (standard 10-col or custom exact columns)
   // ---------------------------------------------------------------------------
   const [receivedRows21, setReceivedRows21] = useState<DspRequestTemplateRow[]>([]);
 
@@ -125,25 +138,56 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
       setReceivedRows21([]);
       return;
     }
-    if (activeRecord && activeRecord.itemsIncluded && activeRecord.itemsIncluded.length > 0) {
-      const mapped: DspRequestTemplateRow[] = activeRecord.itemsIncluded.map((it: any, idx: number) => ({
-        id: `rec-item-${idx}-${activeRecord.id}`,
-        srNo: idx + 1,
-        material: it.material,
-        materialDescription: it.description || it.materialDescription || 'Medical Equipment',
-        qty: Number(it.quantity ?? it.qty ?? 0),
-        totalAmount: Number(it.totalAmount ?? 0),
-        valuationTypeDesc: it.valuationTypeDesc || 'Standard Price (S)',
-        wbsElement: it.wbsElement || '-',
-        budgetSource: it.budgetSource || 'WB',
-        requestDate: it.requestDate || activeRecord.dateSubmitted || TODAY_ISO_DATE,
-        dspRequestTo: it.dspRequestTo || activeRecord.recipientOrg || 'Ministry of Health (PMD Directorate)'
-      }));
-      setReceivedRows21(mapped);
+    if (activeRecord && ((activeRecord.itemsIncluded && activeRecord.itemsIncluded.length > 0) || (activeRecord.exactRows && activeRecord.exactRows.length > 0))) {
+      const cols = activeRecord.exactColumns;
+      if (activeRecord.itemsIncluded && activeRecord.itemsIncluded.length > 0) {
+        const mapped: DspRequestTemplateRow[] = activeRecord.itemsIncluded.map((it: any, idx: number) => ({
+          id: `rec-item-${idx}-${activeRecord.id}`,
+          srNo: it.srNo ?? idx + 1,
+          material: it.material ?? '',
+          materialDescription: it.description ?? it.materialDescription ?? '',
+          qty: Number(it.quantity ?? it.qty ?? 0),
+          totalAmount: Number(it.totalAmount ?? 0),
+          valuationTypeDesc: it.valuationTypeDesc ?? '',
+          wbsElement: it.wbsElement ?? '',
+          budgetSource: it.budgetSource ?? '',
+          requestDate: it.requestDate || activeRecord.dateSubmitted || TODAY_ISO_DATE,
+          dspRequestTo: it.dspRequestTo ?? 'MOH',
+          rawColumns: cols,
+          rawRowData: activeRecord.exactRows?.[idx] || it.rawRowData
+        }));
+        setReceivedRows21(mapped);
+      } else {
+        const mapped: DspRequestTemplateRow[] = (activeRecord.exactRows || []).map((row: any, idx: number) => ({
+          id: `rec-exact-${idx}-${activeRecord.id}`,
+          srNo: Number(row['S/N']) || idx + 1,
+          material: String(row['Material'] ?? ''),
+          materialDescription: String(row['Material Description'] ?? ''),
+          qty: Number(row['Qty'] ?? 0),
+          totalAmount: Number(row['Total Amount'] ?? 0),
+          valuationTypeDesc: String(row['Valuation Type Desc'] ?? ''),
+          wbsElement: String(row['WBS Element'] ?? ''),
+          budgetSource: String(row['Budget Source'] ?? ''),
+          requestDate: String(row['Request Date'] ?? activeRecord.dateSubmitted ?? TODAY_ISO_DATE),
+          dspRequestTo: String(row['DSP request to'] ?? 'MOH'),
+          rawColumns: cols,
+          rawRowData: row
+        }));
+        setReceivedRows21(mapped);
+      }
     } else {
       setReceivedRows21([]);
     }
   }, [is21, activeRecord]);
+
+  const customColumns21 = useMemo(() => {
+    const cols = activeRecord?.exactColumns;
+    if (!cols || cols.length === 0) return null;
+    const isStandard10 =
+      cols.length === DSP_REQUEST_TEMPLATE_COLUMNS.length &&
+      cols.every((c, i) => c === DSP_REQUEST_TEMPLATE_COLUMNS[i]);
+    return isStandard10 ? null : cols;
+  }, [activeRecord]);
 
   // ---------------------------------------------------------------------------
   // 1.2 (MOH -> EPSS): Exact Health Facility Breakdown Matrix sent from 2.5
@@ -209,13 +253,17 @@ export const DspReceivedFromMohView: React.FC<DspReceivedFromMohViewProps> = ({
   const filteredRows21 = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return receivedRows21.filter(row => {
+      const rawMatch = row.rawRowData
+        ? Object.values(row.rawRowData).some(v => String(v ?? '').toLowerCase().includes(q))
+        : false;
       const matchSearch =
         !q ||
         row.material.toLowerCase().includes(q) ||
         row.materialDescription.toLowerCase().includes(q) ||
         row.wbsElement.toLowerCase().includes(q) ||
         row.valuationTypeDesc.toLowerCase().includes(q) ||
-        row.budgetSource.toLowerCase().includes(q);
+        row.budgetSource.toLowerCase().includes(q) ||
+        rawMatch;
 
       const matchBudget = budgetFilter === 'all' || row.budgetSource.toLowerCase() === budgetFilter.toLowerCase();
       return matchSearch && matchBudget;
@@ -375,8 +423,24 @@ Attachment: ${folder.letterFileName}`;
     const refNum = `EPSS/MD-DSP/${new Date().getFullYear()}/${String(Math.floor(100 + Math.random() * 900))}`;
     const dspNameValue = `DSP ${new Date().getFullYear()} - National Medical Equipment Request`;
 
+    const nowTs = Date.now();
+    const nowIso = new Date(nowTs).toISOString();
+    const exactColumns = [...DSP_REQUEST_TEMPLATE_COLUMNS];
+    const exactRows = sourceRows.map((r, idx) => ({
+      'S/N': r.srNo || idx + 1,
+      'Material': r.material,
+      'Material Description': r.materialDescription,
+      'Qty': r.qty,
+      'Total Amount': r.totalAmount,
+      'Valuation Type Desc': r.valuationTypeDesc,
+      'WBS Element': r.wbsElement,
+      'Budget Source': r.budgetSource,
+      'Request Date': r.requestDate,
+      'DSP request to': r.dspRequestTo || 'MOH'
+    }));
+
     const newRecord11: DspWorkflowRecord = {
-      id: `dsp-dossier-${Date.now()}`,
+      id: `dsp-dossier-${nowTs}`,
       dspRefNumber: refNum,
       dspName: dspNameValue,
       stage: 'head-office-dsp',
@@ -387,6 +451,7 @@ Attachment: ${folder.letterFileName}`;
       subject: `DSP [${dspNameValue}]: Request to MOH (${sourceRows.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
+      createdAt: nowIso,
       totalDevices: sourceRows.length,
       totalQuantity: sourceRows.reduce((acc, r) => acc + (r.qty || 0), 0),
       totalValuationETB: sourceRows.reduce((acc, r) => acc + (r.totalAmount || 0), 0),
@@ -395,24 +460,30 @@ Attachment: ${folder.letterFileName}`;
       officialLetterRef: `EPSS/LET/${new Date().getFullYear()}/${String(Math.floor(1000 + Math.random() * 9000))}`,
       signatory: 'EPSS HO Directorate',
       signatoryRole: 'Directorate Technical Lead',
-      itemsIncluded: sourceRows.map(r => ({
+      exactColumns,
+      exactRows,
+      itemsIncluded: sourceRows.map((r, idx) => ({
+        srNo: r.srNo || idx + 1,
         material: r.material,
         description: r.materialDescription,
+        materialDescription: r.materialDescription,
         quantity: r.qty,
+        qty: r.qty,
         plant: 'HO01 Central',
         valuationTypeDesc: r.valuationTypeDesc,
         wbsElement: r.wbsElement,
         budgetSource: r.budgetSource,
         requestDate: r.requestDate,
         dspRequestTo: r.dspRequestTo,
-        totalAmount: r.totalAmount
+        totalAmount: r.totalAmount,
+        rawRowData: exactRows[idx]
       })),
       notes: 'Transmitted via 10-Column Standard EPSS-to-MOH DSP Request Template.'
     };
 
     const newRecord21: DspWorkflowRecord = {
       ...newRecord11,
-      id: `dsp-moh-received-21-${Date.now()}`,
+      id: `dsp-moh-received-21-${nowTs}`,
       stage: 'moh-osp-management',
       subStage: '2.1',
       stageTitle: 'MOH DSP Management',
@@ -450,37 +521,42 @@ Attachment: ${folder.letterFileName}`;
   // ---------------------------------------------------------------------------
   const handleDownloadExcel = () => {
     if (is21) {
-      // Exact 10-Column EPSS -> MOH Excel Export
-      const exportData = receivedRows21.map((r, idx) => ({
-        'S/N': idx + 1,
-        'Material': r.material,
-        'Material Description': r.materialDescription,
-        'Qty': r.qty,
-        'Total Amount': r.totalAmount,
-        'Valuation Type Desc': r.valuationTypeDesc,
-        'WBS Element': r.wbsElement,
-        'Budget Source': r.budgetSource,
-        'Request Date': r.requestDate || TODAY_ISO_DATE,
-        'DSP Request to': r.dspRequestTo || 'Ministry of Health (PMD Directorate)'
-      }));
+      const exportCols = customColumns21 || [...DSP_REQUEST_TEMPLATE_COLUMNS];
+      const exportData = receivedRows21.map((r, idx) => {
+        if (customColumns21 && r.rawRowData) {
+          const obj: Record<string, any> = {};
+          customColumns21.forEach(c => {
+            obj[c] = r.rawRowData?.[c] ?? '';
+          });
+          return obj;
+        }
+        return {
+          'S/N': r.srNo ?? idx + 1,
+          'Material': r.material,
+          'Material Description': r.materialDescription,
+          'Qty': r.qty,
+          'Total Amount': r.totalAmount,
+          'Valuation Type Desc': r.valuationTypeDesc,
+          'WBS Element': r.wbsElement,
+          'Budget Source': r.budgetSource,
+          'Request Date': r.requestDate || TODAY_ISO_DATE,
+          'DSP request to': r.dspRequestTo ?? 'MOH'
+        };
+      });
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      worksheet['!cols'] = [
-        { wch: 8 },
-        { wch: 18 },
-        { wch: 44 },
-        { wch: 10 },
-        { wch: 18 },
-        { wch: 24 },
-        { wch: 22 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 32 }
-      ];
+      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: exportCols });
+      worksheet['!cols'] = exportCols.map(c => {
+        const lower = c.toLowerCase();
+        if (lower === 's/n' || lower === '#') return { wch: 8 };
+        if (lower.includes('description')) return { wch: 44 };
+        if (lower === 'qty' || lower.includes('quantity')) return { wch: 10 };
+        if (lower.includes('amount') || lower.includes('valuation')) return { wch: 22 };
+        return { wch: 18 };
+      });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'DSP_Received_from_EPSS');
       XLSX.writeFile(workbook, `DSP_Received_from_EPSS_${TODAY_ISO_DATE}.xlsx`);
-      showToast('✓ Downloaded 10-Column DSP Received from EPSS Excel');
+      showToast(`✓ Downloaded Exact ${exportCols.length}-Column DSP Received from EPSS Excel`);
       return;
     }
 
@@ -556,10 +632,14 @@ Attachment: ${folder.letterFileName}`;
     const esc = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
 
     if (is21) {
-      const headers = DSP_REQUEST_TEMPLATE_COLUMNS.join(',');
-      const lines = receivedRows21.map((r, idx) =>
-        [
-          idx + 1,
+      const cols = customColumns21 || [...DSP_REQUEST_TEMPLATE_COLUMNS];
+      const headers = cols.map(esc).join(',');
+      const lines = receivedRows21.map((r, idx) => {
+        if (customColumns21 && r.rawRowData) {
+          return customColumns21.map(c => esc(r.rawRowData?.[c] ?? '')).join(',');
+        }
+        return [
+          r.srNo ?? idx + 1,
           esc(r.material),
           esc(r.materialDescription),
           r.qty,
@@ -568,9 +648,9 @@ Attachment: ${folder.letterFileName}`;
           esc(r.wbsElement),
           esc(r.budgetSource),
           esc(r.requestDate || TODAY_ISO_DATE),
-          esc(r.dspRequestTo || 'Ministry of Health (PMD Directorate)')
-        ].join(',')
-      );
+          esc(r.dspRequestTo ?? 'MOH')
+        ].join(',');
+      });
       const csvContent = [headers, ...lines].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -581,7 +661,7 @@ Attachment: ${folder.letterFileName}`;
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('✓ Downloaded 10-Column CSV');
+      showToast(`✓ Downloaded Exact ${cols.length}-Column CSV`);
       return;
     }
 
@@ -783,83 +863,88 @@ Attachment: ${folder.letterFileName}`;
                     </button>
                   </div>
                 ) : (
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-md bg-slate-50/30 p-1">
-                    <table className="w-full border-collapse text-left text-xs bg-white rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto bg-white">
+                    <table className="w-full border-collapse text-left text-xs bg-white border border-slate-900">
                       <thead>
-                        <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
-                          <th className="py-4 px-4 w-12 text-center border-r border-white/10">S/N</th>
-                          <th className="py-4 px-6 border-r border-white/10">Date</th>
-                          <th className="py-4 px-6 border-r border-white/10">DSP Name</th>
-                          <th className="py-4 px-6 border-r border-white/10">Authorized person</th>
-                          <th className="py-4 px-6 border-r border-white/10">Role</th>
-                          <th className="py-4 px-6 border-r border-white/10">Status</th>
-                          <th className="py-4 px-4 w-28 text-center">Action</th>
+                        <tr className="bg-white text-slate-950 font-bold italic text-xs select-none">
+                          <th className="py-2 px-3 w-14 border border-slate-900">S/N</th>
+                          <th className="py-2 px-3 border border-slate-900">Date</th>
+                          <th className="py-2 px-3 border border-slate-900">DSP Name</th>
+                          <th className="py-2 px-3 border border-slate-900">Authorized person</th>
+                          <th className="py-2 px-3 border border-slate-900">Role</th>
+                          <th className="py-2 px-3 w-24 border border-slate-900">View</th>
+                          <th className="py-2 px-3 w-36 border border-slate-900">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      <tbody className="font-medium text-slate-900">
                         {receivedRecords.map((rec, idx) => {
                           const isSelected = activeRecord?.id === rec.id;
                           return (
                             <tr
                               key={rec.id}
                               onClick={() => setSelectedDossierId(rec.id)}
-                              className={`cursor-pointer transition-all group ${
-                                isSelected ? 'bg-amber-50/80 border-l-4 border-l-amber-500' : 'hover:bg-indigo-50/50'
+                              className={`cursor-pointer transition-colors ${
+                                isSelected ? 'bg-amber-50/80' : 'bg-white hover:bg-slate-50'
                               }`}
                             >
-                              <td className="py-4 px-4 text-center font-bold text-slate-400 font-mono border-r border-slate-50">
+                              <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
                                 {idx + 1}
                               </td>
-                              <td className="py-4 px-6 font-mono font-bold text-slate-600 border-r border-slate-50">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{rec.dateSubmitted}</span>
-                                </div>
+                              <td className="py-2 px-3 border border-slate-900 whitespace-nowrap font-mono text-slate-800">
+                                {rec.dateSubmitted || '-'}
                               </td>
-                              <td className="py-4 px-6 border-r border-slate-50">
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
-                                    <FileText className="w-4 h-4" />
-                                  </div>
-                                  <div className="flex flex-col">
-                                    <span className="font-black uppercase text-slate-900 leading-tight tracking-tight">
-                                      {rec.dspName || rec.subject}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-indigo-700 font-bold">{rec.dspRefNumber}</span>
-                                  </div>
-                                </div>
+                              <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
+                                {rec.dspName || rec.subject || rec.dspRefNumber}
                               </td>
-                              <td className="py-4 px-6 border-r border-slate-50 font-bold text-slate-900">
-                                {rec.signatory || 'Authorized Person'}
+                              <td className="py-2 px-3 border border-slate-900 text-slate-900">
+                                {rec.authorizedPerson || rec.signatory || 'Authorized Person'}
                               </td>
-                              <td className="py-4 px-6 border-r border-slate-50 text-slate-600">
-                                {rec.signatoryRole || 'Technical Lead'}
+                              <td className="py-2 px-3 border border-slate-900 text-slate-800">
+                                {rec.role || rec.signatoryRole || 'Technical Lead'}
                               </td>
-                              <td className="py-4 px-6 border-r border-slate-50">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                  {rec.status}
-                                </span>
+                              <td className="py-2 px-3 border border-slate-900">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDossierId(rec.id);
+                                  }}
+                                  className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer transition ${
+                                    isSelected
+                                      ? 'bg-amber-400 text-slate-950'
+                                      : 'bg-slate-900 hover:bg-black text-white'
+                                  }`}
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>{isSelected ? 'Viewing' : 'View'}</span>
+                                </button>
                               </td>
-                              <td className="py-4 px-4 text-center">
-                                {isSelected ? (
-                                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-400 text-slate-950 rounded-lg font-black text-[10px] uppercase">
-                                    <Check className="w-3.5 h-3.5" />
-                                    Selected
-                                  </span>
-                                ) : (
+                              <td className="py-2 px-3 border border-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadDossierLetter(rec);
+                                    }}
+                                    className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 cursor-pointer"
+                                    title="Download Dossier Summary"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedDossierId(rec.id);
+                                      onSelectSubTab?.('dsp-moh-2-2');
                                     }}
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase shadow-sm cursor-pointer"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase cursor-pointer"
                                   >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>Select</span>
+                                    <span>Proceed 2.2</span>
+                                    <ArrowRight className="w-3 h-3" />
                                   </button>
-                                )}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -883,7 +968,7 @@ Attachment: ${folder.letterFileName}`;
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
-                        EXACT EPSS ➔ MOH REQUEST DOSSIER (10-COLUMN FORMAT)
+                        EXACT EPSS ➔ MOH REQUEST DOSSIER ({customColumns21 ? customColumns21.length : 10}-COLUMN FORMAT)
                       </span>
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[10px] font-black uppercase">
                         {activeRecord.status}
@@ -917,7 +1002,7 @@ Attachment: ${folder.letterFileName}`;
                     className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>Excel (10-Col)</span>
+                    <span>Excel ({customColumns21 ? `${customColumns21.length}-Col` : '10-Col'})</span>
                   </button>
                   <button
                     type="button"
@@ -993,8 +1078,40 @@ Attachment: ${folder.letterFileName}`;
                 </div>
               </div>
 
-              {/* EXACT 10-COLUMN EPSS -> MOH TABLE */}
+              {/* EXACT EPSS -> MOH TABLE (Exact Uploaded Columns OR Standard 10 Columns) */}
               <div className="overflow-x-auto bg-slate-50/50 p-1">
+                {customColumns21 ? (
+                  <table className="w-full border-collapse text-xs select-text bg-white rounded-2xl overflow-hidden border border-slate-900 shadow-md">
+                    <thead>
+                      <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
+                        {customColumns21.map(col => (
+                          <th key={col} className="py-2.5 px-3 text-left border-r border-black last:border-r-0 whitespace-nowrap">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {filteredRows21.length === 0 ? (
+                        <tr>
+                          <td colSpan={customColumns21.length} className="py-8 text-center text-slate-500 font-bold border-b border-slate-200">
+                            No materials found in this transmitted EPSS dossier.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredRows21.map((row, idx) => (
+                          <tr key={row.id || idx} className="hover:bg-amber-50/60 transition-all border-b border-slate-200">
+                            {customColumns21.map(col => (
+                              <td key={`${row.id}-${col}`} className="py-3 px-3 border-r border-slate-200 last:border-r-0 font-medium text-slate-900 whitespace-nowrap">
+                                {String(row.rawRowData?.[col] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
                 <table className="w-full border-collapse text-xs select-text bg-white rounded-2xl overflow-hidden border border-slate-900 shadow-md">
                   <thead>
                     <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
@@ -1007,7 +1124,7 @@ Attachment: ${folder.letterFileName}`;
                       <th className="py-2.5 px-3 text-left border-r border-black min-w-[170px] font-mono">WBS Element</th>
                       <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px]">Budget Source</th>
                       <th className="py-2.5 px-3 text-center border-r border-black min-w-[120px]">Request Date</th>
-                      <th className="py-2.5 px-3 text-center min-w-[150px]">DSP Request to</th>
+                      <th className="py-2.5 px-3 text-center min-w-[150px]">DSP request to</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
@@ -1020,7 +1137,7 @@ Attachment: ${folder.letterFileName}`;
                     ) : (
                       filteredRows21.map((row, idx) => (
                         <tr key={row.id || idx} className="hover:bg-amber-50/60 transition-all border-b border-slate-200">
-                          <td className="py-3 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-700">{idx + 1}</td>
+                          <td className="py-3 px-3 border-r border-slate-200 text-center font-mono font-bold text-slate-700">{row.srNo ?? idx + 1}</td>
                           <td className="py-3 px-3 border-r border-slate-200 font-mono font-black text-indigo-950">{row.material}</td>
                           <td className="py-3 px-3 border-r border-slate-200 font-bold text-slate-900">{row.materialDescription}</td>
                           <td className="py-3 px-3 border-r border-slate-200 text-right font-mono font-black text-cyan-800 text-sm">{formatNumber(row.qty)}</td>
@@ -1049,6 +1166,7 @@ Attachment: ${folder.letterFileName}`;
                     </tr>
                   </tfoot>
                 </table>
+                )}
               </div>
             </div>
           ) : (
@@ -1160,92 +1278,91 @@ Attachment: ${folder.letterFileName}`;
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs">
-                <table className="w-full border-collapse text-left text-xs bg-white">
+              <div className="overflow-x-auto bg-white">
+                <table className="w-full border-collapse text-left text-xs bg-white border border-slate-900">
                   <thead>
-                    <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-widest select-none">
-                      <th className="py-3 px-3 w-10 text-center border-r border-white/10">S/N</th>
-                      <th className="py-3 px-3 border-r border-white/10">Date</th>
-                      <th className="py-3 px-4 border-r border-white/10">Dossier Name &amp; Ref</th>
-                      <th className="py-3 px-3 border-r border-white/10">MOH Signatory</th>
-                      <th className="py-3 px-3 border-r border-white/10">Regions</th>
-                      <th className="py-3 px-3 border-r border-white/10 text-right">Facilities / Units</th>
-                      <th className="py-3 px-3 border-r border-white/10 text-center">Status</th>
-                      <th className="py-3 px-3 text-center w-36">Action</th>
+                    <tr className="bg-white text-slate-950 font-bold italic text-xs select-none">
+                      <th className="py-2 px-3 w-14 border border-slate-900">S/N</th>
+                      <th className="py-2 px-3 border border-slate-900">Date</th>
+                      <th className="py-2 px-3 border border-slate-900">DSP Name</th>
+                      <th className="py-2 px-3 border border-slate-900">Authorized person</th>
+                      <th className="py-2 px-3 border border-slate-900">Role</th>
+                      <th className="py-2 px-3 w-24 border border-slate-900">View</th>
+                      <th className="py-2 px-3 w-36 border border-slate-900">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                  <tbody className="font-medium text-slate-900">
                     {receivedRecords.map((rec, idx) => {
                       const isSelected = activeRecord?.id === rec.id;
-                      const facCount =
-                        rec.stage4MatrixData?.rows?.length ||
-                        rec.facilityMatrixData?.rows?.length ||
-                        rec.targetedFacilitiesCount ||
-                        0;
                       return (
                         <tr
                           key={rec.id}
                           onClick={() => setSelectedDossierId(rec.id)}
-                          className={`cursor-pointer transition-all ${
-                            isSelected ? 'bg-amber-50/80 border-l-4 border-l-amber-500' : 'hover:bg-indigo-50/40'
+                          className={`cursor-pointer transition-colors ${
+                            isSelected ? 'bg-amber-50/80' : 'bg-white hover:bg-slate-50'
                           }`}
                         >
-                          <td className="py-3 px-3 text-center font-bold text-slate-500 font-mono border-r border-slate-100">{idx + 1}</td>
-                          <td className="py-3 px-3 font-mono font-bold text-slate-600 border-r border-slate-100 whitespace-nowrap">
-                            {rec.dateSubmitted}
+                          <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
+                            {idx + 1}
                           </td>
-                          <td className="py-3 px-4 border-r border-slate-100">
-                            <div className="font-black text-slate-900 uppercase">{rec.dspName || rec.subject}</div>
-                            <div className="text-[10px] font-mono text-indigo-700 font-bold">{rec.dspRefNumber} • {rec.officialLetterRef}</div>
+                          <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800 whitespace-nowrap">
+                            {rec.dateSubmitted || '-'}
                           </td>
-                          <td className="py-3 px-3 border-r border-slate-100 text-[11px]">
-                            <div className="font-bold text-slate-900">{rec.signatory}</div>
-                            <div className="text-[10px] text-slate-500">{rec.signatoryRole}</div>
+                          <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
+                            {rec.dspName || rec.subject || rec.dspRefNumber}
                           </td>
-                          <td className="py-3 px-3 border-r border-slate-100 text-[11px]">
-                            {(rec.targetedRegions || []).join(', ') || '-'}
+                          <td className="py-2 px-3 border border-slate-900 text-slate-900">
+                            {rec.authorizedPerson || rec.signatory || '-'}
                           </td>
-                          <td className="py-3 px-3 border-r border-slate-100 text-right font-mono">
-                            <span className="font-black text-slate-900">{facCount} HFs</span>
-                            <span className="text-[10px] text-cyan-800 font-bold block">{formatNumber(rec.totalQuantity || 0)} Units</span>
+                          <td className="py-2 px-3 border border-slate-900 text-slate-800">
+                            {rec.role || rec.signatoryRole || '-'}
                           </td>
-                          <td className="py-3 px-3 border-r border-slate-100 text-center">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                              {rec.status}
-                            </span>
+                          <td className="py-2 px-3 border border-slate-900">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDossierId(rec.id);
+                              }}
+                              className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer transition ${
+                                isSelected
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : 'bg-slate-900 hover:bg-black text-white'
+                              }`}
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>{isSelected ? 'Viewing' : 'View'}</span>
+                            </button>
                           </td>
-                          <td className="py-3 px-3 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
+                          <td className="py-2 px-3 border border-slate-900 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleDownloadDossierLetter(rec);
                                 }}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer"
+                                className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 cursor-pointer"
                                 title="Download Summary"
                               >
-                                <Download className="w-3 h-3 text-amber-600" />
+                                <Download className="w-3 h-3" />
                               </button>
-                              {isSelected ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[10px] uppercase">
-                                  <Check className="w-3 h-3" />
-                                  Selected
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedDossierId(rec.id);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] uppercase cursor-pointer"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  <span>View</span>
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDossierId(rec.id);
+                                  if (onProceedToMapHf) {
+                                    onProceedToMapHf(rec);
+                                  } else {
+                                    onSelectSubTab?.('dsp-ho-1-3-1');
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase cursor-pointer"
+                              >
+                                <span>Map HF</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
                             </div>
                           </td>
                         </tr>

@@ -94,6 +94,8 @@ import {
     AuthUser
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
+import { DSP_REQUEST_TEMPLATE_COLUMNS, TODAY_ISO_DATE } from '../data/defaultDspRequestTemplateData';
+import { pushCentralMasterData } from '../utils/centralSyncService';
 import {
   canonicalizeSubStage,
   DspHierarchyTierId,
@@ -1373,54 +1375,138 @@ _Official Dossier Resend Protocol_`;
             ));
           }
 
-          // 2. Record what file i sent with date on my system (Workflow Record)
+          // 2. Build exact 10-column dossier payload & store in BOTH 1.1 (EPSS -> MOH) and 2.1 (DSP Received from EPSS)
+          const nowTs = Date.now();
+          const nowIso = new Date(nowTs).toISOString();
+          const reqDate = metadata.date || TODAY_ISO_DATE;
           const totalQty = removedItems.reduce((acc, i) => acc + i.unrestrictedStock, 0);
           const totalVal = removedItems.reduce((acc, i) => acc + i.currentValueOfUnrestrictedStock, 0);
-          const refNum = `EPSS/MD-DSP/2026/${Math.floor(100 + Math.random() * 900)}`;
+          const year = new Date().getFullYear();
+          const refNum = `EPSS/MD-DSP/${year}/${Math.floor(100 + Math.random() * 900)}`;
+          const mohReceivedRef = `MOH/PMD-DSP/${year}/${Math.floor(200 + Math.random() * 800)}`;
+          const officialLetterRef = `REF-${nowTs.toString().slice(-4)}`;
+          const resolvedDspName = metadata.dspName?.trim() || metadata.subject || `DSP Request ${reqDate}`;
+          const resolvedSignatory = metadata.signatory?.trim() || currentUser?.name || 'Authorized User';
+          const resolvedRole = metadata.signatoryRole?.trim() || 'Directorate Technical Lead';
 
-          const newRecord: DspWorkflowRecord = {
-            id: `dsp-${Date.now().toString().slice(-6)}`,
+          const exactColumns: string[] = [...DSP_REQUEST_TEMPLATE_COLUMNS];
+          const exactRows: Record<string, any>[] = removedItems.map((i, idx) => ({
+            'S/N': idx + 1,
+            'Material': i.material,
+            'Material Description': i.materialDescription,
+            'Qty': i.unrestrictedStock,
+            'Total Amount': i.currentValueOfUnrestrictedStock,
+            'Valuation Type Desc': i.inventoryValuationType || '',
+            'WBS Element': i.wbsElement || '',
+            'Budget Source': metadata.budgetSources?.[i.id] || '',
+            'Request Date': reqDate,
+            'DSP request to': 'MOH'
+          }));
+
+          const exactItemsIncluded = removedItems.map((i, idx) => ({
+            srNo: idx + 1,
+            material: i.material,
+            description: i.materialDescription,
+            materialDescription: i.materialDescription,
+            quantity: i.unrestrictedStock,
+            qty: i.unrestrictedStock,
+            plant: i.plant || 'AA01 Central',
+            allocatedFacility: 'MOH Allocation Quota',
+            totalAmount: i.currentValueOfUnrestrictedStock,
+            valuationTypeDesc: i.inventoryValuationType || '',
+            wbsElement: i.wbsElement || '',
+            budgetSource: metadata.budgetSources?.[i.id] || '',
+            requestDate: reqDate,
+            dspRequestTo: 'MOH',
+            rawRowData: exactRows[idx]
+          }));
+
+          const newRecord11: DspWorkflowRecord = {
+            id: `dsp-${nowTs}`,
             dspRefNumber: refNum,
+            dspName: resolvedDspName,
+            authorizedPerson: resolvedSignatory,
+            organization: 'EPSS',
+            role: resolvedRole,
             stage: 'head-office-dsp',
             subStage: '1.1',
             stageTitle: '1.1 DSP Request to MOH',
             senderOrg: 'EPSS Head Office (Medical Equipment Directorate)',
-            recipientOrg: metadata.recipient,
-            subject: metadata.subject,
+            recipientOrg: metadata.recipient || 'Ministry of Health (PMD Directorate)',
+            subject: metadata.subject || `DSP [${resolvedDspName}]: Request to MOH (${removedItems.length} Materials)`,
             status: 'Submitted & Pending',
-            dateSubmitted: metadata.date,
+            dateSubmitted: reqDate,
+            createdAt: nowIso,
             totalDevices: removedItems.length,
             totalQuantity: totalQty,
             totalValuationETB: totalVal,
             targetedRegions: [...new Set(removedItems.map(i => i.plant))].filter(Boolean) as string[],
             targetedFacilitiesCount: 0,
-            officialLetterRef: `REF-${Date.now().toString().slice(-4)}`,
-            signatory: 'Mosisa (Authorized User)',
-            signatoryRole: 'Directorate Technical Lead',
-            itemsIncluded: removedItems.map(i => ({
-              material: i.material,
-              description: i.materialDescription,
-              quantity: i.unrestrictedStock,
-              plant: i.plant
-            })),
-            notes: `Dossier transmitted via Gmail background dispatch. Files: ${metadata.excelName}, ${metadata.letterName}${metadata.zipName ? `, ${metadata.zipName}` : ''}`,
+            officialLetterRef,
+            signatory: resolvedSignatory,
+            signatoryRole: resolvedRole,
+            exactColumns,
+            exactRows,
+            itemsIncluded: exactItemsIncluded,
+            notes: `DSP Name: ${resolvedDspName}. Transmitted with exact 10-column schema. Files: ${metadata.excelName}${metadata.letterName ? `, ${metadata.letterName}` : ''}${metadata.zipName ? `, ${metadata.zipName}` : ''}`,
             excelFile: { name: metadata.excelName, blob: metadata.excelBlob },
-            pdfFile: { name: metadata.letterName, blob: metadata.letterBlob },
+            pdfFile: metadata.letterName ? { name: metadata.letterName, blob: metadata.letterBlob } : undefined,
             zipFile: metadata.zipName && metadata.zipBlob ? { name: metadata.zipName, blob: metadata.zipBlob } : undefined
           };
 
-          setRecords(prev => {
-            const updated = [newRecord, ...prev];
-            return updated;
-          });
+          const receivedRecord21: DspWorkflowRecord = {
+            ...newRecord11,
+            id: `dsp-moh-received-epss-${nowTs}`,
+            dspRefNumber: mohReceivedRef,
+            stage: 'moh-osp-management',
+            subStage: '2.1',
+            stageTitle: 'MOH OSP Management',
+            recipientOrg: 'Ministry of Health (PMD Directorate)',
+            subject: `DSP [${resolvedDspName}]: Received from EPSS (${removedItems.length} Items)`,
+            notes: `DSP Name: ${resolvedDspName}. Stored inside DSP Received from EPSS (Sub-step 2.1) with exact ${exactColumns.length} columns from Request Ref ${refNum}.`
+          };
+
+          const nextRecords = [newRecord11, receivedRecord21, ...records];
+          setRecords(nextRecords);
+
+          try {
+            const templateRowsSnapshot = exactRows.map((row, idx) => ({
+              id: `rec-modal-${nowTs}-${idx}`,
+              srNo: Number(row['S/N']) || idx + 1,
+              material: row['Material'] || '',
+              materialDescription: row['Material Description'] || '',
+              qty: Number(row['Qty']) || 0,
+              totalAmount: Number(row['Total Amount']) || 0,
+              valuationTypeDesc: row['Valuation Type Desc'] || '',
+              wbsElement: row['WBS Element'] || '',
+              budgetSource: row['Budget Source'] || '',
+              requestDate: row['Request Date'] || reqDate,
+              dspRequestTo: row['DSP request to'] || 'MOH'
+            }));
+            localStorage.setItem('epss_dsp_received_epss_rows', JSON.stringify(templateRowsSnapshot));
+            const cleaned = nextRecords.map(rec => {
+              const c: any = { ...rec };
+              ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
+              return c;
+            });
+            pushCentralMasterData({
+              dspWorkflowRecords: cleaned,
+              dspReceivedEpssRows: templateRowsSnapshot,
+              dspReceivedEpssRecord: { ...receivedRecord21, excelFile: undefined, pdfFile: undefined, zipFile: undefined },
+              updatedBy: resolvedSignatory,
+              updateKind: `Transmit DSP Request to MOH (${removedItems.length} Items)`
+            });
+          } catch (e) {
+            console.warn('Cloud push notice:', e);
+          }
 
           if (onTriggerCloudSync) {
             onTriggerCloudSync(
-              `✓ DSP Request ${refNum} successfully transmitted and synced to cloud!`,
+              `✓ DSP Request ${refNum} transmitted & stored as dossier with exact columns in 2.1 (DSP Received from EPSS)!`,
               {
                 type: 'CREATE',
                 title: `DSP Request ${refNum}`,
-                payload: newRecord
+                payload: { request: newRecord11, received21: receivedRecord21 }
               }
             );
           }
@@ -2535,10 +2621,8 @@ _Official Dossier Resend Protocol_`;
                             'S/N': idx + 1,
                             'Date': r.dateSubmitted,
                             'DSP Name': dspInfo.dspName,
-                            'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
                             'Authorized person': dspInfo.authorizedPerson,
-                            'Organazation': dspInfo.organization,
-                            'Role': dspInfo.role,
+                            'Role': r.signatoryRole || dspInfo.role || 'Official Lead',
                             'Status': dspInfo.status,
                             'Reference': r.dspRefNumber
                           };
@@ -2552,24 +2636,23 @@ _Official Dossier Resend Protocol_`;
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    {/* User-Requested Summary Template */}
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="overflow-x-auto bg-white">
+                    <table className="w-full text-left text-xs border-collapse border border-slate-900">
                       <thead>
-                        <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[140px] italic">Region</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 min-w-[180px] italic">DSP Name</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
-                          <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
-                          <th className="py-2.5 px-3 text-center w-20 italic">View</th>
+                        <tr className="bg-white text-xs font-bold italic text-slate-950 select-none">
+                          <th className="py-2 px-3 border border-slate-900 w-14">S/N</th>
+                          <th className="py-2 px-3 border border-slate-900 w-28">Date</th>
+                          <th className="py-2 px-3 border border-slate-900 min-w-[180px]">DSP Name</th>
+                          <th className="py-2 px-3 border border-slate-900 w-44">Authorized person</th>
+                          <th className="py-2 px-3 border border-slate-900 w-36">Role</th>
+                          <th className="py-2 px-3 border border-slate-900 w-24">View</th>
+                          <th className="py-2 px-3 border border-slate-900 w-32">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
+                      <tbody className="text-slate-900 bg-white">
                         {filteredRecords.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-12 text-center bg-slate-50/30">
+                            <td colSpan={7} className="py-12 text-center border border-slate-900 bg-slate-50/30">
                               <div className="flex flex-col items-center gap-2">
                                 <FileText className="w-8 h-8 text-slate-200" />
                                 <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2579,36 +2662,43 @@ _Official Dossier Resend Protocol_`;
                         ) : (
                           filteredRecords.map((rec, idx) => {
                             const dspInfo = getDossierDisplayInfo(rec, idx);
-                            const regionText = rec.targetedRegions?.length ? rec.targetedRegions.join(', ') : (rec.recipientOrg || 'National');
                             return (
-                              <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
-                                <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                              <tr key={rec.id} className="hover:bg-amber-50/40 transition-colors">
+                                <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
                                   {idx + 1}
                                 </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
-                                  {rec.dateSubmitted}
+                                <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800 whitespace-nowrap">
+                                  {rec.dateSubmitted || '-'}
                                 </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs truncate max-w-[180px]" title={regionText}>
-                                  {regionText}
-                                </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                                <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
                                   {dspInfo.dspName}
                                 </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                                <td className="py-2 px-3 border border-slate-900 text-slate-900">
                                   {dspInfo.authorizedPerson}
                                 </td>
-                                <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                                <td className="py-2 px-3 border border-slate-900 text-slate-800">
                                   {rec.signatoryRole || dspInfo.role || 'Official Lead'}
                                 </td>
-                                <td className="py-2.5 px-3 text-center">
+                                <td className="py-2 px-3 border border-slate-900">
                                   <button
                                     type="button"
                                     onClick={() => { setSelectedRecord(rec); setIsDossierDetailModalOpen(true); }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-black text-white text-[11px] font-bold cursor-pointer"
                                     title="View dossier details"
                                   >
-                                    <Eye className="w-3 h-3 text-amber-600" />
+                                    <Eye className="w-3 h-3" />
                                     <span>View</span>
+                                  </button>
+                                </td>
+                                <td className="py-2 px-3 border border-slate-900">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenActionModal(rec)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black uppercase cursor-pointer"
+                                    title="Take action on dossier"
+                                  >
+                                    <Zap className="w-3 h-3" />
+                                    <span>Action</span>
                                   </button>
                                 </td>
                               </tr>
@@ -2646,9 +2736,7 @@ _Official Dossier Resend Protocol_`;
                             'S/N': idx + 1,
                             'Date': r.dateSubmitted,
                             'DSP Name': dspInfo.dspName,
-                            'DSP Management Hierarchy': dspInfo.hierarchyBadgeText,
                             'Authorized person': dspInfo.authorizedPerson,
-                            'Organazation': dspInfo.organization,
                             'Role': dspInfo.role,
                             'Status': dspInfo.status,
                             'Reference': r.dspRefNumber
@@ -2674,26 +2762,23 @@ _Official Dossier Resend Protocol_`;
               </div>
 
               {showStageSummaryMatrix && (
-              <div className="overflow-x-auto">
-                {/* User-Requested Summary Template */}
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-x-auto bg-white">
+                <table className="w-full text-left text-xs border-collapse border border-slate-900">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-300 text-xs font-bold text-slate-900 select-none">
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-12 text-center italic">S/N</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Date</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 min-w-[160px] italic">DSP Name</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 min-w-[210px] italic">DSP Management Hierarchy</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-44 italic">Authorized person</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 italic">Organazation</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-32 italic">Role</th>
-                      <th className="py-2.5 px-3 border-r border-slate-200 w-28 text-center italic">Status</th>
-                      <th className="py-2.5 px-3 text-center w-20 italic">View</th>
+                    <tr className="bg-white text-xs font-bold italic text-slate-950 select-none">
+                      <th className="py-2 px-3 border border-slate-900 w-14">S/N</th>
+                      <th className="py-2 px-3 border border-slate-900 w-28">Date</th>
+                      <th className="py-2 px-3 border border-slate-900 min-w-[180px]">DSP Name</th>
+                      <th className="py-2 px-3 border border-slate-900 w-44">Authorized person</th>
+                      <th className="py-2 px-3 border border-slate-900 w-36">Role</th>
+                      <th className="py-2 px-3 border border-slate-900 w-24">View</th>
+                      <th className="py-2 px-3 border border-slate-900 w-32">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
+                  <tbody className="text-slate-900 bg-white">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center bg-slate-50/30">
+                        <td colSpan={7} className="py-12 text-center border border-slate-900 bg-slate-50/30">
                           <div className="flex flex-col items-center gap-2">
                             <FileText className="w-8 h-8 text-slate-200" />
                             <p className="text-slate-400 font-medium italic">No dossiers match the current filters.</p>
@@ -2704,48 +2789,42 @@ _Official Dossier Resend Protocol_`;
                       filteredRecords.map((rec, idx) => {
                         const dspInfo = getDossierDisplayInfo(rec, idx);
                         return (
-                          <tr key={rec.id} className="hover:bg-amber-50/30 transition-colors group border-b border-slate-100">
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono text-slate-500 bg-slate-50/20 font-bold">
+                          <tr key={rec.id} className="hover:bg-amber-50/40 transition-colors">
+                            <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
                               {idx + 1}
                             </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-600 font-medium text-xs">
-                              {rec.dateSubmitted}
+                            <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800 whitespace-nowrap">
+                              {rec.dateSubmitted || '-'}
                             </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
+                            <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
                               {dspInfo.dspName}
                             </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${dspInfo.hierarchyBadgeClasses}`}>
-                                {dspInfo.hierarchyBadgeText}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-medium text-slate-800 text-xs">
+                            <td className="py-2 px-3 border border-slate-900 text-slate-900">
                               {dspInfo.authorizedPerson}
                             </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-900 text-xs">
-                              {dspInfo.organization}
-                            </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium text-xs">
+                            <td className="py-2 px-3 border border-slate-900 text-slate-800">
                               {dspInfo.role}
                             </td>
-                            <td className="py-2.5 px-3 border-r border-slate-100 text-center">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                dspInfo.status === 'Approved' 
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                  : 'bg-amber-50 text-amber-800 border-amber-200'
-                              }`}>
-                                {dspInfo.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
+                            <td className="py-2 px-3 border border-slate-900">
                               <button
                                 type="button"
                                 onClick={() => { setSelectedRecord(rec); setIsDossierDetailModalOpen(true); }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-200 cursor-pointer shadow-2xs active:scale-95"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-black text-white text-[11px] font-bold cursor-pointer"
                                 title="View dossier details"
                               >
-                                <Eye className="w-3 h-3 text-amber-600" />
+                                <Eye className="w-3 h-3" />
                                 <span>View</span>
+                              </button>
+                            </td>
+                            <td className="py-2 px-3 border border-slate-900">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenActionModal(rec)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black uppercase cursor-pointer"
+                                title="Take action on dossier"
+                              >
+                                <Zap className="w-3 h-3" />
+                                <span>Action</span>
                               </button>
                             </td>
                           </tr>
@@ -2874,77 +2953,76 @@ _Official Dossier Resend Protocol_`;
               const isMohToRhb = recSub === '2.2' || recSub === '3.1' || selectedRecord.stage === 'moh-to-rhb';
 
               if (isEpssToMoh) {
+                const hasCustomExact =
+                  Array.isArray(selectedRecord.exactColumns) &&
+                  selectedRecord.exactColumns.length > 0 &&
+                  Array.isArray(selectedRecord.exactRows) &&
+                  selectedRecord.exactRows.length > 0;
+                const exactColsToShow = hasCustomExact ? selectedRecord.exactColumns! : [...DSP_REQUEST_TEMPLATE_COLUMNS];
+
                 return (
                   <div className="space-y-2">
                     <div className="text-xs font-bold text-slate-700 flex items-center justify-between px-1">
                       <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] font-black">
                         <FileText className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Exact EPSS ➔ MOH Request Dossier (10-Column Format)</span>
+                        <span>Exact EPSS ➔ MOH Request Dossier ({exactColsToShow.length}-Column Format)</span>
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-bold">
-                          {selectedRecord.itemsIncluded.length} Materials
+                          {hasCustomExact ? selectedRecord.exactRows!.length : selectedRecord.itemsIncluded.length} Materials
                         </span>
                         <button
                           type="button"
                           onClick={() => {
-                            const csv = selectedRecord.itemsIncluded.map((item, idx) => ({
-                              'S/N': idx + 1,
-                              'Material': item.material,
-                              'Material Description': item.description || (item as any).materialDescription || '',
-                              'Qty': item.quantity || (item as any).qty || 0,
-                              'Total Amount': item.totalAmount || 0,
-                              'Valuation Type Desc': item.valuationTypeDesc || 'Standard Price (S)',
-                              'WBS Element': item.wbsElement || '-',
-                              'Budget Source': item.budgetSource || 'WB',
-                              'Request Date': item.requestDate || selectedRecord.dateSubmitted,
-                              'DSP Request to': item.dspRequestTo || selectedRecord.recipientOrg || 'Ministry of Health (PMD)'
-                            }));
-                            downloadCSV(`dossier-${selectedRecord.dspRefNumber}-10col.csv`, csv);
+                            const csv = hasCustomExact
+                              ? selectedRecord.exactRows!.map((row) => {
+                                  const obj: Record<string, any> = {};
+                                  exactColsToShow.forEach((col) => { obj[col] = row[col] ?? ''; });
+                                  return obj;
+                                })
+                              : selectedRecord.itemsIncluded.map((item, idx) => ({
+                                  'S/N': item.srNo ?? idx + 1,
+                                  'Material': item.material,
+                                  'Material Description': item.description || item.materialDescription || '',
+                                  'Qty': item.quantity ?? item.qty ?? 0,
+                                  'Total Amount': item.totalAmount ?? 0,
+                                  'Valuation Type Desc': item.valuationTypeDesc ?? '',
+                                  'WBS Element': item.wbsElement ?? '',
+                                  'Budget Source': item.budgetSource ?? '',
+                                  'Request Date': item.requestDate || selectedRecord.dateSubmitted,
+                                  'DSP request to': item.dspRequestTo ?? 'MOH'
+                                }));
+                            downloadCSV(`dossier-${selectedRecord.dspRefNumber}-exact.csv`, csv);
                           }}
                           className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
                         >
                           <Download className="w-3 h-3" />
-                          <span>Export 10-Col CSV</span>
+                          <span>Export Exact CSV</span>
                         </button>
                       </div>
                     </div>
 
                     <div className="bg-white border border-slate-300 rounded-xl overflow-hidden shadow-2xs max-h-80 overflow-y-auto overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse min-w-[900px]">
-                        <thead>
-                          <tr className="bg-[#FFA500] border-b-2 border-black text-black italic font-bold text-[11px]">
-                            <th className="p-2 border-r border-black w-10 text-center">S/N</th>
-                            <th className="p-2 border-r border-black font-mono">Material</th>
-                            <th className="p-2 border-r border-black">Material Description</th>
-                            <th className="p-2 border-r border-black text-right">Qty</th>
-                            <th className="p-2 border-r border-black text-right">Total Amount</th>
-                            <th className="p-2 border-r border-black">Valuation Type Desc</th>
-                            <th className="p-2 border-r border-black font-mono">WBS Element</th>
-                            <th className="p-2 border-r border-black text-center">Budget Source</th>
-                            <th className="p-2 border-r border-black text-center">Request Date</th>
-                            <th className="p-2 border-r border-black text-center">DSP Request to</th>
-                            <th className="p-2 text-center w-12">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                          {selectedRecord.itemsIncluded.map((item, idx) => {
-                            const qty = item.quantity || (item as any).qty || 0;
-                            const totalAmt = item.totalAmount || 0;
-                            return (
+                      {hasCustomExact ? (
+                        <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                          <thead>
+                            <tr className="bg-[#FFA500] border-b-2 border-black text-black italic font-bold text-[11px]">
+                              {exactColsToShow.map((col) => (
+                                <th key={col} className="p-2 border-r border-black whitespace-nowrap">
+                                  {col}
+                                </th>
+                              ))}
+                              <th className="p-2 text-center w-12">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {selectedRecord.exactRows!.map((row, idx) => (
                               <tr key={idx} className="hover:bg-amber-50/40">
-                                <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
-                                <td className="p-2 border-r border-slate-200 font-mono font-bold text-indigo-950">{item.material}</td>
-                                <td className="p-2 border-r border-slate-200 text-slate-900 font-medium">
-                                  {item.description || (item as any).materialDescription || 'Medical Equipment'}
-                                </td>
-                                <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-800">{formatNumber(qty)}</td>
-                                <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(totalAmt)}</td>
-                                <td className="p-2 border-r border-slate-200 text-slate-700">{item.valuationTypeDesc || 'Standard Price (S)'}</td>
-                                <td className="p-2 border-r border-slate-200 font-mono text-slate-800">{item.wbsElement || '-'}</td>
-                                <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-indigo-800">{item.budgetSource || 'WB'}</td>
-                                <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">{item.requestDate || selectedRecord.dateSubmitted}</td>
-                                <td className="p-2 border-r border-slate-200 text-center font-semibold text-amber-900">{item.dspRequestTo || selectedRecord.recipientOrg}</td>
+                                {exactColsToShow.map((col) => (
+                                  <td key={`${idx}-${col}`} className="p-2 border-r border-slate-200 text-slate-900 whitespace-nowrap">
+                                    {String(row[col] ?? '')}
+                                  </td>
+                                ))}
                                 <td className="p-2 text-center">
                                   <button
                                     type="button"
@@ -2956,10 +3034,60 @@ _Official Dossier Resend Protocol_`;
                                   </button>
                                 </td>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                          <thead>
+                            <tr className="bg-[#FFA500] border-b-2 border-black text-black italic font-bold text-[11px]">
+                              <th className="p-2 border-r border-black w-10 text-center">S/N</th>
+                              <th className="p-2 border-r border-black font-mono">Material</th>
+                              <th className="p-2 border-r border-black">Material Description</th>
+                              <th className="p-2 border-r border-black text-right">Qty</th>
+                              <th className="p-2 border-r border-black text-right">Total Amount</th>
+                              <th className="p-2 border-r border-black">Valuation Type Desc</th>
+                              <th className="p-2 border-r border-black font-mono">WBS Element</th>
+                              <th className="p-2 border-r border-black text-center">Budget Source</th>
+                              <th className="p-2 border-r border-black text-center">Request Date</th>
+                              <th className="p-2 border-r border-black text-center">DSP request to</th>
+                              <th className="p-2 text-center w-12">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {selectedRecord.itemsIncluded.map((item, idx) => {
+                              const qty = item.quantity ?? item.qty ?? 0;
+                              const totalAmt = item.totalAmount ?? 0;
+                              return (
+                                <tr key={idx} className="hover:bg-amber-50/40">
+                                  <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-500">{item.srNo ?? idx + 1}</td>
+                                  <td className="p-2 border-r border-slate-200 font-mono font-bold text-indigo-950">{item.material}</td>
+                                  <td className="p-2 border-r border-slate-200 text-slate-900 font-medium">
+                                    {item.description || item.materialDescription || ''}
+                                  </td>
+                                  <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-cyan-800">{formatNumber(qty)}</td>
+                                  <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(totalAmt)}</td>
+                                  <td className="p-2 border-r border-slate-200 text-slate-700">{item.valuationTypeDesc ?? ''}</td>
+                                  <td className="p-2 border-r border-slate-200 font-mono text-slate-800">{item.wbsElement ?? ''}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-indigo-800">{item.budgetSource ?? ''}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-600">{item.requestDate || selectedRecord.dateSubmitted}</td>
+                                  <td className="p-2 border-r border-slate-200 text-center font-semibold text-amber-900">{item.dspRequestTo ?? 'MOH'}</td>
+                                  <td className="p-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveItemFromRecord(selectedRecord.id, idx)}
+                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                                      title="Remove item from this dossier"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </div>
                 );

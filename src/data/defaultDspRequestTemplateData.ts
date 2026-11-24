@@ -12,6 +12,8 @@ export interface DspRequestTemplateRow {
   budgetSource: string;
   requestDate: string;
   dspRequestTo: string;
+  rawColumns?: string[];
+  rawRowData?: Record<string, any>;
 }
 
 export const DSP_REQUEST_TEMPLATE_COLUMNS = [
@@ -142,35 +144,43 @@ export function buildDspTemplateRowsFromStock(stockItems: any[], todayStr?: stri
 }
 
 export function generateDspRequestExcelBlob(rows: DspRequestTemplateRow[]): { blob: Blob; fileName: string } {
-  const exportData = rows.map((r, idx) => ({
-    'S/N': idx + 1,
-    'Material': r.material,
-    'Material Description': r.materialDescription,
-    'Qty': r.qty,
-    'Total Amount': r.totalAmount,
-    'Valuation Type Desc': r.valuationTypeDesc,
-    'WBS Element': r.wbsElement,
-    'Budget Source': r.budgetSource,
-    'Request Date': r.requestDate || TODAY_ISO_DATE,
-    'DSP request to': r.dspRequestTo || 'MOH'
-  }));
+  const customCols = rows[0]?.rawColumns && rows[0].rawColumns.length > 0 ? rows[0].rawColumns : null;
+  const headers = customCols ? customCols : [...DSP_REQUEST_TEMPLATE_COLUMNS];
 
-  const worksheet = XLSX.utils.json_to_sheet(exportData, {
-    header: [...DSP_REQUEST_TEMPLATE_COLUMNS]
+  const exportData = rows.map((r, idx) => {
+    if (customCols && r.rawRowData) {
+      const obj: Record<string, any> = {};
+      customCols.forEach(col => {
+        obj[col] = r.rawRowData?.[col] ?? '';
+      });
+      return obj;
+    }
+    return {
+      'S/N': r.srNo || idx + 1,
+      'Material': r.material,
+      'Material Description': r.materialDescription,
+      'Qty': r.qty,
+      'Total Amount': r.totalAmount,
+      'Valuation Type Desc': r.valuationTypeDesc,
+      'WBS Element': r.wbsElement,
+      'Budget Source': r.budgetSource,
+      'Request Date': r.requestDate || TODAY_ISO_DATE,
+      'DSP request to': r.dspRequestTo || 'MOH'
+    };
   });
 
-  worksheet['!cols'] = [
-    { wch: 8 },  // S/N
-    { wch: 18 }, // Material
-    { wch: 42 }, // Material Description
-    { wch: 10 }, // Qty
-    { wch: 20 }, // Total Amount
-    { wch: 24 }, // Valuation Type Desc
-    { wch: 22 }, // WBS Element
-    { wch: 16 }, // Budget Source
-    { wch: 16 }, // Request Date
-    { wch: 18 }  // DSP request to
-  ];
+  const worksheet = XLSX.utils.json_to_sheet(exportData, {
+    header: headers
+  });
+
+  worksheet['!cols'] = headers.map((h) => {
+    const lower = h.toLowerCase();
+    if (lower === 's/n' || lower === '#') return { wch: 8 };
+    if (lower.includes('description')) return { wch: 42 };
+    if (lower === 'qty' || lower.includes('quantity')) return { wch: 10 };
+    if (lower.includes('amount') || lower.includes('valuation')) return { wch: 22 };
+    return { wch: 18 };
+  });
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'DSP_Request_MOH');
@@ -195,17 +205,24 @@ export function downloadDspRequestTemplateExcel(rows: DspRequestTemplateRow[] = 
 }
 
 export function downloadDspRequestCSV(rows: DspRequestTemplateRow[], fileName = `DSP_Request_to_MOH_Program_HP_${TODAY_ISO_DATE}.csv`): void {
-  const headers = [...DSP_REQUEST_TEMPLATE_COLUMNS].join(',');
+  const customCols = rows[0]?.rawColumns && rows[0].rawColumns.length > 0 ? rows[0].rawColumns : null;
+  const cols = customCols ? customCols : [...DSP_REQUEST_TEMPLATE_COLUMNS];
+
+  const escapeCsv = (val: any) => {
+    const s = String(val ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const headers = cols.map(escapeCsv).join(',');
   const lines = rows.map((r, idx) => {
-    const escapeCsv = (val: any) => {
-      const s = String(val ?? '');
-      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
+    if (customCols && r.rawRowData) {
+      return customCols.map(col => escapeCsv(r.rawRowData?.[col] ?? '')).join(',');
+    }
     return [
-      idx + 1,
+      r.srNo || idx + 1,
       escapeCsv(r.material),
       escapeCsv(r.materialDescription),
       r.qty,

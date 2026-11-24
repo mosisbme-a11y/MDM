@@ -293,6 +293,22 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     totalValuation: itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0)
   }), [itemsToSend]);
 
+  const customUploadCols = useMemo(() => {
+    const firstCols = templateRows[0]?.rawColumns;
+    if (!firstCols || firstCols.length === 0) return null;
+    const isSameAsStandard =
+      firstCols.length === DSP_REQUEST_TEMPLATE_COLUMNS.length &&
+      firstCols.every((c, idx) => c === DSP_REQUEST_TEMPLATE_COLUMNS[idx]);
+    if (isSameAsStandard) return null;
+    const consistent = templateRows.every(
+      (r) =>
+        Array.isArray(r.rawColumns) &&
+        r.rawColumns.length === firstCols.length &&
+        r.rawColumns.every((c, i) => c === firstCols[i])
+    );
+    return consistent ? firstCols : null;
+  }, [templateRows]);
+
   // Confirmation Criteria State for Institutional Transmission Gate
   const [criteriaAcknowledge, setCriteriaAcknowledge] = useState<Record<string, boolean>>({
     dspName: true,
@@ -439,8 +455,8 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     const updated = buildDspTemplateRowsFromStock(multipleStockItems, TODAY_ISO_DATE);
     setTemplateRows(updated);
     setIsLinkedToStock(true);
-    setViewFormatMode('matrix');
-    showToast(`✓ Synced & displayed ${updated.length} Program (HP) items in Plant x Material Matrix format`);
+    setSelectedRowIds([]);
+    showToast(`✓ Synced ${updated.length} Program (HP) items from Multiple Stock`);
   };
 
   // Unique budget sources for filter
@@ -596,7 +612,7 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-              processUploadedData(results.data);
+              processUploadedData(results.data, results.meta?.fields);
             },
             error: (err: any) => {
               setUploadError(`CSV Parse Error: ${err.message}`);
@@ -614,8 +630,12 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-          processUploadedData(jsonData);
+          const headerAoa = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+          const headerFields = Array.isArray(headerAoa?.[0])
+            ? headerAoa[0].map((h: any) => String(h ?? '').trim()).filter(Boolean)
+            : undefined;
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          processUploadedData(jsonData, headerFields);
         } catch (err: any) {
           setUploadError(`Failed to parse Excel file: ${err.message}`);
         }
@@ -624,11 +644,23 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     }
   };
 
-  const processUploadedData = (rows: any[]) => {
+  const processUploadedData = (rows: any[], explicitHeaders?: string[]) => {
     if (!rows || rows.length === 0) {
       setUploadError('Uploaded file contains no data rows.');
       return;
     }
+
+    const detectedHeaders =
+      explicitHeaders && explicitHeaders.length > 0
+        ? explicitHeaders
+        : Array.from(
+            rows.reduce((set: Set<string>, r: any) => {
+              Object.keys(r || {}).forEach((k) => {
+                if (k && !k.startsWith('__EMPTY')) set.add(k);
+              });
+              return set;
+            }, new Set<string>())
+          );
 
     const mappedRows: DspRequestTemplateRow[] = [];
 
@@ -644,35 +676,46 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
         return '';
       };
 
-      const material = String(getVal(['Material', 'Material Code', 'Item Code', 'Item No', 'Material Number']) || '').trim();
-      const materialDescription = String(getVal(['Material Description', 'Description', 'Item Description', 'Equipment Name']) || '').trim();
-      const qty = Number(getVal(['Qty', 'Quantity', 'Unrestricted Stock', 'Stock Qty'])) || 1;
-      const totalAmount = Number(getVal(['Total Amount', 'Amount', 'Total Value', 'Current Value (ETB)', 'Total Price'])) || 0;
-      const valuationTypeDesc = String(getVal(['Valuation Type Desc', 'Valuation Type', 'Manufacturer', 'Supplier', 'Make']) || '').trim();
-      const wbsElement = String(getVal(['WBS Element', 'WBS', 'Project Code', 'Grant Ref']) || '').trim();
-      const budgetSource = String(getVal(['Budget Source', 'Funding Source', 'Donor', 'Budget']) || 'WB').trim();
-      const requestDate = String(getVal(['Request Date', 'Date']) || TODAY_ISO_DATE).trim();
-      const dspRequestTo = String(getVal(['DSP request to', 'DSP Request To', 'Target', 'DSP Target', 'Recipient']) || 'MOH').trim();
+      const rawSn = getVal(['S/N', 'Sr. No', 'Sr No', 'No', '#']);
+      const material = String(getVal(['Material', 'Material Code', 'Item Code', 'Item No', 'Material Number']) ?? '').trim();
+      const materialDescription = String(getVal(['Material Description', 'Description', 'Item Description', 'Equipment Name']) ?? '').trim();
+      const rawQty = getVal(['Qty', 'Quantity', 'Unrestricted Stock', 'Stock Qty']);
+      const qty = rawQty !== '' && rawQty !== null && rawQty !== undefined ? Number(rawQty) || 0 : 0;
+      const rawAmt = getVal(['Total Amount', 'Amount', 'Total Value', 'Current Value (ETB)', 'Total Price']);
+      const totalAmount = rawAmt !== '' && rawAmt !== null && rawAmt !== undefined ? Number(rawAmt) || 0 : 0;
+      const valuationTypeDesc = String(getVal(['Valuation Type Desc', 'Valuation Type', 'Manufacturer', 'Supplier', 'Make']) ?? '').trim();
+      const wbsElement = String(getVal(['WBS Element', 'WBS', 'Project Code', 'Grant Ref']) ?? '').trim();
+      const budgetSource = String(getVal(['Budget Source', 'Funding Source', 'Donor', 'Budget']) ?? '').trim();
+      const requestDate = String(getVal(['Request Date', 'Date']) ?? '').trim();
+      const dspRequestTo = String(getVal(['DSP request to', 'DSP Request To', 'Target', 'DSP Target', 'Recipient']) ?? '').trim();
 
-      if (material || materialDescription) {
+      const hasAnyValue = Object.values(row || {}).some((v) => String(v ?? '').trim() !== '');
+      if (hasAnyValue) {
+        const cleanRawRow: Record<string, any> = {};
+        detectedHeaders.forEach((col) => {
+          cleanRawRow[col] = row[col] ?? '';
+        });
+
         mappedRows.push({
           id: `uploaded-row-${idx}-${Date.now()}`,
-          srNo: idx + 1,
-          material: material || `MAT-${1000 + idx}`,
-          materialDescription: materialDescription || 'Medical Equipment Item',
+          srNo: Number(rawSn) || idx + 1,
+          material: material || String(cleanRawRow[detectedHeaders[1]] ?? cleanRawRow[detectedHeaders[0]] ?? `MAT-${1000 + idx}`).trim(),
+          materialDescription: materialDescription || String(cleanRawRow[detectedHeaders[2]] ?? '').trim(),
           qty,
           totalAmount,
-          valuationTypeDesc: valuationTypeDesc || 'Siemens Healthineers',
-          wbsElement: wbsElement || 'SDG-ME-23-001-011',
-          budgetSource: budgetSource || 'WB',
+          valuationTypeDesc,
+          wbsElement,
+          budgetSource,
           requestDate: requestDate || TODAY_ISO_DATE,
-          dspRequestTo: dspRequestTo || 'MOH'
+          dspRequestTo: dspRequestTo || 'MOH',
+          rawColumns: detectedHeaders.length > 0 ? detectedHeaders : undefined,
+          rawRowData: detectedHeaders.length > 0 ? cleanRawRow : undefined
         });
       }
     });
 
     if (mappedRows.length === 0) {
-      setUploadError('Could not find recognizable material columns. Headers must follow: S/N, Material, Material Description, Qty, Total Amount, Valuation Type Desc, WBS Element, Budget Source, Request Date, DSP request to');
+      setUploadError('Could not find recognizable rows in the uploaded file.');
       return;
     }
 
@@ -685,19 +728,19 @@ export const DspRequestMohTemplateView: React.FC<DspRequestMohTemplateViewProps>
     if (uploadMode === 'replace') {
       const renumbered = parsedUploadRows.map((r, idx) => ({ 
         ...r, 
-        srNo: idx + 1,
+        srNo: r.srNo || idx + 1,
         requestDate: r.requestDate || TODAY_ISO_DATE,
-        dspRequestTo: 'MOH'
+        dspRequestTo: r.dspRequestTo || 'MOH'
       }));
       setTemplateRows(renumbered);
-      showToast(`✓ Loaded ${renumbered.length} rows from file into DSP Request template`);
+      showToast(`✓ Loaded ${renumbered.length} rows with exact columns into DSP Request template`);
     } else {
       const offset = templateRows.length;
       const renumbered = parsedUploadRows.map((r, idx) => ({ 
         ...r, 
-        srNo: offset + idx + 1,
+        srNo: r.srNo || offset + idx + 1,
         requestDate: r.requestDate || TODAY_ISO_DATE,
-        dspRequestTo: 'MOH'
+        dspRequestTo: r.dspRequestTo || 'MOH'
       }));
       setTemplateRows(prev => [...prev, ...renumbered]);
       showToast(`✓ Appended ${renumbered.length} rows to DSP Request template`);
@@ -897,18 +940,77 @@ Authorized Directorate Desk`;
     }
 
     const year = new Date().getFullYear();
+    const nowTs = Date.now();
+    const nowIso = new Date(nowTs).toISOString();
     const randHo = String(Math.floor(100 + Math.random() * 900));
     const randMoh = String(Math.floor(200 + Math.random() * 800));
     const refNum = `EPSS/MD-DSP/${year}/${randHo}`;
     const mohReceivedRef = `MOH/PMD-DSP/${year}/${randMoh}`;
     const officialLetterRef = `EPSS/LET/${year}/${String(Math.floor(1000 + Math.random() * 9000))}`;
-    const mohLetterRef = `MOH/PMD/ACT/${year}/${randMoh}`;
 
     const sentTotals = {
       lineItemsCount: itemsToSend.length,
       totalQty: itemsToSend.reduce((sum, r) => sum + (Number(r.qty) || 0), 0),
       totalValuation: itemsToSend.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0)
     };
+
+    // Preserve exact column schema (uploaded custom headers or standard 10-column schema)
+    const firstCustomCols = itemsToSend[0]?.rawColumns;
+    const hasConsistentCustomCols =
+      Array.isArray(firstCustomCols) &&
+      firstCustomCols.length > 0 &&
+      itemsToSend.every(
+        (r) =>
+          Array.isArray(r.rawColumns) &&
+          r.rawColumns.length === firstCustomCols.length &&
+          r.rawColumns.every((c, i) => c === firstCustomCols[i])
+      );
+
+    const exactColumns: string[] = hasConsistentCustomCols
+      ? [...firstCustomCols!]
+      : [...DSP_REQUEST_TEMPLATE_COLUMNS];
+
+    const buildExactRowObject = (r: DspRequestTemplateRow, idx: number): Record<string, any> => {
+      if (hasConsistentCustomCols && r.rawRowData) {
+        const out: Record<string, any> = {};
+        exactColumns.forEach((col) => {
+          out[col] = r.rawRowData?.[col] ?? '';
+        });
+        return out;
+      }
+      return {
+        'S/N': r.srNo || idx + 1,
+        'Material': r.material,
+        'Material Description': r.materialDescription,
+        'Qty': r.qty,
+        'Total Amount': r.totalAmount,
+        'Valuation Type Desc': r.valuationTypeDesc,
+        'WBS Element': r.wbsElement,
+        'Budget Source': r.budgetSource,
+        'Request Date': r.requestDate || TODAY_ISO_DATE,
+        'DSP request to': r.dspRequestTo || 'MOH'
+      };
+    };
+
+    const exactRows: Record<string, any>[] = itemsToSend.map((r, idx) => buildExactRowObject(r, idx));
+
+    const exactItemsIncluded = itemsToSend.map((r, idx) => ({
+      srNo: r.srNo || idx + 1,
+      material: r.material,
+      description: r.materialDescription,
+      materialDescription: r.materialDescription,
+      quantity: r.qty,
+      qty: r.qty,
+      plant: 'AA01 Central',
+      allocatedFacility: 'MOH Allocation Quota',
+      valuationTypeDesc: r.valuationTypeDesc,
+      wbsElement: r.wbsElement,
+      budgetSource: r.budgetSource,
+      requestDate: r.requestDate || TODAY_ISO_DATE,
+      dspRequestTo: r.dspRequestTo || 'MOH',
+      totalAmount: r.totalAmount,
+      rawRowData: exactRows[idx]
+    }));
 
     try {
       if (dspName.trim()) {
@@ -918,7 +1020,7 @@ Authorized Directorate Desk`;
 
     // 1. Outgoing DSP Request record (Sub-step 1.1)
     const newRecord11: DspWorkflowRecord = {
-      id: `dsp-dossier-${Date.now()}`,
+      id: `dsp-dossier-${nowTs}`,
       dspRefNumber: refNum,
       stage: 'head-office-dsp',
       subStage: '1.1',
@@ -928,6 +1030,7 @@ Authorized Directorate Desk`;
       subject: `DSP [${dspName}]: Request to MOH (${itemsToSend.length} Materials)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
+      createdAt: nowIso,
       totalDevices: itemsToSend.length,
       totalQuantity: sentTotals.totalQty,
       totalValuationETB: sentTotals.totalValuation,
@@ -941,25 +1044,15 @@ Authorized Directorate Desk`;
       role: manualSignatoryRole,
       organization: manualOrganization.trim() || 'EPSS',
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
-      itemsIncluded: itemsToSend.map(r => ({
-        material: r.material,
-        description: r.materialDescription,
-        quantity: r.qty,
-        plant: 'AA01 Central',
-        allocatedFacility: 'Regional Allocation Quota',
-        valuationTypeDesc: r.valuationTypeDesc,
-        wbsElement: r.wbsElement,
-        budgetSource: r.budgetSource,
-        requestDate: r.requestDate,
-        dspRequestTo: r.dspRequestTo,
-        totalAmount: r.totalAmount
-      })),
-      notes: `DSP Name: ${dspName}. Generated via 10-Column Standard DSP Request Template. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
+      exactColumns,
+      exactRows,
+      itemsIncluded: exactItemsIncluded.map(it => ({ ...it, allocatedFacility: 'Regional Allocation Quota' })),
+      notes: `DSP Name: ${dspName}. Stored with exact ${exactColumns.length}-column schema. Transmitted ${itemsToSend.length} Program HP items.${uploadedLetterFile ? ` Attached Official Covering Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
     // 2. Incoming Received DSP record for MOH Side (Sub-step 2.1: DSP Received from EPSS)
     const receivedRecord21: DspWorkflowRecord = {
-      id: `dsp-moh-received-epss-${Date.now()}`,
+      id: `dsp-moh-received-epss-${nowTs}`,
       dspRefNumber: mohReceivedRef,
       stage: 'moh-osp-management',
       subStage: '2.1',
@@ -969,6 +1062,7 @@ Authorized Directorate Desk`;
       subject: `DSP [${dspName}]: Received from EPSS (${itemsToSend.length} Items)`,
       status: 'Submitted & Pending',
       dateSubmitted: TODAY_ISO_DATE,
+      createdAt: nowIso,
       totalDevices: itemsToSend.length,
       totalQuantity: sentTotals.totalQty,
       totalValuationETB: sentTotals.totalValuation,
@@ -982,32 +1076,19 @@ Authorized Directorate Desk`;
       role: manualSignatoryRole,
       organization: manualOrganization.trim() || 'EPSS',
       pdfFile: uploadedLetterFile ? { name: uploadedLetterFile.name, blob: uploadedLetterFile } : undefined,
-      itemsIncluded: itemsToSend.map(r => ({
-        material: r.material,
-        description: r.materialDescription,
-        quantity: r.qty,
-        plant: 'AA01 Central',
-        allocatedFacility: 'MOH Allocation Quota',
-        valuationTypeDesc: r.valuationTypeDesc,
-        wbsElement: r.wbsElement,
-        budgetSource: r.budgetSource,
-        requestDate: r.requestDate,
-        dspRequestTo: r.dspRequestTo,
-        totalAmount: r.totalAmount
-      })),
-      notes: `DSP Name: ${dspName}. Official DSP Request received by MOH from EPSS HO (Ref: ${refNum}). Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
+      exactColumns,
+      exactRows,
+      itemsIncluded: exactItemsIncluded,
+      notes: `DSP Name: ${dspName}. Official DSP Dossier received by MOH from EPSS HO (Ref: ${refNum}) with exact ${exactColumns.length} columns. Stored inside DSP Received from EPSS (Sub-step 2.1).${uploadedLetterFile ? ` Includes Official Letter: ${uploadedLetterFile.name}` : ''}`
     };
 
-    // 3. Store exact transmitted 10-column records strictly in 1.1 (EPSS outgoing) and 2.1 (MOH incoming from EPSS)
-    // Do NOT overwrite 1.2 (which belongs exclusively to MOH -> EPSS breakdown transmittals)
-    setRecords(prev => {
-      const updated = [
-        { ...newRecord11, dspName },
-        receivedRecord21,
-        ...prev
-      ];
-      return updated;
-    });
+    // 3. Store exact transmitted dossier records strictly in 1.1 (EPSS outgoing) and 2.1 (MOH incoming from EPSS)
+    const nextRecordsSnapshot = [
+      { ...newRecord11, dspName },
+      receivedRecord21,
+      ...records
+    ];
+    setRecords(nextRecordsSnapshot);
 
     // 4. Generate matching 2.2 matrix columns directly from itemsToSend
     const generated22Columns = itemsToSend.map((item, idx) => ({
@@ -1041,13 +1122,19 @@ Authorized Directorate Desk`;
     } catch {}
 
     try {
-      // Push to Supabase Cloud so all users and devices immediately receive exact transmittal data
+      const cleanedWorkflowRecords = nextRecordsSnapshot.map(rec => {
+        const c: any = { ...rec };
+        ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
+        return c;
+      });
+      // Push to Supabase Cloud so all users and devices immediately receive exact transmittal dossier + columns
       pushCentralMasterData({
+        dspWorkflowRecords: cleanedWorkflowRecords,
         dspReceivedEpssRows: itemsToSend,
         dspReceivedEpssRecord: receivedRecord21,
         dsp22Columns: generated22Columns,
         dsp22Rows: default22Rows,
-        updatedBy: 'EPSS HO Transmittal',
+        updatedBy: manualSignatoryName || 'EPSS HO Transmittal',
         updateKind: `Transmit DSP Request to MOH (${itemsToSend.length} Items)`
       });
     } catch (e) {
@@ -1062,7 +1149,7 @@ Authorized Directorate Desk`;
     setSelectedRowIds([]);
 
     if (onTriggerCloudSync) {
-      onTriggerCloudSync(`Official DSP Request ${refNum} transmitted to MOH & stored inside DSP Received from EPSS (2.1)`, {
+      onTriggerCloudSync(`Official DSP Request ${refNum} stored as dossier with exact columns in Sub-step 2.1 (DSP Received from EPSS)`, {
         type: 'CREATE',
         title: `DSP Transmittal ${refNum}`,
         payload: { request: newRecord11, received21: receivedRecord21 }
@@ -1070,7 +1157,7 @@ Authorized Directorate Desk`;
     }
 
     setIsTransmitModalOpen(false);
-    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Exact 10-column copy stored in Sub-step 1.1 and Sub-step 2.1 (MOH Received from EPSS).`);
+    showToast(`✓ Transmitted ${itemsToSend.length} items to MOH! Stored as dossier with exact ${exactColumns.length} columns in DSP Received from EPSS (2.1).`);
   };
 
   return (
@@ -1210,10 +1297,21 @@ Authorized Directorate Desk`;
               type="button"
               onClick={() => downloadDspRequestTemplateExcel(templateRows)}
               className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border-b-4 border-slate-300 shadow-[0_4px_0_rgb(203,213,225)] text-xs font-bold flex items-center gap-1 transition cursor-pointer active:border-b-0 active:translate-y-[4px]"
-              title="Download formatted Excel (.xlsx) file with orange headers and yellow rows"
+              title="Download formatted Excel (.xlsx) file"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span className="uppercase">Excel (.xlsx)</span>
+            </button>
+
+            {/* Upload Excel / CSV with Exact Columns */}
+            <button
+              type="button"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-b-4 border-indigo-200 shadow-[0_4px_0_rgb(199,210,254)] text-xs font-bold flex items-center gap-1 transition cursor-pointer active:border-b-0 active:translate-y-[4px]"
+              title="Import Excel or CSV file preserving exact columns"
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="uppercase">Import Excel</span>
             </button>
 
             {/* Remove Selected Button - Only visible when items are selected */}
@@ -1313,9 +1411,78 @@ Authorized Directorate Desk`;
 
       </div>
 
-      {/* THE OFFICIAL 10-COLUMN TEMPLATE TABLE MATCHING USER REQUEST & SCREENSHOT {639F1CC2-A50D-439A-93C3-F49D8E836963}.png */}
+      {/* THE OFFICIAL TEMPLATE TABLE (10-Column Standard or Exact Imported Columns) */}
       <div className="bg-white border-2 border-slate-900 rounded-xl overflow-hidden shadow-md">
         <div className="overflow-x-auto">
+          {customUploadCols ? (
+            <table className="w-full border-collapse text-xs select-text">
+              <thead>
+                <tr className="bg-[#FFA500] text-black italic font-bold text-xs md:text-sm border-b-2 border-black">
+                  <th className="py-2.5 px-2 text-center border-r border-black w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredRows.length > 0 && filteredRows.every(r => selectedRowIds.includes(r.id))}
+                      onChange={handleSelectAllRows}
+                      className="w-4 h-4 accent-slate-900 rounded border-black cursor-pointer align-middle"
+                      title="Select all visible rows to send"
+                    />
+                  </th>
+                  {customUploadCols.map((col) => (
+                    <th key={col} className="py-2.5 px-3 text-left border-r border-black whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
+                  <th className="py-2.5 px-2 text-center min-w-[64px] text-[10px] not-italic font-sans uppercase bg-[#FF9000] border-l border-black">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={customUploadCols.length + 2} className="py-10 text-center text-black font-bold border-b border-black">
+                      No matching rows found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row) => {
+                    const isSelected = selectedRowIds.includes(row.id);
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => handleToggleRowSelection(row.id)}
+                        className={`border-b border-black text-black font-medium transition-all group cursor-pointer ${isSelected ? 'bg-amber-100/80' : 'hover:bg-amber-50/50'}`}
+                      >
+                        <td className="py-2 px-2 text-center border-r border-black" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleRowSelection(row.id)}
+                            className="w-4 h-4 accent-slate-900 rounded border-black cursor-pointer align-middle"
+                          />
+                        </td>
+                        {customUploadCols.map((col) => (
+                          <td key={`${row.id}-${col}`} className="py-2 px-3 border-r border-black whitespace-nowrap">
+                            {String(row.rawRowData?.[col] ?? '')}
+                          </td>
+                        ))}
+                        <td className="py-2 px-1 text-center bg-yellow-200/50" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(row.id)}
+                            className="p-1 hover:bg-rose-600 hover:text-white rounded cursor-pointer text-rose-800"
+                            title="Delete Row"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
           <table className="w-full border-collapse text-xs select-text">
             {/* Orange Header with Italic Bold Black Text */}
             <thead>
@@ -1636,6 +1803,7 @@ Authorized Directorate Desk`;
               </tr>
             </tfoot>
           </table>
+          )}
         </div>
       </div>
 
@@ -2021,25 +2189,49 @@ Authorized Directorate Desk`;
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 space-y-3 shadow-xs flex-1 flex flex-col">
 
                       <div className="max-h-96 overflow-y-auto overflow-x-auto border border-emerald-200 rounded-xl shadow-inner bg-white">
-                        <table className="w-full text-[10px] text-left border-collapse min-w-[780px]">
+                        {customUploadCols ? (
+                          <table className="w-full text-[10px] text-left border-collapse min-w-[780px]">
+                            <thead className="bg-emerald-100/90 text-emerald-950 uppercase font-black sticky top-0 z-10 shadow-xs text-[9px] tracking-wider">
+                              <tr>
+                                {customUploadCols.map((col) => (
+                                  <th key={col} className="p-2 border-r border-emerald-200 whitespace-nowrap">
+                                    {col}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-emerald-100">
+                              {itemsToSend.map((r) => (
+                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                  {customUploadCols.map((col) => (
+                                    <td key={`${r.id}-${col}`} className="p-2 border-r border-emerald-100 whitespace-nowrap text-slate-800">
+                                      {String(r.rawRowData?.[col] ?? '')}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                        <table className="w-full text-[10px] text-left border-collapse min-w-[920px]">
                           <thead className="bg-emerald-100/90 text-emerald-950 uppercase font-black sticky top-0 z-10 shadow-xs text-[9px] tracking-wider">
                             <tr>
-                              <th className="p-2 border-r border-emerald-200 w-8 text-center">#</th>
+                              <th className="p-2 border-r border-emerald-200 w-10 text-center">S/N</th>
                               <th className="p-2 border-r border-emerald-200 w-28">Material</th>
-                              <th className="p-2 border-r border-emerald-200 min-w-[160px]">Material Description</th>
+                              <th className="p-2 border-r border-emerald-200 min-w-[170px]">Material Description</th>
                               <th className="p-2 border-r border-emerald-200 w-20 text-center">Qty</th>
-                              <th className="p-2 border-r border-emerald-200 w-24 text-right">Unit Price</th>
-                              <th className="p-2 border-r border-emerald-200 w-28 text-right">Total Amount (ETB)</th>
-                              <th className="p-2 border-r border-emerald-200 w-28">Valuation Type</th>
-                              <th className="p-2 border-r border-emerald-200 w-24">WBS Element</th>
-                              <th className="p-2 border-r border-emerald-200 w-20">Budget</th>
-                              <th className="p-2 w-16 text-center">Target</th>
+                              <th className="p-2 border-r border-emerald-200 w-28 text-right">Total Amount</th>
+                              <th className="p-2 border-r border-emerald-200 w-28">Valuation Type Desc</th>
+                              <th className="p-2 border-r border-emerald-200 w-28">WBS Element</th>
+                              <th className="p-2 border-r border-emerald-200 w-24 text-center">Budget Source</th>
+                              <th className="p-2 border-r border-emerald-200 w-24 text-center">Request Date</th>
+                              <th className="p-2 w-24 text-center">DSP request to</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-emerald-100">
                             {itemsToSend.map((r, idx) => (
                               <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-500 font-bold">{r.srNo || idx + 1}</td>
                                 <td className="p-2 border-r border-emerald-100 font-mono font-bold text-slate-800">{r.material}</td>
                                 <td className="p-2 border-r border-emerald-100">
                                   <input 
@@ -2069,9 +2261,6 @@ Authorized Directorate Desk`;
                                     className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono font-black text-center text-cyan-900 focus:outline-none focus:border-amber-400"
                                   />
                                 </td>
-                                <td className="p-2 border-r border-emerald-100 text-right font-mono text-slate-600">
-                                  {formatCurrency(r.qty > 0 ? r.totalAmount / r.qty : 0)}
-                                </td>
                                 <td className="p-2 border-r border-emerald-100 text-right">
                                   <input 
                                     type="number"
@@ -2085,12 +2274,14 @@ Authorized Directorate Desk`;
                                 </td>
                                 <td className="p-2 border-r border-emerald-100 text-slate-600 text-[9px]">{r.valuationTypeDesc}</td>
                                 <td className="p-2 border-r border-emerald-100 font-mono text-slate-600 text-[9px]">{r.wbsElement}</td>
-                                <td className="p-2 border-r border-emerald-100 text-slate-800 font-bold text-[9px]">{r.budgetSource}</td>
+                                <td className="p-2 border-r border-emerald-100 text-center text-slate-800 font-bold text-[9px]">{r.budgetSource}</td>
+                                <td className="p-2 border-r border-emerald-100 text-center font-mono text-slate-600 text-[9px]">{r.requestDate || TODAY_ISO_DATE}</td>
                                 <td className="p-2 text-center text-emerald-800 font-black text-[9px]">{r.dspRequestTo || 'MOH'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        )}
                       </div>
                     </div>
 

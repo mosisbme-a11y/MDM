@@ -353,11 +353,24 @@ export function App() {
       ['excelFile', 'pdfFile', 'zipFile'].forEach(k => { if (c[k]) c[k] = { name: c[k].name }; });
       return c;
     });
-  const mergeRemoteDsp = (remote: DspWorkflowRecord[]) => {
-    if (!remote || remote.length === 0) return;
-    const normalized = remote.map(normalizeDspRecord);
+  const mergeRemoteDsp = (remote?: DspWorkflowRecord[], extraReceived21?: DspWorkflowRecord | null) => {
+    const combinedRemote = [...(remote || [])];
+    if (extraReceived21 && extraReceived21.id && !combinedRemote.some(r => r.id === extraReceived21.id)) {
+      combinedRemote.unshift(extraReceived21);
+    }
+    if (combinedRemote.length === 0) return;
+    const normalized = combinedRemote.map(normalizeDspRecord);
     try { lastSyncedDspSigRef.current = JSON.stringify(cleanDspForSync(normalized)); } catch { lastSyncedDspSigRef.current = ''; }
-    setDspRecords(normalized);
+    setDspRecords(prev => {
+      const nowMs = Date.now();
+      const remoteIds = new Set(normalized.map(r => r.id));
+      const pendingRecentLocal = prev.filter(r => {
+        if (remoteIds.has(r.id)) return false;
+        const ts = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+        return ts > 0 && nowMs - ts < 15000;
+      });
+      return pendingRecentLocal.length > 0 ? [...pendingRecentLocal, ...normalized] : normalized;
+    });
   };
 
   // Cross-Browser Real-Time Master Data Hydration & Automatic Polling
@@ -379,8 +392,8 @@ export function App() {
     const applyFullData = (centralData: CentralMasterData) => {
       syncDspMatrixToStorage(centralData);
 
-      if (centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) {
-        mergeRemoteDsp(centralData.dspWorkflowRecords);
+      if ((centralData.dspWorkflowRecords && centralData.dspWorkflowRecords.length > 0) || centralData.dspReceivedEpssRecord) {
+        mergeRemoteDsp(centralData.dspWorkflowRecords, centralData.dspReceivedEpssRecord);
       }
 
       if (centralData.items !== undefined) setItems(centralData.items);
@@ -558,8 +571,8 @@ export function App() {
         setDsp22Rows(remoteData.dsp22Rows);
       }
 
-      if (remoteData.dspWorkflowRecords && remoteData.dspWorkflowRecords.length > 0) {
-        mergeRemoteDsp(remoteData.dspWorkflowRecords);
+      if ((remoteData.dspWorkflowRecords && remoteData.dspWorkflowRecords.length > 0) || remoteData.dspReceivedEpssRecord) {
+        mergeRemoteDsp(remoteData.dspWorkflowRecords, remoteData.dspReceivedEpssRecord);
       }
 
       if (remoteData.counts) {

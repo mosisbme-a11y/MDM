@@ -1416,71 +1416,57 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
             No dossiers have been sent to EPSS Branches yet. Click <strong className="text-cyan-700">Send to Branch</strong> above to generate and archive a Branch dispatch dossier.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto bg-white">
+            <table className="w-full text-left border-collapse text-xs border border-slate-900">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-700">
-                  <th className="py-2.5 px-3 border-r border-slate-200 text-center w-12 italic">S/N</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[200px] italic">DSP Management Hierarchy</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[100px] italic">Date</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[180px] italic">DSP Name</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[140px] italic">Authorized person</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[120px] italic">Organization</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 min-w-[130px] italic">Role</th>
-                  <th className="py-2.5 px-3 border-r border-slate-200 text-center min-w-[110px] italic">Status</th>
-                  <th className="py-2.5 px-3 text-center min-w-[110px] italic">View</th>
+                <tr className="bg-white text-xs font-bold italic text-slate-950 select-none">
+                  <th className="py-2 px-3 border border-slate-900 w-14">S/N</th>
+                  <th className="py-2 px-3 border border-slate-900 min-w-[100px]">Date</th>
+                  <th className="py-2 px-3 border border-slate-900 min-w-[180px]">DSP Name</th>
+                  <th className="py-2 px-3 border border-slate-900 min-w-[140px]">Authorized person</th>
+                  <th className="py-2 px-3 border border-slate-900 min-w-[130px]">Role</th>
+                  <th className="py-2 px-3 border border-slate-900 w-24">View</th>
+                  <th className="py-2 px-3 border border-slate-900 w-28">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="text-slate-900 bg-white">
                 {branchDispatchedDossiers.map((rec, idx) => (
-                  <tr key={rec.id} className="hover:bg-cyan-50/40 transition">
-                    <td className="py-2.5 px-3 border-r border-slate-100 text-center font-mono font-bold text-slate-500">
+                  <tr key={rec.id} className="hover:bg-amber-50/40 transition">
+                    <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
                       {idx + 1}
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100">
-                      <span className="inline-block px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-900 border border-cyan-200 text-[11px] font-bold leading-snug">
-                        4. Branches DSP Management • 4.1 Breakdown Received from EPSS HO
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 font-mono text-slate-700 whitespace-nowrap">
+                    <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800 whitespace-nowrap">
                       {rec.dateSubmitted || '-'}
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 font-black text-slate-900">
+                    <td className="py-2 px-3 border border-slate-900 font-bold text-slate-950">
                       {rec.dspName || rec.subject || rec.dspRefNumber}
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 text-slate-700 font-medium">
-                      {rec.signatory || '-'}
+                    <td className="py-2 px-3 border border-slate-900 text-slate-900 font-medium">
+                      {rec.authorizedPerson || rec.signatory || '-'}
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-800">
-                      {rec.senderOrg || 'MOH'}
+                    <td className="py-2 px-3 border border-slate-900 text-slate-800">
+                      {rec.role || rec.signatoryRole || '-'}
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 text-slate-600">
-                      {rec.signatoryRole || '-'}
+                    <td className="py-2 px-3 border border-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBranchDossier(rec)}
+                        className="px-2.5 py-1 rounded bg-slate-900 hover:bg-black text-white font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer transition"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
                     </td>
-                    <td className="py-2.5 px-3 border-r border-slate-100 text-center">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                        {rec.status === 'Submitted & Pending' ? 'Pending' : rec.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <div className="inline-flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBranchDossier(rec)}
-                          className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider inline-flex items-center gap-1 cursor-pointer shadow-2xs transition"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>VIEW</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDossier(rec.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition"
-                          title="Delete dossier"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    <td className="py-2 px-3 border border-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDossier(rec.id)}
+                        className="px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10px] uppercase inline-flex items-center gap-1 cursor-pointer transition"
+                        title="Delete dossier"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
                     </td>
                   </tr>
                 ))}

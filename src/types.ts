@@ -693,6 +693,7 @@ export interface DspWorkflowRecord {
   subject: string;
   status: 'Draft' | 'Submitted & Pending' | 'Under Review' | 'Endorsed & Approved' | 'Dispatched to Plants';
   dateSubmitted: string;
+  createdAt?: string;
   approvedDate?: string;
   actionTakenDate?: string;
   actionTakenBy?: string;
@@ -708,10 +709,15 @@ export interface DspWorkflowRecord {
   officialLetterRef: string;
   signatory: string;
   signatoryRole: string;
+  exactColumns?: string[];
+  exactRows?: Record<string, any>[];
   itemsIncluded: {
+    srNo?: number;
     material: string;
     description: string;
+    materialDescription?: string;
     quantity: number;
+    qty?: number;
     allocatedFacility?: string;
     plant: string;
     totalAmount?: number;
@@ -720,6 +726,7 @@ export interface DspWorkflowRecord {
     budgetSource?: string;
     requestDate?: string;
     dspRequestTo?: string;
+    rawRowData?: Record<string, any>;
   }[];
   notes?: string;
   excelFile?: { name: string; blob: Blob };
