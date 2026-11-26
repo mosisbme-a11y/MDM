@@ -14,7 +14,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord } from '../types';
+import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord, DistributionDataRecord, ReceivingDataRecord } from '../types';
 import { formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
 import { getHubByCode } from '../data/epssHubs';
@@ -24,6 +24,8 @@ interface BranchReceivedDspViewProps {
   records: DspWorkflowRecord[];
   setRecords?: React.Dispatch<React.SetStateAction<DspWorkflowRecord[]>>;
   multipleStockItems?: MultipleStockRecord[];
+  distributionRecords?: DistributionDataRecord[];
+  receivingRecords?: ReceivingDataRecord[];
   mode: '4.1' | '4.2';
   onSelectSubTab?: (tab: EpssSubTab) => void;
   onTriggerCloudSync?: (
@@ -60,6 +62,8 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
   records,
   setRecords,
   multipleStockItems = [],
+  distributionRecords = [],
+  receivingRecords = [],
   mode,
   onSelectSubTab,
   onTriggerCloudSync
@@ -223,36 +227,51 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
     });
   }, [allocations, selectedHubFilter, searchQuery]);
 
-  // 4.2 Comparison rows: group dispatched units by (hubCode, materialCode) vs MultipleStock SOH
+  // 4.2 Comparison rows: DSP data by Material Code, Material Description, Quantity, Delivery Amount, WBS Element, Package, Remaining Quantity, Status
   const comparisonRows = useMemo(() => {
     if (mode !== '4.2' || !activeDossier) return [];
 
-    // Pre-index SOH by plant+material and national material
-    const sohByPlantMat = new Map<string, number>();
-    const sohByMat = new Map<string, number>();
-
-    multipleStockItems.forEach(item => {
-      const mat = (item.material || '').trim().toUpperCase();
-      const plant = (item.plant || '').trim().toUpperCase();
-      const stock = Number(item.unrestrictedStock) || 0;
-      if (mat) {
-        sohByMat.set(mat, (sohByMat.get(mat) || 0) + stock);
-        if (plant) {
-          const key = `${plant}:::${mat}`;
-          sohByPlantMat.set(key, (sohByPlantMat.get(key) || 0) + stock);
-        }
+    // 1. Build WBS Element lookup across active dossier, upstream dossiers, distribution, receiving, and stock
+    const wbsByMaterial = new Map<string, string>();
+    const setWbsIfEmpty = (matRaw: string | undefined, wbsRaw: string | undefined) => {
+      const m = (matRaw || '').trim().toUpperCase();
+      const w = (wbsRaw || '').trim();
+      if (m && w && w !== '-' && !wbsByMaterial.has(m)) {
+        wbsByMaterial.set(m, w);
       }
+    };
+
+    // Priority 1: Active dossier itemsIncluded & exactRows
+    activeDossier.itemsIncluded?.forEach(it => setWbsIfEmpty(it.material, it.wbsElement));
+    activeDossier.exactRows?.forEach(r => setWbsIfEmpty(String(r['Material'] || r['Material Code'] || ''), String(r['WBS Element'] || '')));
+
+    // Priority 2: Upstream dossiers (same DSP Name first, then any dossier)
+    const cleanCanon = (canonicalDspName || '').trim().toLowerCase();
+    const sortedUpstream = [...records].sort((a, b) => {
+      const aMatch = cleanCanon && (a.dspName || '').trim().toLowerCase() === cleanCanon ? 1 : 0;
+      const bMatch = cleanCanon && (b.dspName || '').trim().toLowerCase() === cleanCanon ? 1 : 0;
+      return bMatch - aMatch;
+    });
+    sortedUpstream.forEach(rec => {
+      rec.itemsIncluded?.forEach(it => setWbsIfEmpty(it.material, it.wbsElement));
+      rec.exactRows?.forEach(r => setWbsIfEmpty(String(r['Material'] || r['Material Code'] || ''), String(r['WBS Element'] || '')));
     });
 
+    // Priority 3: Distribution, Receiving, MultipleStock
+    distributionRecords.forEach(d => setWbsIfEmpty(d.materialCode, d.wbsElementDescr));
+    receivingRecords.forEach(r => setWbsIfEmpty(r.material, r.wbsElement));
+    multipleStockItems.forEach(s => setWbsIfEmpty(s.material, s.wbsElement));
+
+    // 2. Group DSP allocations by material (across filtered allocations respecting hub & search filters)
     const grouped = new Map<
       string,
       {
-        hubCode: string;
-        hubName: string;
-        material: string;
-        description: string;
-        dspQty: number;
-        facilityCount: number;
+        materialCode: string;
+        materialDescription: string;
+        quantity: number;
+        packages: Set<string>;
+        hubCodes: Set<string>;
+        facilityNames: Set<string>;
       }
     >();
 
@@ -260,42 +279,118 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
       columns.forEach(col => {
         const qty = Number(a.quantities[col.id]) || 0;
         if (qty <= 0) return;
-        const key = `${a.hubCode}:::${col.code}`;
-        const existing = grouped.get(key);
+        const matKey = (col.code || col.name || col.id).trim().toUpperCase();
+        const existing = grouped.get(matKey);
         if (existing) {
-          existing.dspQty += qty;
-          existing.facilityCount += 1;
+          existing.quantity += qty;
+          if (a.packages && a.packages.trim()) existing.packages.add(a.packages.trim());
+          if (a.hubCode && a.hubCode.trim()) existing.hubCodes.add(a.hubCode.trim().toUpperCase());
+          if (a.healthFacility && a.healthFacility.trim()) existing.facilityNames.add(a.healthFacility.trim().toLowerCase());
         } else {
-          grouped.set(key, {
-            hubCode: a.hubCode,
-            hubName: a.hubName,
-            material: col.code,
-            description: col.name,
-            dspQty: qty,
-            facilityCount: 1
+          const pkgSet = new Set<string>();
+          if (a.packages && a.packages.trim()) pkgSet.add(a.packages.trim());
+          const hubSet = new Set<string>();
+          if (a.hubCode && a.hubCode.trim()) hubSet.add(a.hubCode.trim().toUpperCase());
+          const facSet = new Set<string>();
+          if (a.healthFacility && a.healthFacility.trim()) facSet.add(a.healthFacility.trim().toLowerCase());
+          grouped.set(matKey, {
+            materialCode: col.code || '-',
+            materialDescription: col.name || '-',
+            quantity: qty,
+            packages: pkgSet,
+            hubCodes: hubSet,
+            facilityNames: facSet
           });
         }
       });
     });
 
+    // Fallback: if no matrix columns/allocations exist, derive from activeDossier.itemsIncluded
+    if (grouped.size === 0 && activeDossier.itemsIncluded?.length) {
+      activeDossier.itemsIncluded.forEach((it, idx) => {
+        const matCode = (it.material || `ITEM-${idx + 1}`).trim();
+        const matKey = matCode.toUpperCase();
+        const qty = Number(it.quantity ?? it.qty) || 0;
+        if (qty <= 0 && !it.description) return;
+        const hubSet = new Set<string>();
+        if (it.plant) {
+          it.plant.split(',').map(p => p.trim().toUpperCase()).filter(Boolean).forEach(p => hubSet.add(p));
+        }
+        const existing = grouped.get(matKey);
+        if (existing) {
+          existing.quantity += qty;
+          hubSet.forEach(h => existing.hubCodes.add(h));
+        } else {
+          grouped.set(matKey, {
+            materialCode: matCode,
+            materialDescription: it.description || it.materialDescription || '-',
+            quantity: qty,
+            packages: new Set<string>(),
+            hubCodes: hubSet,
+            facilityNames: new Set<string>()
+          });
+        }
+      });
+    }
+
+    // 3. Match Delivery Amount from DistributionDataRecord[] for each DSP material
     return Array.from(grouped.values()).map((row, idx) => {
-      const matUpper = row.material.trim().toUpperCase();
-      const plantUpper = row.hubCode.trim().toUpperCase();
-      const branchSoh = sohByPlantMat.get(`${plantUpper}:::${matUpper}`) || 0;
-      const nationalSoh = sohByMat.get(matUpper) || 0;
-      const variance = branchSoh - row.dspQty;
-      const status: 'Sufficient' | 'Shortage' = variance >= 0 ? 'Sufficient' : 'Shortage';
+      const matUpper = row.materialCode.trim().toUpperCase();
+      const descLower = row.materialDescription.trim().toLowerCase();
+
+      const matchingDeliveries = distributionRecords.filter(d => {
+        const dMat = (d.materialCode || '').trim().toUpperCase();
+        const dDesc = (d.materialDescr || '').trim().toLowerCase();
+        const matMatch = (matUpper && dMat === matUpper) || (!dMat && descLower && dDesc === descLower);
+        if (!matMatch) return false;
+
+        if (selectedHubFilter !== 'all') {
+          return (d.plant || '').trim().toUpperCase() === selectedHubFilter.trim().toUpperCase();
+        }
+        if (row.hubCodes.size > 0) {
+          const dPlant = (d.plant || '').trim().toUpperCase();
+          const dCust = (d.customerName || '').trim().toLowerCase();
+          return row.hubCodes.has(dPlant) || (dCust !== '' && row.facilityNames.has(dCust));
+        }
+        return true;
+      });
+
+      const deliveryAmount = matchingDeliveries.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+      const remainingQuantity = Math.max(0, row.quantity - deliveryAmount);
+      const status: 'Delivered' | 'Partial' | 'Pending' =
+        row.quantity > 0 && deliveryAmount >= row.quantity
+          ? 'Delivered'
+          : deliveryAmount > 0
+            ? 'Partial'
+            : 'Pending';
+
+      const wbsElement = wbsByMaterial.get(matUpper) || '-';
+      const packageLabel = row.packages.size > 0 ? Array.from(row.packages).join(', ') : '-';
 
       return {
-        id: `cmp-${idx}-${row.hubCode}-${row.material}`,
-        ...row,
-        branchSoh,
-        nationalSoh,
-        variance,
+        id: `cmp-${idx}-${row.materialCode}`,
+        materialCode: row.materialCode,
+        materialDescription: row.materialDescription,
+        quantity: row.quantity,
+        deliveryAmount,
+        wbsElement,
+        packageLabel,
+        remainingQuantity,
         status
       };
     });
-  }, [mode, activeDossier, filteredAllocations, columns, multipleStockItems]);
+  }, [
+    mode,
+    activeDossier,
+    filteredAllocations,
+    columns,
+    records,
+    canonicalDspName,
+    distributionRecords,
+    receivingRecords,
+    multipleStockItems,
+    selectedHubFilter
+  ]);
 
   const handleExportExcel = () => {
     if (!activeDossier) return;
@@ -345,20 +440,19 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
 
     const exportData = comparisonRows.map((r, idx) => ({
       'S/N': idx + 1,
-      'Hub / Plant': `${r.hubName} (${r.hubCode})`,
-      'Material Code': r.material,
-      'Material Description': r.description,
-      'Facilities': r.facilityCount,
-      'Dispatched DSP Qty': r.dspQty,
-      'Branch SOH Available': r.branchSoh,
-      'National SOH Total': r.nationalSoh,
-      'Variance (Branch SOH - DSP)': r.variance,
+      'Material Code': r.materialCode,
+      'Material Description': r.materialDescription,
+      'Quantity': r.quantity,
+      'Delivery Amount': r.deliveryAmount,
+      'WBS Element': r.wbsElement,
+      'Package': r.packageLabel,
+      'Remaining Quantity': r.remainingQuantity,
       'Status': r.status
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Branch_DSP_vs_SOH');
-    XLSX.writeFile(wb, `Branch_4_2_DSP_vs_SOH_Analysis_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Analysis_Compare_With_DSP');
+    XLSX.writeFile(wb, `Branch_4_2_Analysis_Compare_With_DSP_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (branchRecords.length === 0) {
@@ -767,72 +861,95 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
           </div>
         </div>
       ) : (
-        /* Mode 4.2: Compare Dispatched DSP Quantities vs Branch Stock on Hand (SOH) */
+        /* Mode 4.2: Analysis & Compare with DSP */
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Hub-Material Pairs</div>
+                <div className="text-[11px] font-bold text-slate-500 uppercase">DSP Materials</div>
                 <div className="text-xl font-black text-slate-900 font-mono">{comparisonRows.length}</div>
               </div>
               <Layers className="w-5 h-5 text-indigo-600" />
             </div>
             <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Sufficient Stock Lines</div>
+                <div className="text-[11px] font-bold text-slate-500 uppercase">Total Quantity</div>
+                <div className="text-xl font-black text-slate-900 font-mono">
+                  {formatNumber(comparisonRows.reduce((s, r) => s + r.quantity, 0))}
+                </div>
+              </div>
+              <Building2 className="w-5 h-5 text-cyan-600" />
+            </div>
+            <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-bold text-slate-500 uppercase">Delivery Amount</div>
                 <div className="text-xl font-black text-emerald-600 font-mono">
-                  {comparisonRows.filter(r => r.status === 'Sufficient').length}
+                  {formatNumber(comparisonRows.reduce((s, r) => s + r.deliveryAmount, 0))}
                 </div>
               </div>
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
             <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Shortage Lines (Need Replenishment)</div>
-                <div className="text-xl font-black text-rose-600 font-mono">
-                  {comparisonRows.filter(r => r.status === 'Shortage').length}
+                <div className="text-[11px] font-bold text-slate-500 uppercase">Remaining Quantity</div>
+                <div className="text-xl font-black text-amber-600 font-mono">
+                  {formatNumber(comparisonRows.reduce((s, r) => s + r.remainingQuantity, 0))}
                 </div>
               </div>
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
+          <div className="bg-white border border-slate-900 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto bg-white">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-[#0B1527] text-white font-black uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-3 text-center w-10">S/N</th>
-                    <th className="py-3 px-3">Hub / Plant</th>
-                    <th className="py-3 px-3 font-mono">Material Code</th>
-                    <th className="py-3 px-3">Material Description</th>
-                    <th className="py-3 px-3 text-center">HFs</th>
-                    <th className="py-3 px-3 text-right">Dispatched DSP Qty</th>
-                    <th className="py-3 px-3 text-right">Branch SOH</th>
-                    <th className="py-3 px-3 text-right">National SOH</th>
-                    <th className="py-3 px-3 text-right">Variance</th>
-                    <th className="py-3 px-3 text-center">Status</th>
+                  <tr className="bg-white text-slate-950 font-bold italic text-xs select-none">
+                    <th className="py-2 px-3 border border-slate-900 w-14">S/N</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[120px]">Material Code</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[220px]">Material Description</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[100px]">Quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[125px]">Delivery Amount</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[140px]">WBS Element</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[110px]">Package</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[135px]">Remaining Quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 text-center min-w-[110px]">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="text-slate-900 bg-white">
                   {comparisonRows.map((row, idx) => (
-                    <tr key={row.id} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900">{row.hubName} ({row.hubCode})</td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-indigo-800">{row.material}</td>
-                      <td className="py-2.5 px-3 font-medium text-slate-800">{row.description}</td>
-                      <td className="py-2.5 px-3 text-center font-mono">{row.facilityCount}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-cyan-800">{formatNumber(row.dspQty)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">{formatNumber(row.branchSoh)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">{formatNumber(row.nationalSoh)}</td>
-                      <td className={`py-2.5 px-3 text-right font-mono font-black ${row.variance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {row.variance >= 0 ? `+${formatNumber(row.variance)}` : formatNumber(row.variance)}
+                    <tr key={row.id} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">
+                        {idx + 1}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          row.status === 'Sufficient'
+                      <td className="py-2 px-3 border border-slate-900 font-mono font-bold text-slate-900">
+                        {row.materialCode}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 font-medium text-slate-900">
+                        {row.materialDescription}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-slate-950">
+                        {formatNumber(row.quantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-emerald-700">
+                        {formatNumber(row.deliveryAmount)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800">
+                        {row.wbsElement}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-slate-900 font-medium">
+                        {row.packageLabel}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-amber-800">
+                        {formatNumber(row.remainingQuantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          row.status === 'Delivered'
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-rose-100 text-rose-800 border border-rose-200'
+                            : row.status === 'Partial'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-rose-100 text-rose-800 border border-rose-200'
                         }`}>
                           {row.status}
                         </span>
@@ -841,13 +958,33 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                   ))}
                   {comparisonRows.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-10 text-center text-slate-400">
+                      <td colSpan={9} className="py-10 text-center border border-slate-900 text-slate-400">
                         <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        No material allocations match the selected filters.
+                        No DSP material data matches the selected dossier or filters.
                       </td>
                     </tr>
                   )}
                 </tbody>
+                {comparisonRows.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-black text-xs">
+                      <td colSpan={3} className="py-2.5 px-3 border border-slate-900 text-right uppercase text-amber-400 font-mono">
+                        TOTAL ({comparisonRows.length} Materials):
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-white">
+                        {formatNumber(comparisonRows.reduce((s, r) => s + r.quantity, 0))}
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-emerald-400">
+                        {formatNumber(comparisonRows.reduce((s, r) => s + r.deliveryAmount, 0))}
+                      </td>
+                      <td colSpan={2} className="py-2.5 px-3 border border-slate-900"></td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-amber-300">
+                        {formatNumber(comparisonRows.reduce((s, r) => s + r.remainingQuantity, 0))}
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>

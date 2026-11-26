@@ -91,7 +91,9 @@ import {
     RegionBreakdownMatrixData,
     RegionBreakdownColumn,
     RegionBreakdownRow,
-    AuthUser
+    AuthUser,
+    DistributionDataRecord,
+    ReceivingDataRecord
 } from '../types';
 import { formatCurrency, formatNumber, downloadCSV } from '../utils/formatters';
 import { DSP_REQUEST_TEMPLATE_COLUMNS, TODAY_ISO_DATE } from '../data/defaultDspRequestTemplateData';
@@ -392,6 +394,8 @@ export interface DspWorkflowViewProps {
   onSelectItem?: (item: MedicalDeviceItem) => void;
   multipleStockItems?: MultipleStockRecord[];
   setMultipleStockItems?: React.Dispatch<React.SetStateAction<MultipleStockRecord[]>>;
+  distributionRecords?: DistributionDataRecord[];
+  receivingRecords?: ReceivingDataRecord[];
   onAddDocument?: (doc: DeviceDocument) => void;
   userId?: string;
   hfListItems?: HealthFacilityRecord[];
@@ -418,6 +422,8 @@ export const DspWorkflowView: React.FC<DspWorkflowViewProps> = ({
   onSelectItem,
   multipleStockItems = [],
   setMultipleStockItems,
+  distributionRecords = [],
+  receivingRecords = [],
   onAddDocument,
   userId,
   hfListItems = [],
@@ -2298,6 +2304,8 @@ _Official Dossier Resend Protocol_`;
           records={records}
           setRecords={setRecords}
           multipleStockItems={multipleStockItems}
+          distributionRecords={distributionRecords}
+          receivingRecords={receivingRecords}
           mode="4.1"
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
@@ -2307,6 +2315,8 @@ _Official Dossier Resend Protocol_`;
           records={records}
           setRecords={setRecords}
           multipleStockItems={multipleStockItems}
+          distributionRecords={distributionRecords}
+          receivingRecords={receivingRecords}
           mode="4.2"
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}

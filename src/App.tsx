@@ -3449,6 +3449,8 @@ export function App() {
                 onSelectItem={(item) => setSelectedDevice(item)}
                 multipleStockItems={multipleStockItems}
                 setMultipleStockItems={setMultipleStockItems}
+                distributionRecords={distributionDataRecords}
+                receivingRecords={receivingDataRecords}
                 onAddDocument={handleAddDocument}
                 userId={getActiveUserId()}
                 hfListItems={hfListItems}
