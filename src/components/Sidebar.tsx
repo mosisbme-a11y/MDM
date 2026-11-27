@@ -820,6 +820,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               steps: [
                                 { label: 'Received DSP', tab: 'dsp-branches-4-1' as EpssSubTab },
                                 { label: 'Analysis & Compare with DSP', tab: 'dsp-branches-4-2' as EpssSubTab },
+                                { label: 'DSP Distribution Status', tab: 'dsp-branches-4-3' as EpssSubTab },
                               ],
                             },
                           ].map((stageGroup) => {
@@ -889,83 +890,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       )}
                     </div>
 
-                    {/* Plant DSP Status Section with Collapsible Sub-Items */}
-                    <div className="space-y-1">
-                      <button
-                        onClick={() => {
-                          setActiveTab('inventory');
-                          setIsPlantDspOpen(prev => !prev);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                          isActive && (
-                            epssSubTab === 'plant-dsp' ||
-                            epssSubTab === 'plant-receiving-dsp' ||
-                            epssSubTab === 'plant-distribution-status' ||
-                            epssSubTab === 'plant-receiving-status'
-                          )
-                            ? 'bg-slate-900 text-white font-bold shadow-xs'
-                            : (navTheme.category === 'light' ? 'text-black hover:bg-slate-300' : `text-slate-400 hover:text-white ${navTheme.navInactiveHover}`)
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <Building2 className="w-3.5 h-3.5 shrink-0 text-indigo-600" />
-                          <span className="truncate">Plant DSP Status</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-indigo-500 ml-1">
-                          {isPlantDspOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                        </span>
-                      </button>
-
-                      {/* Visible only when expanded / clicked */}
-                      {isPlantDspOpen && (
-                        <div className="ml-3 pl-2.5 border-l-2 border-indigo-500/30 space-y-1 py-0.5">
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('plant-receiving-dsp');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && (epssSubTab === 'plant-receiving-dsp' || epssSubTab === 'plant-dsp')
-                                ? 'bg-indigo-600/30 text-indigo-300 font-bold border border-indigo-500/40 shadow-xs'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Inbox className="w-3 h-3 text-cyan-400 shrink-0" />
-                            <span className="truncate">Receiving DSP</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('plant-distribution-status');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'plant-distribution-status'
-                                ? 'bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/40 shadow-xs'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <Truck className="w-3 h-3 text-emerald-400 shrink-0" />
-                            <span className="truncate">Distribution Status</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('inventory');
-                              onSelectEpssSubTab?.('plant-receiving-status');
-                            }}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
-                              isActive && epssSubTab === 'plant-receiving-status'
-                                ? 'bg-teal-600/30 text-teal-300 font-bold border border-teal-500/40 shadow-xs'
-                                : (navTheme.category === 'light' ? 'text-slate-800 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-slate-800/40')
-                            }`}
-                          >
-                            <PackageCheck className="w-3 h-3 text-teal-400 shrink-0" />
-                            <span className="truncate">Receiving Status</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
 
                     {/* Distribution Status Section with Collapsible Sub-Items */}
                     <div className="space-y-1">

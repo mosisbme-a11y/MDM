@@ -252,6 +252,7 @@ export type EpssSubTab =
   | 'dsp-rhb-3-2'
   | 'dsp-branches-4-1'
   | 'dsp-branches-4-2'
+  | 'dsp-branches-4-3'
   | 'plant-dsp'
   | 'plant-receiving-dsp'
   | 'plant-distribution-status'

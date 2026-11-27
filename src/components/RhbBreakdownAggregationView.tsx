@@ -703,28 +703,10 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
             <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
               Sub-step 2.4 • Ministry of Health Aggregation
             </span>
-            <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-              Only Individual RHB → MOH Submissions
-            </span>
           </div>
-          <h2 className="text-lg font-black tracking-tight text-white">
-            Breakdown Aggregation by RHB — All-Region Summary
-          </h2>
-          <p className="text-xs text-slate-300 max-w-3xl">
-            Automatically aggregates only what individual Regional Health Bureaus (RHBs) submitted to MOH, preserving every metadata, facility, package, HUB, and two-tier equipment column without omission.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
-          >
-            <Upload className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Upload RHB Submission</span>
-          </button>
-
           <button
             type="button"
             onClick={handleExportExcel}
@@ -737,36 +719,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
 
           <button
             type="button"
-            onClick={handleSendToBranch}
-            disabled={facilityRows.length === 0}
-            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Send to Branch</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSendViaEmail}
-            disabled={facilityRows.length === 0}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Via Email</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSendViaWhatsApp}
-            disabled={facilityRows.length === 0}
-            className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            <span>WhatsApp</span>
-          </button>
-
-          <button
-            type="button"
             onClick={handleProceed}
             disabled={facilityRows.length === 0}
             className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md border-b-4 border-amber-700 active:border-b-0 active:translate-y-[2px] transition"
@@ -775,45 +727,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
             <span>Proceed to DSP Aggr. Submitted to EPSS (2.5)</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-        </div>
-      </div>
-
-      {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">RHB Dossiers</div>
-          <div className="text-xl font-black font-mono text-indigo-700 mt-1 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-indigo-500" />
-            <span>{submissions.length}</span>
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Verified RHB submissions</div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Health Facilities</div>
-          <div className="text-xl font-black font-mono text-purple-700 mt-1 flex items-center gap-2">
-            <Hospital className="w-4 h-4 text-purple-500" />
-            <span>{formatNumber(facilityRows.length)}</span>
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Across all submitted RHBs</div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Equipment Columns</div>
-          <div className="text-xl font-black font-mono text-slate-800 mt-1 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-600" />
-            <span>{unifiedColumns.length}</span>
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">100% of RHB columns kept</div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Units</div>
-          <div className="text-xl font-black font-mono text-emerald-700 mt-1 flex items-center gap-2">
-            <Package className="w-4 h-4 text-emerald-600" />
-            <span>{formatNumber(grandTotalUnits)}</span>
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Latest date: {latestDate}</div>
         </div>
       </div>
 
@@ -1392,24 +1305,6 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
 
       {/* Sent to Branch Dossier Archive (Standard 8-Column Format) */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-cyan-700" />
-            </div>
-            <div>
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                Sent to Branch Dossier Archive ({branchDispatchedDossiers.length})
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Official dossiers dispatched to EPSS Regional Branches (Sub-step 4.1)
-              </p>
-            </div>
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200 self-start sm:self-auto">
-            4. Branches DSP Management • 4.1
-          </span>
-        </div>
 
         {branchDispatchedDossiers.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
@@ -1603,18 +1498,7 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
 
       {/* Next Step Guidance Bar */}
       {submissions.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="space-y-0.5">
-            <div className="text-[11px] font-black uppercase tracking-wider text-amber-900">
-              Next Workflow Step → 2.5 DSP Aggr. Submitted to EPSS
-            </div>
-            <p className="text-xs text-amber-800">
-              Ready to forward <strong>{regionSummaries.length} region(s)</strong>,{' '}
-              <strong>{facilityRows.length} health facilities</strong>, and all{' '}
-              <strong>{unifiedColumns.length} equipment columns</strong> ({formatNumber(grandTotalUnits)} total units) to{' '}
-              <strong>2.5 DSP Aggr. Submitted to EPSS</strong> for final MOH → EPSS submission.
-            </p>
-          </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-end gap-3 shadow-2xs">
           <button
             type="button"
             onClick={handleProceed}

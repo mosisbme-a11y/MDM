@@ -72,6 +72,7 @@ export const DSP_HIERARCHY_TIERS: Record<
     subSteps: {
       '4.1': 'Received DSP',
       '4.2': 'Analysis & Compare with DSP',
+      '4.3': 'DSP Distribution Status',
     },
   },
 };
@@ -103,6 +104,7 @@ export const canonicalizeSubStage = (s?: string, stage?: string): string => {
   // EPSS Branch (Stage 4)
   if (clean === '4.1' || clean.includes('4.1') || clean.includes('received dsp')) return '4.1';
   if (clean === '4.2' || clean.includes('4.2') || clean.includes('analysis & compare with dsp')) return '4.2';
+  if (clean === '4.3' || clean.includes('4.3') || clean.includes('dsp distribution status')) return '4.3';
 
   // Legacy & canonical stage fallbacks
   if (stage === 'head-office-dsp' || stage === 'moh-to-epss' || stage === 'dsp-mgmt') return '1.1';

@@ -11,12 +11,14 @@ import {
   Building2,
   BarChart3,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  Truck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DspWorkflowRecord, EpssSubTab, MultipleStockRecord, DistributionDataRecord, ReceivingDataRecord } from '../types';
 import { formatNumber } from '../utils/formatters';
 import { canonicalizeSubStage, isDossierInTier } from '../data/defaultDspWorkflows';
+import { isMovementType641 } from '../data/defaultReceivingData';
 import { getHubByCode } from '../data/epssHubs';
 import { resolveCanonicalEpssDspName } from '../utils/dspDisplayUtils';
 
@@ -26,7 +28,7 @@ interface BranchReceivedDspViewProps {
   multipleStockItems?: MultipleStockRecord[];
   distributionRecords?: DistributionDataRecord[];
   receivingRecords?: ReceivingDataRecord[];
-  mode: '4.1' | '4.2';
+  mode: '4.1' | '4.2' | '4.3';
   onSelectSubTab?: (tab: EpssSubTab) => void;
   onTriggerCloudSync?: (
     successMsg: string,
@@ -72,7 +74,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
     return records
       .filter(r => {
         const sub = canonicalizeSubStage(r.subStage, r.stage);
-        return isDossierInTier(r, 'branches-dsp-management') && (sub === '4.1' || sub === '4.2');
+        return isDossierInTier(r, 'branches-dsp-management') && (sub === '4.1' || sub === '4.2' || sub === '4.3');
       })
       .sort((a, b) => new Date(b.dateSubmitted).getTime() - new Date(a.dateSubmitted).getTime());
   }, [records]);
@@ -80,6 +82,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
   const [selectedDossierId, setSelectedDossierId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHubFilter, setSelectedHubFilter] = useState('all');
+  const [distributionStatusFilter, setDistributionStatusFilter] = useState<'all' | 'Delivered' | 'Partial' | 'Pending'>('all');
 
   useEffect(() => {
     if (branchRecords.length > 0 && !branchRecords.some(r => r.id === selectedDossierId)) {
@@ -392,6 +395,239 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
     selectedHubFilter
   ]);
 
+  // 4.3 DSP Distribution Status rows: grouped by Hub & Material with DSP Allocated Quantity, Receiving Quantity, DSP Quantity, Remain quantity, WBS Element, Package, Status
+  const distributionStatusRows = useMemo(() => {
+    if (mode !== '4.3' || !activeDossier) return [];
+
+    const normText = (v?: string) => (v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+    // 1. WBS Element lookup (prioritize Hub + Material match, then active dossier, upstream dossiers, and SAP tables)
+    const wbsByHubAndMaterial = new Map<string, string>();
+    const wbsByMaterial = new Map<string, string>();
+    const setWbsIfEmpty = (
+      matRaw: string | undefined,
+      wbsRaw: string | undefined,
+      hubRaw?: string | undefined
+    ) => {
+      const m = (matRaw || '').trim().toUpperCase();
+      const w = (wbsRaw || '').trim();
+      const h = (hubRaw || '').trim().toUpperCase();
+      if (!m || !w || w === '-') return;
+      if (h) {
+        const hk = `${h}::${m}`;
+        if (!wbsByHubAndMaterial.has(hk)) wbsByHubAndMaterial.set(hk, w);
+      }
+      if (!wbsByMaterial.has(m)) wbsByMaterial.set(m, w);
+    };
+
+    activeDossier.itemsIncluded?.forEach(it => setWbsIfEmpty(it.material, it.wbsElement, it.plant));
+    activeDossier.exactRows?.forEach(r =>
+      setWbsIfEmpty(
+        String(r['Material'] || r['Material Code'] || ''),
+        String(r['WBS Element'] || ''),
+        String(r['Hub'] || r['Plant'] || '')
+      )
+    );
+
+    const cleanCanon = (canonicalDspName || '').trim().toLowerCase();
+    const sortedUpstream = [...records].sort((a, b) => {
+      const aMatch = cleanCanon && (a.dspName || '').trim().toLowerCase() === cleanCanon ? 1 : 0;
+      const bMatch = cleanCanon && (b.dspName || '').trim().toLowerCase() === cleanCanon ? 1 : 0;
+      return bMatch - aMatch;
+    });
+    sortedUpstream.forEach(rec => {
+      rec.itemsIncluded?.forEach(it => setWbsIfEmpty(it.material, it.wbsElement, it.plant));
+      rec.exactRows?.forEach(r =>
+        setWbsIfEmpty(
+          String(r['Material'] || r['Material Code'] || ''),
+          String(r['WBS Element'] || ''),
+          String(r['Hub'] || r['Plant'] || '')
+        )
+      );
+    });
+
+    receivingRecords.forEach(r => setWbsIfEmpty(r.material, r.wbsElement, r.plant));
+    distributionRecords.forEach(d => setWbsIfEmpty(d.materialCode, d.wbsElementDescr, d.plant));
+    multipleStockItems.forEach(s => setWbsIfEmpty(s.material, s.wbsElement, s.plant));
+
+    // 2. Group DSP allocations by (Hub, Material) respecting selectedHubFilter
+    const hubAllocations = allocations.filter(
+      a => selectedHubFilter === 'all' || a.hubCode === selectedHubFilter
+    );
+
+    const grouped = new Map<
+      string,
+      {
+        hub: string;
+        materialCode: string;
+        materialDescription: string;
+        dspAllocatedQuantity: number;
+        packages: Set<string>;
+      }
+    >();
+
+    hubAllocations.forEach(a => {
+      const hubCode = (a.hubCode || 'AA01').trim().toUpperCase();
+      columns.forEach(col => {
+        const qty = Number(a.quantities[col.id]) || 0;
+        if (qty <= 0) return;
+
+        const matCode = (col.code || col.name || col.id).trim();
+        const matKey = matCode.toUpperCase();
+        const groupKey = `${hubCode}::${matKey}`;
+
+        const existing = grouped.get(groupKey);
+        if (existing) {
+          existing.dspAllocatedQuantity += qty;
+          if (a.packages && a.packages.trim()) existing.packages.add(a.packages.trim());
+        } else {
+          const pkgSet = new Set<string>();
+          if (a.packages && a.packages.trim()) pkgSet.add(a.packages.trim());
+          grouped.set(groupKey, {
+            hub: hubCode,
+            materialCode: col.code || '-',
+            materialDescription: col.name || '-',
+            dspAllocatedQuantity: qty,
+            packages: pkgSet
+          });
+        }
+      });
+    });
+
+    // Fallback when dossier has itemsIncluded without matrix allocations
+    if (grouped.size === 0 && activeDossier.itemsIncluded?.length) {
+      activeDossier.itemsIncluded.forEach((it, idx) => {
+        const matCode = (it.material || `ITEM-${idx + 1}`).trim();
+        const matKey = matCode.toUpperCase();
+        const qty = Number(it.quantity ?? it.qty) || 0;
+        if (qty <= 0 && !it.description) return;
+
+        const plants = it.plant
+          ? it.plant.split(',').map(p => p.trim().toUpperCase()).filter(Boolean)
+          : ['AA01'];
+        plants.forEach(hubCode => {
+          if (selectedHubFilter !== 'all' && hubCode !== selectedHubFilter.toUpperCase()) return;
+          const groupKey = `${hubCode}::${matKey}`;
+          const existing = grouped.get(groupKey);
+          if (existing) {
+            existing.dspAllocatedQuantity += qty;
+          } else {
+            grouped.set(groupKey, {
+              hub: hubCode,
+              materialCode: matCode,
+              materialDescription: it.description || it.materialDescription || '-',
+              dspAllocatedQuantity: qty,
+              packages: new Set<string>()
+            });
+          }
+        });
+      });
+    }
+
+    // 3. Match Receiving Quantity & Distributed (DSP) Quantity per (Hub, Material) using positive quantities only
+    const rows = Array.from(grouped.values())
+      .sort((a, b) => {
+        const hubCmp = a.hub.localeCompare(b.hub);
+        if (hubCmp !== 0) return hubCmp;
+        return a.materialCode.localeCompare(b.materialCode);
+      })
+      .map((entry, idx) => {
+        const hubUpper = entry.hub.trim().toUpperCase();
+        const matUpper = entry.materialCode.trim().toUpperCase();
+        const descNorm = normText(entry.materialDescription);
+
+        // Receiving Quantity from ReceivingDataRecord[] (exclude 641 transfers & negative reversals)
+        const receivingQuantity = receivingRecords.reduce((sum, rec) => {
+          if (isMovementType641(rec.movementType)) return sum;
+          const q = Number(rec.quantity) || 0;
+          if (q <= 0) return sum;
+
+          const rPlant = (rec.plant || '').trim().toUpperCase();
+          if (rPlant !== hubUpper) return sum;
+
+          const rMat = (rec.material || '').trim().toUpperCase();
+          const rDesc = normText(rec.materialDescription);
+          const matMatch =
+            (matUpper && matUpper !== '-' && rMat === matUpper) ||
+            ((!rMat || matUpper === '-') && descNorm && rDesc === descNorm);
+          return matMatch ? sum + q : sum;
+        }, 0);
+
+        // DSP Quantity (Distributed / Delivered quantity at that Hub from DistributionDataRecord[], positive quantities only)
+        const dspQuantity = distributionRecords.reduce((sum, dist) => {
+          const q = Number(dist.quantity) || 0;
+          if (q <= 0) return sum;
+
+          const dPlant = (dist.plant || '').trim().toUpperCase();
+          if (dPlant !== hubUpper) return sum;
+
+          const dMat = (dist.materialCode || '').trim().toUpperCase();
+          const dDesc = normText(dist.materialDescr);
+          const matMatch =
+            (matUpper && matUpper !== '-' && dMat === matUpper) ||
+            ((!dMat || matUpper === '-') && descNorm && dDesc === descNorm);
+          return matMatch ? sum + q : sum;
+        }, 0);
+
+        const remainQuantity = Math.max(0, entry.dspAllocatedQuantity - dspQuantity);
+        const status: 'Delivered' | 'Partial' | 'Pending' =
+          entry.dspAllocatedQuantity > 0 && dspQuantity >= entry.dspAllocatedQuantity
+            ? 'Delivered'
+            : dspQuantity > 0
+              ? 'Partial'
+              : 'Pending';
+
+        const wbsElement =
+          wbsByHubAndMaterial.get(`${hubUpper}::${matUpper}`) ||
+          wbsByMaterial.get(matUpper) ||
+          '-';
+        const packageLabel =
+          entry.packages.size > 0 ? Array.from(entry.packages).join(', ') : '-';
+
+        return {
+          id: `dist-stat-${idx}-${hubUpper}-${matUpper}`,
+          hub: hubUpper,
+          materialCode: entry.materialCode,
+          materialDescription: entry.materialDescription,
+          dspAllocatedQuantity: entry.dspAllocatedQuantity,
+          receivingQuantity,
+          dspQuantity,
+          remainQuantity,
+          wbsElement,
+          packageLabel,
+          status
+        };
+      });
+
+    const q = searchQuery.toLowerCase().trim();
+    return rows.filter(r => {
+      const matchSearch =
+        !q ||
+        r.hub.toLowerCase().includes(q) ||
+        r.materialCode.toLowerCase().includes(q) ||
+        r.materialDescription.toLowerCase().includes(q) ||
+        r.wbsElement.toLowerCase().includes(q) ||
+        r.packageLabel.toLowerCase().includes(q) ||
+        r.status.toLowerCase().includes(q);
+      const matchStatus =
+        distributionStatusFilter === 'all' || r.status === distributionStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [
+    mode,
+    activeDossier,
+    allocations,
+    columns,
+    records,
+    canonicalDspName,
+    receivingRecords,
+    distributionRecords,
+    multipleStockItems,
+    selectedHubFilter,
+    searchQuery,
+    distributionStatusFilter
+  ]);
+
   const handleExportExcel = () => {
     if (!activeDossier) return;
     if (mode === '4.1') {
@@ -438,6 +674,27 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
       return;
     }
 
+    if (mode === '4.3') {
+      const exportData = distributionStatusRows.map((r, idx) => ({
+        'S/N': idx + 1,
+        'Hub': r.hub,
+        'Material Code': r.materialCode,
+        'Material Description': r.materialDescription,
+        'DSP Allocated Quantity': r.dspAllocatedQuantity,
+        'Receiving Quantity': r.receivingQuantity,
+        'DSP Quantity': r.dspQuantity,
+        'Remain quantity': r.remainQuantity,
+        'WBS Element': r.wbsElement,
+        'Package': r.packageLabel,
+        'Status': r.status
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'DSP_Distribution_Status');
+      XLSX.writeFile(wb, `Branch_4_3_DSP_Distribution_Status_${new Date().toISOString().split('T')[0]}.xlsx`);
+      return;
+    }
+
     const exportData = comparisonRows.map((r, idx) => ({
       'S/N': idx + 1,
       'Material Code': r.materialCode,
@@ -460,7 +717,11 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
       <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center space-y-3">
         <Warehouse className="w-10 h-10 text-slate-300 mx-auto" />
         <h3 className="text-sm font-black text-slate-800 uppercase">
-          {mode === '4.1' ? '4.1 Received DSP — No Dispatched Dossiers Yet' : '4.2 Analysis & Compare with DSP — No Dispatched Dossiers Yet'}
+          {mode === '4.1'
+            ? '4.1 Received DSP — No Dispatched Dossiers Yet'
+            : mode === '4.2'
+              ? '4.2 Analysis & Compare with DSP — No Dispatched Dossiers Yet'
+              : '4.3 DSP Distribution Status — No Dispatched Dossiers Yet'}
         </h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">
           Dispatch a mapped Health Facility Allocation Matrix from EPSS Head Office (Sub-step 1.3.2 Send DSP to Hub) so regional branches receive the exact dispatched DSP.
@@ -483,7 +744,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-sm">
-            {mode === '4.1' ? <Warehouse className="w-5 h-5" /> : <BarChart3 className="w-5 h-5" />}
+            {mode === '4.1' ? <Warehouse className="w-5 h-5" /> : mode === '4.2' ? <BarChart3 className="w-5 h-5" /> : <Truck className="w-5 h-5" />}
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -491,7 +752,11 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                 4. Branches DSP Management • {mode}
               </span>
               <h3 className="text-sm md:text-base font-black text-slate-900 uppercase">
-                {mode === '4.1' ? '4.1 Branch Received DSP (From EPSS Head Office)' : '4.2 Branch SOH Analysis & Compare with DSP'}
+                {mode === '4.1'
+                  ? '4.1 Branch Received DSP (From EPSS Head Office)'
+                  : mode === '4.2'
+                    ? '4.2 Branch SOH Analysis & Compare with DSP'
+                    : '4.3 Branch DSP Distribution Status'}
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
@@ -532,13 +797,22 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
               <span>Proceed to 4.2 Analysis &amp; Compare</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
+          ) : mode === '4.2' ? (
+            <button
+              type="button"
+              onClick={() => onSelectSubTab?.('dsp-branches-4-3')}
+              className="px-4 py-2 rounded-xl bg-[#0B1527] hover:bg-slate-800 text-amber-300 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Proceed to 4.3 DSP Distribution Status</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           ) : (
             <button
               type="button"
-              onClick={() => onSelectSubTab?.('dsp-branches-4-1')}
+              onClick={() => onSelectSubTab?.('dsp-branches-4-2')}
               className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-black cursor-pointer"
             >
-              Back to 4.1 Received DSP
+              Back to 4.2 Analysis &amp; Compare
             </button>
           )}
         </div>
@@ -778,10 +1052,25 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900"
             />
           </div>
+
+          {mode === '4.3' && (
+            <select
+              value={distributionStatusFilter}
+              onChange={(e) => setDistributionStatusFilter(e.target.value as 'all' | 'Delivered' | 'Partial' | 'Pending')}
+              className="bg-white border border-slate-200 text-xs font-medium text-slate-700 rounded-lg px-2.5 py-1.5 cursor-pointer"
+            >
+              <option value="all">All Distribution Status</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Partial">Partial</option>
+              <option value="Pending">Pending</option>
+            </select>
+          )}
         </div>
 
         <div className="text-xs font-mono text-slate-600">
-          {filteredAllocations.length} Facilities • {formatNumber(filteredAllocations.reduce((s, a) => s + a.totalQty, 0))} Units
+          {mode === '4.3'
+            ? `${distributionStatusRows.length} Hub Material Lines • ${formatNumber(distributionStatusRows.reduce((s, r) => s + r.dspAllocatedQuantity, 0))} Allocated Units`
+            : `${filteredAllocations.length} Facilities • ${formatNumber(filteredAllocations.reduce((s, a) => s + a.totalQty, 0))} Units`}
         </div>
       </div>
 
@@ -860,7 +1149,7 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
             </table>
           </div>
         </div>
-      ) : (
+      ) : mode === '4.2' ? (
         /* Mode 4.2: Analysis & Compare with DSP */
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -982,6 +1271,136 @@ export const BranchReceivedDspView: React.FC<BranchReceivedDspViewProps> = ({
                         {formatNumber(comparisonRows.reduce((s, r) => s + r.remainingQuantity, 0))}
                       </td>
                       <td className="py-2.5 px-3 border border-slate-900"></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Mode 4.3: DSP Distribution Status (Hub-by-Material Table) */
+        <div className="space-y-4">
+          {(() => {
+            const totalAllocated = distributionStatusRows.reduce((s, r) => s + r.dspAllocatedQuantity, 0);
+            const totalReceiving = distributionStatusRows.reduce((s, r) => s + r.receivingQuantity, 0);
+            const totalDistributed = distributionStatusRows.reduce((s, r) => s + r.dspQuantity, 0);
+            const totalRemain = distributionStatusRows.reduce((s, r) => s + r.remainQuantity, 0);
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase">DSP Allocated Qty</div>
+                    <div className="text-xl font-black text-slate-900 font-mono">{formatNumber(totalAllocated)}</div>
+                  </div>
+                  <Layers className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase">Receiving Quantity</div>
+                    <div className="text-xl font-black text-cyan-700 font-mono">{formatNumber(totalReceiving)}</div>
+                  </div>
+                  <Building2 className="w-5 h-5 text-cyan-600" />
+                </div>
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase">DSP Quantity</div>
+                    <div className="text-xl font-black text-emerald-600 font-mono">{formatNumber(totalDistributed)}</div>
+                  </div>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase">Remain Quantity</div>
+                    <div className="text-xl font-black text-amber-600 font-mono">{formatNumber(totalRemain)}</div>
+                  </div>
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="bg-white border border-slate-900 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto bg-white">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-white text-slate-950 font-bold italic text-xs select-none">
+                    <th className="py-2 px-3 border border-slate-900 w-12">S/N</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[85px]">Hub</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[120px]">Material Code</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[210px]">Material Description</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[145px]">DSP Allocated Quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[130px]">Receiving Quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[115px]">DSP Quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 text-right min-w-[125px]">Remain quantity</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[135px]">WBS Element</th>
+                    <th className="py-2 px-3 border border-slate-900 min-w-[100px]">Package</th>
+                    <th className="py-2 px-3 border border-slate-900 text-center min-w-[105px]">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="text-slate-900 bg-white">
+                  {distributionStatusRows.map((row, idx) => (
+                    <tr key={row.id} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="py-2 px-3 border border-slate-900 font-semibold text-slate-900">{idx + 1}</td>
+                      <td className="py-2 px-3 border border-slate-900 font-mono font-bold text-slate-950">{row.hub}</td>
+                      <td className="py-2 px-3 border border-slate-900 font-mono font-bold text-slate-900">{row.materialCode}</td>
+                      <td className="py-2 px-3 border border-slate-900 font-medium text-slate-900">{row.materialDescription}</td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-slate-950">
+                        {formatNumber(row.dspAllocatedQuantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-cyan-700">
+                        {formatNumber(row.receivingQuantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-emerald-700">
+                        {formatNumber(row.dspQuantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 text-right font-mono font-bold text-amber-800">
+                        {formatNumber(row.remainQuantity)}
+                      </td>
+                      <td className="py-2 px-3 border border-slate-900 font-mono text-slate-800">{row.wbsElement}</td>
+                      <td className="py-2 px-3 border border-slate-900 text-slate-900 font-medium">{row.packageLabel}</td>
+                      <td className="py-2 px-3 border border-slate-900 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          row.status === 'Delivered'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : row.status === 'Partial'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-rose-100 text-rose-800 border border-rose-200'
+                        }`}>
+                          {row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {distributionStatusRows.length === 0 && (
+                    <tr>
+                      <td colSpan={11} className="py-10 text-center border border-slate-900 text-slate-400">
+                        <Truck className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        No Hub DSP distribution status rows match the selected filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {distributionStatusRows.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-black text-xs">
+                      <td colSpan={4} className="py-2.5 px-3 border border-slate-900 text-right uppercase text-amber-400 font-mono">
+                        TOTAL ({distributionStatusRows.length} Lines):
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-white">
+                        {formatNumber(distributionStatusRows.reduce((s, r) => s + r.dspAllocatedQuantity, 0))}
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-cyan-300">
+                        {formatNumber(distributionStatusRows.reduce((s, r) => s + r.receivingQuantity, 0))}
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-emerald-400">
+                        {formatNumber(distributionStatusRows.reduce((s, r) => s + r.dspQuantity, 0))}
+                      </td>
+                      <td className="py-2.5 px-3 border border-slate-900 text-right font-mono text-amber-300">
+                        {formatNumber(distributionStatusRows.reduce((s, r) => s + r.remainQuantity, 0))}
+                      </td>
+                      <td colSpan={3} className="py-2.5 px-3 border border-slate-900"></td>
                     </tr>
                   </tfoot>
                 )}

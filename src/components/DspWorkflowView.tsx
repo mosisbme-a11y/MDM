@@ -384,6 +384,16 @@ export const SUBMITTING_CRITERIA_MAP: Record<string, { title: string; sender: st
       'Discrepancy & Variance Audit Report',
       'Waybill Generation & Final Gate Pass Approval'
     ]
+  },
+  '4.3': {
+    title: 'DSP Distribution Status',
+    sender: 'EPSS Branch Hub Operations',
+    recipient: 'Health Facilities & EPSS Head Office',
+    criteria: [
+      'Facility-Level Dispatch & Delivery Tracking',
+      'POD Confirmation & Distributed Quantity Verification',
+      'Hub & Package Distribution Completion Rate'
+    ]
   }
 };
 
@@ -787,6 +797,8 @@ _Official Dossier Resend Protocol_`;
         return { currentStage: 'branches-dsp-management', currentSubStep: '4.1' };
       case 'dsp-branches-4-2':
         return { currentStage: 'branches-dsp-management', currentSubStep: '4.2' };
+      case 'dsp-branches-4-3':
+        return { currentStage: 'branches-dsp-management', currentSubStep: '4.3' };
 
       default:
         return { currentStage: 'all', currentSubStep: 'all' };
@@ -1176,6 +1188,7 @@ _Official Dossier Resend Protocol_`;
       subSteps: [
         { id: '4.1', label: 'Received DSP', subTab: 'dsp-branches-4-1' as EpssSubTab },
         { id: '4.2', label: 'Analysis & compare with DSP', subTab: 'dsp-branches-4-2' as EpssSubTab },
+        { id: '4.3', label: 'DSP Distribution Status', subTab: 'dsp-branches-4-3' as EpssSubTab },
       ]
     },
   ];
@@ -2318,6 +2331,17 @@ _Official Dossier Resend Protocol_`;
           distributionRecords={distributionRecords}
           receivingRecords={receivingRecords}
           mode="4.2"
+          onSelectSubTab={onSelectSubTab}
+          onTriggerCloudSync={onTriggerCloudSync}
+        />
+      ) : (currentSubStep === '4.3' || currentSubTab === 'dsp-branches-4-3') ? (
+        <BranchReceivedDspView
+          records={records}
+          setRecords={setRecords}
+          multipleStockItems={multipleStockItems}
+          distributionRecords={distributionRecords}
+          receivingRecords={receivingRecords}
+          mode="4.3"
           onSelectSubTab={onSelectSubTab}
           onTriggerCloudSync={onTriggerCloudSync}
         />
