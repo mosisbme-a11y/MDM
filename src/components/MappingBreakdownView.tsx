@@ -448,11 +448,24 @@ export const MappingBreakdownView: React.FC<MappingBreakdownViewProps> = ({
           ? mapping.hubCode
           : 'AA01';
 
+        const stripId = (v?: string) =>
+          (v || '').replace(/\s*\[ID:\s*[^\]]*\]/gi, '').replace(/\s*\(ID:\s*[^)]*\)/gi, '').replace(/\s+#\d+\b/g, '').trim();
+        const isIdOnly = (s: string) => !s || /^\d+$/.test(s) || /^HF-\d+$/i.test(s);
+        const rawHf = stripId(row.healthFacility);
+        const rawDesc = stripId(row.customerDescription);
+        const masterDesc = stripId(mapping.masterFacilityName);
+        const facilityNameOnly = !isIdOnly(rawHf)
+          ? rawHf
+          : !isIdOnly(rawDesc)
+          ? rawDesc
+          : !isIdOnly(masterDesc)
+          ? masterDesc
+          : rawHf || rawDesc || 'Health Facility';
+
         return {
           ...row,
-          // CRITICAL: KEEP 100% EXACT UPLOADED NAMES - NEVER ALTER OR OVERWRITE HF NAME, WOREDA, OR ZONE!
-          healthFacility: row.healthFacility || row.customerDescription || 'Health Facility',
-          customerDescription: row.customerDescription || row.healthFacility || 'Health Facility',
+          healthFacility: facilityNameOnly,
+          customerDescription: facilityNameOnly,
           zone: row.zone || '', // KEEP EXACT UPLOADED ZONE ONLY
           woreda: row.woreda || '', // KEEP EXACT UPLOADED WOREDA ONLY
           region: row.region || '', // KEEP EXACT UPLOADED REGION

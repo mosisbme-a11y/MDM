@@ -78,6 +78,30 @@ export interface RegionBreakdownMatrixData {
   rows: RegionBreakdownRow[];
 }
 
+const stripFacilityIdSuffix = (val?: string): string => {
+  if (!val) return '';
+  return val
+    .replace(/\s*\[ID:\s*[^\]]*\]/gi, '')
+    .replace(/\s*\(ID:\s*[^)]*\)/gi, '')
+    .replace(/\s+#\d+\b/g, '')
+    .trim();
+};
+
+const resolveFacilityNameOnly = (
+  primary?: string,
+  secondary?: string,
+  fallbackName?: string
+): string => {
+  const c1 = stripFacilityIdSuffix(primary);
+  const c2 = stripFacilityIdSuffix(secondary);
+  const c3 = stripFacilityIdSuffix(fallbackName);
+  const isIdOnly = (s: string) => !s || /^\d+$/.test(s) || /^HF-\d+$/i.test(s);
+  if (!isIdOnly(c1)) return c1;
+  if (!isIdOnly(c2)) return c2;
+  if (!isIdOnly(c3)) return c3;
+  return c1 || c2 || c3 || 'Health Facility';
+};
+
 export const ALL_ETHIOPIAN_REGIONS = [
   'Addis Ababa',
   'Afar',
@@ -325,8 +349,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       const hubSymbol = (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD'))
         ? mapping.hubCode
         : (row.hub && row.hub !== 'HO01' ? row.hub : 'AA01');
+      const cleanFacilityName = resolveFacilityNameOnly(
+        row.healthFacility,
+        row.customerDescription,
+        mapping.masterFacilityName
+      );
       return {
         ...row,
+        healthFacility: cleanFacilityName,
+        customerDescription: cleanFacilityName,
         hub: hubSymbol
       };
     });
@@ -864,14 +895,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         rowQuantities[col.id] = 1;
       });
 
+      const facilityNameOnly = resolveFacilityNameOnly(hf.customerDescription, undefined, `Health Facility ${idx + 1}`);
       return {
         id: `row-auto-${targetRegion.toLowerCase().replace(/\s+/g, '-')}-${idx}-${Date.now()}`,
         region: hf.region || targetRegion,
         zone: hf.zoneDescription || hf.zoneCode || 'Zone 1',
         woreda: hf.woredaDescription || hf.woreda || '1',
         hub: hf.deliveringPlant || 'General Regional Hub',
-        healthFacility: hf.customer || `HF-${idx + 1}`,
-        customerDescription: hf.customerDescription || hf.customer || 'Health Facility',
+        healthFacility: facilityNameOnly,
+        customerDescription: facilityNameOnly,
         packages: idx % 2 === 0 ? 'MCH' : 'OR',
         quantities: rowQuantities
       };
@@ -973,14 +1005,15 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       });
 
       const regionLabel = hf.region || selectedAutoRegions[0] || 'Oromia';
+      const facilityNameOnly = resolveFacilityNameOnly(hf.customerDescription, undefined, `Health Facility ${idx + 1}`);
       return {
         id: `row-auto-multi-${regionLabel.toLowerCase().replace(/\s+/g, '-')}-${idx}-${stamp}`,
         region: regionLabel,
         zone: hf.zoneDescription || hf.zoneCode || 'Zone 1',
         woreda: hf.woredaDescription || hf.woreda || '1',
         hub: hf.deliveringPlant || 'General Regional Hub',
-        healthFacility: hf.customer || `HF-${idx + 1}`,
-        customerDescription: hf.customerDescription || hf.customer || 'Health Facility',
+        healthFacility: facilityNameOnly,
+        customerDescription: facilityNameOnly,
         packages: existingMatch?.packages || (idx % 2 === 0 ? 'MCH' : 'OR'),
         quantities: rowQuantities
       };
@@ -1024,8 +1057,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             if (firstHf.region) {
               updatedRow.region = firstHf.region;
             }
-            updatedRow.customerDescription = firstHf.customerDescription || firstHf.customer || 'Health Facility';
-            updatedRow.healthFacility = firstHf.customer || firstHf.customerDescription || 'HF-001';
+            const facilityNameOnly = resolveFacilityNameOnly(firstHf.customerDescription, undefined, 'Health Facility');
+            updatedRow.customerDescription = facilityNameOnly;
+            updatedRow.healthFacility = facilityNameOnly;
             updatedRow.zone = firstHf.zoneDescription || firstHf.zoneCode || '';
             updatedRow.woreda = firstHf.woredaDescription || firstHf.woreda || '';
             updatedRow.hub = (firstHf.deliveringPlant && firstHf.deliveringPlant !== 'HO01') ? firstHf.deliveringPlant : 'AA01';
@@ -1039,7 +1073,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         }
 
         // 2. When Customer Description is selected:
-        // Automatically populate Zone, Woreda, and Name of health facility (Customer ID) strictly from matching HF in selected region
+        // Automatically populate Zone, Woreda, and Name of health facility strictly from matching HF in selected region
         if (field === 'customerDescription' && masterHfItems.length > 0) {
           const regionFacilities = masterHfItems.filter(h => isRegionMatch(h.region, r.region));
           const matchedHf = regionFacilities.find(
@@ -1051,10 +1085,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           );
 
           if (matchedHf) {
-            updatedRow.customerDescription = matchedHf.customerDescription || matchedHf.customer;
-            if (matchedHf.customer) {
-              updatedRow.healthFacility = matchedHf.customer;
-            }
+            const facilityNameOnly = resolveFacilityNameOnly(matchedHf.customerDescription, value);
+            updatedRow.customerDescription = facilityNameOnly;
+            updatedRow.healthFacility = facilityNameOnly;
             if (matchedHf.region) {
               updatedRow.region = matchedHf.region;
             }
@@ -1062,10 +1095,14 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             updatedRow.woreda = matchedHf.woredaDescription || matchedHf.woreda || r.woreda;
             const dp = matchedHf.deliveringPlant;
             updatedRow.hub = (dp && dp !== 'HO01') ? dp : (r.hub && r.hub !== 'HO01' ? r.hub : 'AA01');
+          } else {
+            const cleanValue = stripFacilityIdSuffix(value);
+            updatedRow.customerDescription = cleanValue;
+            updatedRow.healthFacility = cleanValue;
           }
         }
 
-        // 3. When Name of health facility (Customer ID) is selected:
+        // 3. When Name of health facility is selected:
         if (field === 'healthFacility' && masterHfItems.length > 0) {
           const regionFacilities = masterHfItems.filter(h => isRegionMatch(h.region, r.region));
           const matchedHf = regionFacilities.find(
@@ -1077,10 +1114,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           );
 
           if (matchedHf) {
-            updatedRow.customerDescription = matchedHf.customerDescription || matchedHf.customer;
-            if (matchedHf.customer) {
-              updatedRow.healthFacility = matchedHf.customer;
-            }
+            const facilityNameOnly = resolveFacilityNameOnly(matchedHf.customerDescription, value);
+            updatedRow.customerDescription = facilityNameOnly;
+            updatedRow.healthFacility = facilityNameOnly;
             if (matchedHf.region) {
               updatedRow.region = matchedHf.region;
             }
@@ -1088,6 +1124,9 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
             updatedRow.woreda = matchedHf.woredaDescription || matchedHf.woreda || r.woreda;
             const dp = matchedHf.deliveringPlant;
             updatedRow.hub = (dp && dp !== 'HO01') ? dp : (r.hub && r.hub !== 'HO01' ? r.hub : 'AA01');
+          } else {
+            const cleanValue = stripFacilityIdSuffix(value);
+            updatedRow.healthFacility = cleanValue;
           }
         }
 
@@ -1112,7 +1151,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       zone: firstFacility?.zoneDescription || firstFacility?.zoneCode || uniqueZones[0] || 'Zone 1',
       woreda: firstFacility?.woredaDescription || firstFacility?.woreda || '1',
       hub: firstFacility?.deliveringPlant || 'General Regional Hub',
-      healthFacility: firstFacility?.customerDescription || 'New Health Center',
+      healthFacility: resolveFacilityNameOnly(firstFacility?.customerDescription, undefined, 'New Health Center'),
       packages: 'MCH',
       quantities: {}
     };
@@ -1225,7 +1264,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           r.region,
           r.zone,
           r.woreda,
-          r.healthFacility || r.customerDescription,
+          resolveFacilityNameOnly(r.healthFacility, r.customerDescription),
           r.packages || 'MCH',
           ...(activeHubMapped ? [r.hub || 'AA01'] : []),
           ...columns.map(c => {
@@ -1264,7 +1303,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
           r.region,
           r.zone,
           r.woreda,
-          r.customerDescription || r.healthFacility,
+          resolveFacilityNameOnly(r.customerDescription, r.healthFacility),
           r.packages || 'MCH',
           ...columns.map(c => {
             const val = r.quantities[c.id];
@@ -1343,7 +1382,7 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
       esc(r.region),
       esc(r.zone),
       esc(r.woreda),
-      esc(r.customerDescription || r.healthFacility),
+      esc(resolveFacilityNameOnly(r.healthFacility, r.customerDescription)),
       esc(r.packages || 'MCH'),
       ...(effectiveShowHubColumn && isHubMapped ? [esc(r.hub || 'AA01')] : []),
       ...columns.map(c => Number(r.quantities[c.id]) || 0)
@@ -1409,8 +1448,8 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
         '403-XRRD-0101', '403-XRRD-0101', '403-XRRB-0101N', '403-XRRD-0101-001', '401-WICU-0101N', '401-WICU-0101N'
       ],
       ['Addis Ababa', 'Addis Ketema', 'Woreda 01', 'Tikur Anbessa Specialized Hospital', 'MCH', 'AA01', 2, 2, 2, 2, 2, 2],
-      ['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College #40002328', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
-      ['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital #40002962', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
+      ['Oromia', 'East Shewa', 'Adama Town Woreda 01', 'Adama Hospital Medical College', 'MCH', 'AD01', 2, 2, 2, 2, 2, 2],
+      ['Dire Dawa', 'Dire Dawa Administration', 'Woreda 01', 'Dire Dawa Dil Chora Hospital', 'MCH', 'DD01', 2, 2, 2, 2, 2, 2]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -1543,7 +1582,6 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                     type="button"
                     onClick={() => {
                       const mappedRows = rows.map(row => {
-                        if (row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD')) return row;
                         const mapping = mapFacilityToHub(
                           row.healthFacility || row.customerDescription || '',
                           row.region || '',
@@ -1551,9 +1589,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                           row.woreda || '',
                           hfListItems
                         );
+                        const cleanFacilityName = resolveFacilityNameOnly(
+                          row.healthFacility,
+                          row.customerDescription,
+                          mapping.masterFacilityName
+                        );
+                        const hasValidHub = row.hub && row.hub !== 'HO01' && !row.hub.includes('HEAD');
                         return {
                           ...row,
-                          hub: (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01'
+                          healthFacility: cleanFacilityName,
+                          customerDescription: cleanFacilityName,
+                          hub: hasValidHub
+                            ? row.hub
+                            : (mapping.hubCode && mapping.hubCode !== 'HO01' && !mapping.hubCode.includes('HEAD')) ? mapping.hubCode : 'AA01'
                         };
                       });
                       setRows(mappedRows);
@@ -2474,9 +2522,12 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                          (h.customer && h.customer === row.healthFacility)
                   );
 
-                  // Prioritize exact uploaded health facility name - never overwrite with master data
-                  const activeCustDesc = row.healthFacility || row.customerDescription || 'Health Facility';
-                  const custIdBadge = row.customerId || null;
+                  // Prioritize exact uploaded health facility name - never display customer IDs
+                  const activeCustDesc = resolveFacilityNameOnly(
+                    row.healthFacility,
+                    row.customerDescription,
+                    matchedHf?.customerDescription || 'Health Facility'
+                  );
                   const isRecentlyLoaded = recentlyLoadedToken && Date.now() - recentlyLoadedToken < 30000;
 
                   return (
@@ -2594,19 +2645,19 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                               value={activeCustDesc}
                               onChange={(e) => handleRowFieldChange(row.id, 'customerDescription', e.target.value)}
                               className="w-full p-1.5 border border-amber-300 rounded-lg text-xs font-bold bg-white focus:border-amber-500 text-slate-900 cursor-pointer shadow-2xs transition"
-                              title={`Select Customer Description strictly for ${row.region} from HF Master List`}
+                              title={`Select Health Facility Name strictly for ${row.region} from HF Master List`}
                             >
-                              {activeCustDesc && !facilitiesInRegion.some(h => (h.customerDescription || h.customer) === activeCustDesc) && (
+                              {activeCustDesc && !facilitiesInRegion.some(h => resolveFacilityNameOnly(h.customerDescription, h.customer) === activeCustDesc) && (
                                 <option value={activeCustDesc}>{activeCustDesc}</option>
                               )}
                               
                               {facilitiesInRegion.length > 0 ? (
                                 <optgroup label={`Facilities strictly in ${row.region} (${facilitiesInRegion.length} in HF Master List)`}>
                                   {facilitiesInRegion.map((hf, hfIdx) => {
-                                    const desc = hf.customerDescription || hf.customer;
+                                    const desc = resolveFacilityNameOnly(hf.customerDescription, hf.customer);
                                     return (
                                       <option key={hf.id || hfIdx} value={desc}>
-                                        {desc} {hf.customer ? `[ID: ${hf.customer}]` : ''}
+                                        {desc}
                                       </option>
                                     );
                                   })}
@@ -2617,22 +2668,12 @@ export const RegionBreakdownMatrixTable: React.FC<RegionBreakdownMatrixTableProp
                                 </option>
                               )}
                             </select>
-
-                            <div className="text-[10px] text-amber-800/80 font-medium px-0.5 flex items-center justify-between">
-                              <span className="font-bold text-amber-900">{row.region} Master Link:</span>
-                              {matchedHf ? <span className="font-mono text-emerald-700 font-bold">✓ Verified ({matchedHf.customer})</span> : <span className="text-amber-700 italic">Custom Entry</span>}
-                            </div>
                           </div>
                         ) : (
                           <div className="space-y-0.5">
                             <div className="font-bold text-slate-900 flex items-center justify-between group">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-slate-900">{activeCustDesc}</span>
-                                {custIdBadge && (
-                                  <span className="font-mono text-[#8094ae] text-[11px] font-semibold select-all">
-                                    #{custIdBadge}
-                                  </span>
-                                )}
                               </div>
                               <button
                                 type="button"

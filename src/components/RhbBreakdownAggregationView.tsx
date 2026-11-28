@@ -1170,10 +1170,7 @@ export const RhbBreakdownAggregationView: React.FC<RhbBreakdownAggregationViewPr
                     <td className="p-2 border-r border-slate-200 text-slate-700">{row.zone}</td>
                     <td className="p-2 border-r border-slate-200 text-center font-mono text-slate-700">{row.woreda}</td>
                     <td className="p-2 border-r border-slate-200 font-semibold text-slate-900">
-                      <div>{row.healthFacility}</div>
-                      {row.customerId && (
-                        <div className="text-[10px] font-mono text-slate-400">ID: {row.customerId}</div>
-                      )}
+                      <div>{(row.healthFacility || '').replace(/\s*\[ID:\s*[^\]]*\]/gi, '').replace(/\s+#\d+\b/g, '').trim()}</div>
                     </td>
                     <td className="p-2 border-r border-slate-200 text-center bg-[#eff6ff] font-bold text-blue-900">
                       {row.packages}

@@ -1010,6 +1010,19 @@ _Official Dossier Resend Protocol_`;
   }, [activeStage131Record]);
 
   const commitStage131MappedData = (updated: RegionBreakdownMatrixData) => {
+    const cleanNameOnly = (primary?: string, secondary?: string, fallback?: string) => {
+      const strip = (v?: string) =>
+        (v || '').replace(/\s*\[ID:\s*[^\]]*\]/gi, '').replace(/\s*\(ID:\s*[^)]*\)/gi, '').replace(/\s+#\d+\b/g, '').trim();
+      const isIdOnly = (s: string) => !s || /^\d+$/.test(s) || /^HF-\d+$/i.test(s);
+      const a = strip(primary);
+      const b = strip(secondary);
+      const c = strip(fallback);
+      if (!isIdOnly(a)) return a;
+      if (!isIdOnly(b)) return b;
+      if (!isIdOnly(c)) return c;
+      return a || b || c || 'Health Facility';
+    };
+
     const newAllocations = updated.rows.map((r, idx) => {
       const match = mapFacilityToHub(
         r.healthFacility || r.customerDescription || '',
@@ -1027,10 +1040,11 @@ _Official Dossier Resend Protocol_`;
       const hubInfo = getHubByCode(hubCode);
       const quantities = r.quantities || {};
       const totalQty = Object.values(quantities).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0) as number;
+      const facilityName = cleanNameOnly(r.healthFacility, r.customerDescription, match.masterFacilityName);
 
       return {
         id: r.id || `alloc-s5-${idx}`,
-        healthFacility: r.healthFacility || r.customerDescription || 'Health Facility',
+        healthFacility: facilityName,
         region: r.region || match.region || 'Unspecified',
         zone: r.zone || match.zone || '-',
         woreda: r.woreda || match.woreda || '-',
@@ -1050,6 +1064,8 @@ _Official Dossier Resend Protocol_`;
       ...updated,
       rows: updated.rows.map((r, idx) => ({
         ...r,
+        healthFacility: newAllocations[idx]?.healthFacility || cleanNameOnly(r.healthFacility, r.customerDescription),
+        customerDescription: newAllocations[idx]?.healthFacility || cleanNameOnly(r.customerDescription, r.healthFacility),
         hub: newAllocations[idx]?.hubCode || r.hub || 'AA01'
       }))
     };
