@@ -269,6 +269,7 @@ app.get('/api/active-app-data', asyncRoute(async (_req: AuthedRequest, res: Resp
       programMdRecords: masterData.programMdRecords || [],
       agreementProcurementRecords: masterData.agreementProcurementRecords || [],
       supplyPlanRecords: masterData.supplyPlanRecords || [],
+      contractManagementRecords: masterData.contractManagementRecords || [],
       noBkdItems: masterData.noBkdItems || [],
       categoryThresholds: masterData.categoryThresholds || {},
       uploadedFiles: fileRegistry || [],

@@ -114,7 +114,8 @@ import {
   SupplyPlanRecord,
   MasterDataLog,
   DspWorkflowRecord,
-  AgreementProcurementRecord
+  AgreementProcurementRecord,
+  ContractManagementRecord
 } from './types';
 import { DEFAULT_RECEIVING_DATA_RECORDS } from './data/defaultReceivingData';
 import { DEFAULT_DISTRIBUTION_DATA_RECORDS } from './data/defaultDistributionData';
@@ -408,6 +409,7 @@ export function App() {
       if (centralData.programMdRecords !== undefined) setProgramMdRecords(centralData.programMdRecords);
       if (centralData.agreementProcurementRecords !== undefined) setAgreementProcurementRecords(centralData.agreementProcurementRecords);
       if (centralData.supplyPlanRecords !== undefined) setSupplyPlanRecords(centralData.supplyPlanRecords);
+      if (centralData.contractManagementRecords !== undefined) setContractManagementRecords(centralData.contractManagementRecords);
 
       if (centralData.counts) {
         setCentralSyncStatus({
@@ -554,6 +556,24 @@ export function App() {
             const map = new Map(prev.map(i => [i.id, i]));
             let changed = false;
             remoteData.supplyPlanRecords!.forEach(r => {
+              if (!map.has(r.id) || JSON.stringify(map.get(r.id)) !== JSON.stringify(r)) {
+                map.set(r.id, r);
+                changed = true;
+              }
+            });
+            return changed ? Array.from(map.values()) : prev;
+          });
+        }
+      }
+
+      if (remoteData.contractManagementRecords !== undefined) {
+        if (remoteData.contractManagementRecords.length === 0 && /clear/i.test(remoteData.updateKind || '')) {
+          setContractManagementRecords([]);
+        } else if (remoteData.contractManagementRecords.length > 0) {
+          setContractManagementRecords(prev => {
+            const map = new Map(prev.map(i => [i.id, i]));
+            let changed = false;
+            remoteData.contractManagementRecords!.forEach(r => {
               if (!map.has(r.id) || JSON.stringify(map.get(r.id)) !== JSON.stringify(r)) {
                 map.set(r.id, r);
                 changed = true;
@@ -1111,6 +1131,91 @@ export function App() {
     triggerCloudSyncToast(`Deleted Supply Plan item.`, {
       type: 'DELETE',
       title: `Delete Supply Plan Item`
+    });
+  };
+
+  // Contract Management Dataset (14-column schema + 12 tracking statuses)
+  const [contractManagementRecords, setContractManagementRecords] = useState<ContractManagementRecord[]>([]);
+
+  const handleUploadContractManagementData = (newRecords: ContractManagementRecord[], mode: 'append' | 'replace' = 'replace', fileName?: string) => {
+    const updated = mode === 'replace' ? newRecords : [...contractManagementRecords, ...newRecords];
+    setContractManagementRecords(updated);
+    pushCentralMasterData({
+      contractManagementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Upload Contract Management (${newRecords.length} Records)`
+    });
+    recordMasterDataLog({
+      type: 'Contract Management',
+      fileName: fileName || 'Contract Management',
+      rowCount: newRecords.length,
+      uploadedAt: new Date().toISOString(),
+      status: 'Success'
+    });
+    triggerCloudSyncToast(
+      `✓ Saved ${newRecords.length} Contract Management record(s) (Total: ${updated.length}).`,
+      {
+        type: 'CREATE',
+        title: `Upload ${newRecords.length} Contract Management Records`,
+        payload: newRecords
+      }
+    );
+  };
+
+  const handleClearContractManagementData = () => {
+    setContractManagementRecords([]);
+    pushCentralMasterData({
+      contractManagementRecords: [],
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: 'Clear Contract Management Records'
+    });
+    triggerCloudSyncToast('Cleared all Contract Management records.', {
+      type: 'DELETE',
+      title: 'Clear Contract Management Records'
+    });
+  };
+
+  const handleAddContractManagementRecord = (record: ContractManagementRecord) => {
+    const updated = [record, ...contractManagementRecords];
+    setContractManagementRecords(updated);
+    pushCentralMasterData({
+      contractManagementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Add Contract Item: ${record.materialCode || record.materialDescription}`
+    });
+    triggerCloudSyncToast(`Added Contract Management row ${record.materialCode || record.materialDescription}.`, {
+      type: 'CREATE',
+      title: `Add Contract Item`,
+      payload: record
+    });
+  };
+
+  const handleUpdateContractManagementRecord = (record: ContractManagementRecord) => {
+    const updated = contractManagementRecords.map(r => r.id === record.id ? record : r);
+    setContractManagementRecords(updated);
+    pushCentralMasterData({
+      contractManagementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Update Contract Item: ${record.materialCode || record.materialDescription}`
+    });
+    triggerCloudSyncToast(`Updated Contract Management row ${record.materialCode || record.materialDescription}.`, {
+      type: 'UPDATE',
+      title: `Update Contract Item`,
+      payload: record
+    });
+  };
+
+  const handleDeleteContractManagementRecord = (id: string) => {
+    const updated = contractManagementRecords.filter(r => r.id !== id);
+    setContractManagementRecords(updated);
+    pushCentralMasterData({
+      contractManagementRecords: updated,
+      updatedBy: currentUser?.name || currentUser?.email || 'Inventory Administrator',
+      updateKind: `Delete Contract Item: ${id}`
+    });
+    triggerCloudSyncToast(`Deleted Contract Management row.`, {
+      type: 'DELETE',
+      title: `Delete Contract Item`
     });
   };
 
@@ -3311,6 +3416,13 @@ export function App() {
               onSelectSubTab={(tab) => setEpssSubTab(tab)}
               items={epssFilteredItems}
               onSelectItem={(item) => setSelectedDevice(item)}
+              records={contractManagementRecords}
+              onUploadRecords={handleUploadContractManagementData}
+              onClearRecords={handleClearContractManagementData}
+              onAddRecord={handleAddContractManagementRecord}
+              onUpdateRecord={handleUpdateContractManagementRecord}
+              onDeleteRecord={handleDeleteContractManagementRecord}
+              isAdmin={isAdmin}
             />
           </motion.div>
         )}
@@ -3497,6 +3609,13 @@ export function App() {
                 onSelectSubTab={(tab) => setEpssSubTab(tab)}
                 items={epssFilteredItems}
                 onSelectItem={(item) => setSelectedDevice(item)}
+                records={contractManagementRecords}
+                onUploadRecords={handleUploadContractManagementData}
+                onClearRecords={handleClearContractManagementData}
+                onAddRecord={handleAddContractManagementRecord}
+                onUpdateRecord={handleUpdateContractManagementRecord}
+                onDeleteRecord={handleDeleteContractManagementRecord}
+                isAdmin={isAdmin}
               />
             ) : epssSubTab === 'outbound-analysis' ? (
               <InventoryAnalysisView

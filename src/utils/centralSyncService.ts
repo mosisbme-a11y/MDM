@@ -13,7 +13,8 @@ import {
   DspWorkflowRecord,
   MedicalDeviceAgreement,
   UploadedAgreementBatch,
-  AgreementProcurementRecord
+  AgreementProcurementRecord,
+  ContractManagementRecord
 } from '../types';
 import { supabase } from '../lib/supabase';
 import { cacheGet, cacheGetAllWithPrefix, cacheSetMany, cacheDeleteWithPrefix, cacheClearAll } from './syncCacheDb';
@@ -33,6 +34,7 @@ export interface CentralMasterDataCounts {
   agreements?: number;
   uploadedAgreementBatches?: number;
   agreementProcurement?: number;
+  contractManagement?: number;
 }
 
 export interface CentralMasterData {
@@ -55,6 +57,7 @@ export interface CentralMasterData {
   agreements?: MedicalDeviceAgreement[];
   uploadedAgreementBatches?: UploadedAgreementBatch[];
   agreementProcurementRecords?: AgreementProcurementRecord[];
+  contractManagementRecords?: ContractManagementRecord[];
   categoryThresholds?: Record<string, CategoryThreshold>;
   dspReceivedMohRows?: any[];
   dspReceivedEpssRows?: any[];
@@ -126,6 +129,7 @@ const ARRAY_FIELDS = [
   'agreements',
   'uploadedAgreementBatches',
   'agreementProcurementRecords',
+  'contractManagementRecords',
   'dspReceivedMohRows',
   'dspReceivedEpssRows',
   'dsp22Columns',

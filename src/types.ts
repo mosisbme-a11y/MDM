@@ -775,4 +775,36 @@ export interface SupplyPlanRecord {
   sourceFile?: string;
 }
 
+export type ContractTrackingStatus =
+  | 'Under Production'
+  | 'Shipped'
+  | 'Arrived Djibouti'
+  | 'Original Document Received'
+  | 'Under Taking Letter and Marin Time'
+  | 'Mojo Dry Port'
+  | 'Custom Assessment'
+  | 'Paid Tax'
+  | 'EFDA Apply'
+  | 'Send Declaration to EPSS'
+  | 'Inbound Create'
+  | 'Deliver To WOS';
 
+export interface ContractManagementRecord {
+  id: string;
+  sn?: string | number;
+  materialCode: string;
+  materialDescription: string;
+  unit: string;
+  quantity: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  po: string;
+  supplier: string;
+  contractSigning: string;
+  pg: string;
+  paymentStatus: string;
+  lcOpening: string;
+  status: ContractTrackingStatus | string;
+  uploadedAt?: string;
+  sourceFile?: string;
+}
